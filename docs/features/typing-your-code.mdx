@@ -51,18 +51,43 @@ end
 | `table<string, Player>` | A map; the value type is what gets used |
 | `fun(a: number)` | A function |
 
-`---@type` overrides whatever the initialiser looked like, which is the escape
-hatch when inference gets it wrong:
+<Tip>
+  A `@param` with no type is treated as documentation, not a type. Writing
+  `--- @param ply the player who did it` will not create a type called `the`.
+</Tip>
+
+## Casting with `---@type`
+
+Inference can only work with what a value looks like at the point it's
+created. Sometimes that's nothing at all:
 
 ```lua
 ---@type Player
 local target = nil
 ```
 
-<Tip>
-  A `@param` with no type is treated as documentation, not a type. Writing
-  `--- @param ply the player who did it` will not create a type called `the`.
-</Tip>
+Without the annotation, `target` would infer as `nil` for its whole scope —
+there's nothing in `= nil` to pull a class from. `---@type` overrides that:
+whatever type you write becomes the type of `target` from here on, regardless
+of what the initialiser looked like.
+
+The same escape hatch narrows a value that came out too broad, like something
+pulled out of an untyped table:
+
+```lua
+local raw = someTable[key]
+
+---@type Weapon
+local weapon = raw
+```
+
+<Warning>
+  `---@type` only takes effect on a `local` declaration, and only for the
+  first name when a statement declares several (`local a, b = ...`). It does
+  nothing on a plain assignment (`x = value`) or a table field
+  (`self.target = value`) — give those a type where they're first declared
+  with `local` instead.
+</Warning>
 
 ## Or annotate nothing
 

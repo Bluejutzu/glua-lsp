@@ -13,7 +13,7 @@ GLua Language Server uses the same annotation dialect as the Lua Language Server
 | --- | --- | --- |
 | `---@param` | `---@param name type` or `---@param name? type` | Documents a function parameter. Add `?` after the name to mark it optional. |
 | `---@return` | `---@return type` | Documents the return type of a function. |
-| `---@type` | `---@type type` | Overrides the inferred type of the following expression or variable. |
+| `---@type` | `---@type type` | Overrides the inferred type of a `local` declaration. |
 | `---@class` | `---@class ClassName` | Declares a new class or table shape. |
 | `---@field` | `---@field name type` | Declares a field on a class declared with `---@class`. |
 | `---@deprecated` | `---@deprecated` | Marks a function or field as deprecated. The server will surface a diagnostic at call sites. |
@@ -59,3 +59,7 @@ local function oldVehicleConfig() end
 <Note>
   When you write an explicit `---@param` or `---@type`, it always wins over automatic inference. Use this to correct the server when your code shape is too dynamic for it to follow.
 </Note>
+
+<Warning>
+  `---@type` only takes effect on a `local` declaration, and only for the first name when a statement declares several (`local a, b = ...`). It has no effect on a plain assignment (`x = value`) or a table field (`self.x = value`). See [Casting with `---@type`](/features/typing-your-code#casting-with-type) for examples.
+</Warning>

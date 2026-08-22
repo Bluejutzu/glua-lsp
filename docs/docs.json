@@ -14,7 +14,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Guides",
         "groups": [
           {
             "group": "Get Started",
@@ -24,11 +24,15 @@
             "group": "Features",
             "pages": [
               "features/intellisense",
+              "features/typing-your-code",
               "features/realms",
               "features/net-messages",
-              "features/hooks",
-              "features/formatter"
+              "features/hooks"
             ]
+          },
+          {
+            "group": "Formatting",
+            "pages": ["features/formatter"]
           },
           {
             "group": "Configuration",
@@ -37,7 +41,12 @@
               "configuration/config-files",
               "configuration/suppressions"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
           {
             "group": "Reference",
             "pages": [
