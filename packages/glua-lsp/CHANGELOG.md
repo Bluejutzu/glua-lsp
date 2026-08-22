@@ -4,7 +4,20 @@ Notable changes to the GLua Language Server extension. Release notes on each
 [GitHub release](https://github.com/Bluejutzu/glua-lsp/releases) list every
 commit; this file covers what actually changed for you.
 
-## Unreleased
+## 0.2.1
+
+### Fixed
+
+- CI ran the tests before the build, so the CLI's tests failed on a clean
+  checkout. Both workflows now build first.
+- The light-mode code block theme was set to a dark Catppuccin variant.
+
+### Changed
+
+- Release notes list each change as `subject by @author in #PR`, and open with
+  an install command for every supported editor.
+
+## 0.2.0
 
 ### Added
 
