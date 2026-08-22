@@ -33,6 +33,17 @@ export interface Settings {
   hover: {
     wikiLinks: boolean;
   };
+  format: {
+    enable: boolean;
+    maxLineWidth: number;
+    quoteStyle: 'double' | 'single' | 'preserve';
+    operatorStyle: 'preserve' | 'lua';
+    commentStyle: 'preserve' | 'lua';
+    spaceInsideParens: boolean;
+    keepSingleLineBlocks: boolean;
+    maxBlankLines: number;
+    semicolons: 'remove' | 'preserve';
+  };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -65,6 +76,17 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   hover: {
     wikiLinks: true,
+  },
+  format: {
+    enable: true,
+    maxLineWidth: 120,
+    quoteStyle: 'preserve',
+    operatorStyle: 'preserve',
+    commentStyle: 'preserve',
+    spaceInsideParens: false,
+    keepSingleLineBlocks: true,
+    maxBlankLines: 2,
+    semicolons: 'remove',
   },
 };
 

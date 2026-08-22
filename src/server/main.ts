@@ -28,6 +28,7 @@ import { diagnose } from './features/diagnostics.js';
 import { LEGEND, semanticTokens } from './features/semanticTokens.js';
 import { inlayHints } from './features/inlayHints.js';
 import { codeActions } from './features/codeActions.js';
+import { formatting, rangeFormatting } from './features/formatting.js';
 import { buildNetGraph } from './features/netGraph.js';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -67,6 +68,8 @@ connection.onInitialize((params): InitializeResult => {
       workspaceSymbolProvider: true,
       codeActionProvider: true,
       inlayHintProvider: true,
+      documentFormattingProvider: true,
+      documentRangeFormattingProvider: true,
       semanticTokensProvider: {
         legend: LEGEND,
         full: true,
@@ -294,6 +297,20 @@ connection.onCodeAction(
     const analysis = analysisFor(params.textDocument.uri);
     if (!analysis) return [];
     return codeActions(analysis, params.range, params.context.diagnostics, { api, workspace });
+  }),
+);
+
+connection.onDocumentFormatting(
+  guarded('formatting', [], (params) => {
+    const analysis = analysisFor(params.textDocument.uri);
+    return analysis ? formatting(analysis, params.options, settings) : [];
+  }),
+);
+
+connection.onDocumentRangeFormatting(
+  guarded('rangeFormatting', [], (params) => {
+    const analysis = analysisFor(params.textDocument.uri);
+    return analysis ? rangeFormatting(analysis, params.range, params.options, settings) : [];
   }),
 );
 

@@ -277,6 +277,72 @@
           "default": true,
           "description": "Include a link to the Garry's Mod wiki in hover documentation."
         },
+        "glua.format.enable": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable the GLua formatter. Select it per language with `editor.defaultFormatter`."
+        },
+        "glua.format.maxLineWidth": {
+          "type": "number",
+          "default": 120,
+          "description": "Column to wrap tables and argument lists at."
+        },
+        "glua.format.quoteStyle": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "double",
+            "single"
+          ],
+          "default": "preserve",
+          "description": "Preferred string quotes. Strings are only rewritten when it needs no extra escaping."
+        },
+        "glua.format.operatorStyle": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "lua"
+          ],
+          "default": "preserve",
+          "markdownEnumDescriptions": [
+            "Leave `!=`, `&&`, `||` and `!` as written.",
+            "Rewrite them to `~=`, `and`, `or` and `not`."
+          ],
+          "markdownDescription": "What to do with GLua's C-style operator aliases."
+        },
+        "glua.format.commentStyle": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "lua"
+          ],
+          "default": "preserve",
+          "markdownDescription": "Whether to rewrite `//` and `/* */` comments as `--` and `--[[ ]]`."
+        },
+        "glua.format.spaceInsideParens": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Write `func( a, b )` instead of `func(a, b)`. This is the style used across the Garry's Mod wiki."
+        },
+        "glua.format.keepSingleLineBlocks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Keep blocks the author wrote on one line on one line, e.g. `if not IsValid(ent) then return end`."
+        },
+        "glua.format.maxBlankLines": {
+          "type": "number",
+          "default": 2,
+          "description": "Consecutive blank lines to keep between statements."
+        },
+        "glua.format.semicolons": {
+          "type": "string",
+          "enum": [
+            "remove",
+            "preserve"
+          ],
+          "default": "remove",
+          "description": "Whether to keep optional trailing semicolons."
+        },
         "glua.trace.server": {
           "type": "string",
           "enum": [
@@ -287,6 +353,11 @@
           "default": "off",
           "description": "Trace communication with the language server."
         }
+      }
+    },
+    "configurationDefaults": {
+      "[glua]": {
+        "editor.defaultFormatter": "bluejutzu.glua-lsp"
       }
     },
     "semanticTokenScopes": [
