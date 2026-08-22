@@ -1,0 +1,11 @@
+{
+  "accent": "#D97757",
+  "accentMuted": "#A85C42",
+  "success": "#4ADE80",
+  "failure": "#F87171",
+  "warning": "#FBBF24",
+  "highlight": "#60A5FA",
+  "text": "#E5E5E5",
+  "muted": "#9CA3AF",
+  "faint": "#6B7280"
+}

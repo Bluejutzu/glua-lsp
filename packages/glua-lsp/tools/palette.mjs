@@ -4,25 +4,21 @@
 // values are the source of truth so a docs site or a VS Code theme can pull the
 // same numbers instead of re-inventing them.
 
-export const PALETTE = {
-  /** Claude's coral. Primary accent — headings, names, the thing you look at first. */
-  accent: '#D97757',
-  /** A dimmer coral for secondary accents and rules. */
-  accentMuted: '#A85C42',
+import { readFileSync } from 'node:fs';
 
-  success: '#4ADE80',
-  failure: '#F87171',
-  warning: '#FBBF24',
-  /** Highlight: counts, measurements, anything numeric worth noticing. */
-  highlight: '#60A5FA',
-
-  /** Standard body text. */
-  text: '#E5E5E5',
-  /** Secondary text: units, labels, context. */
-  muted: '#9CA3AF',
-  /** Tertiary: separators, skipped items, things you can ignore. */
-  faint: '#6B7280',
-};
+/**
+ * The hex values live in palette.json so the TypeScript CLI and these plain
+ * Node scripts share one source of truth instead of drifting apart.
+ *
+ * - `accent`     Claude's coral; headings and names, what you look at first
+ * - `highlight`  counts and measurements, anything numeric worth noticing
+ * - `text`       standard body text
+ * - `muted`      units, labels, context
+ * - `faint`      separators, skipped items, things you can ignore
+ */
+export const PALETTE = JSON.parse(
+  readFileSync(new URL('./palette.json', import.meta.url), 'utf8'),
+);
 
 /**
  * Colour is disabled when output is piped, when NO_COLOR is set, or when TERM

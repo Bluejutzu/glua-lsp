@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // The analyser lives in the extension package. esbuild reads these paths
+    // too, so the CLI bundles straight from source with no build ordering
+    // between the two packages.
+    "paths": {
+      "@glua/*": ["../glua-lsp/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "../glua-lsp/src/**/*.ts"]
+}

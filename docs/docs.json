@@ -53,6 +53,7 @@
               "reference/rules",
               "reference/annotations",
               "reference/commands",
+              "reference/cli",
               "reference/performance"
             ]
           }

@@ -1,0 +1,48 @@
+{
+  "name": "glua-cli",
+  "version": "0.1.0",
+  "description": "Lint and format Garry's Mod Lua from the command line, using the same analysis as the GLua language server.",
+  "license": "MIT",
+  "homepage": "https://glua.bluejutzu.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bluejutzu/glua-lsp.git",
+    "directory": "packages/glua-cli"
+  },
+  "keywords": [
+    "glua",
+    "garrysmod",
+    "gmod",
+    "lua",
+    "linter",
+    "formatter"
+  ],
+  "type": "commonjs",
+  "bin": {
+    "glua": "./dist/glua.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-reporter=../glua-lsp/test/reporter.mjs test/*.test.mjs"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "vscode-languageserver-types": "^3.18.0",
+    "vscode-uri": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2"
+  }
+}

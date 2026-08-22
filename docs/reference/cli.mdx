@@ -1,0 +1,144 @@
+---
+title: "Command Line Interface"
+description: "Lint and format Garry's Mod Lua outside the editor with the glua CLI, using the same analysis as the language server so CI and your editor agree."
+icon: "terminal"
+sidebarTitle: "CLI"
+---
+
+The `glua` command runs the same parser, analyser and formatter as the extension,
+so a finding in CI is the same finding you saw in the editor. Use it to gate pull
+requests, run a pre-commit hook, or format a whole addon in one go.
+
+## Installing
+
+```bash
+pnpm add -D glua-cli
+```
+
+Or build it from the repository:
+
+```bash
+git clone https://github.com/Bluejutzu/glua-lsp
+cd glua-lsp
+pnpm install
+pnpm run build
+node packages/glua-cli/dist/glua.js --help
+```
+
+## `glua lint`
+
+```bash
+glua lint lua/
+glua lint lua/autorun/server/sv_main.lua
+glua lint . --quiet --max-warnings 0
+```
+
+| Flag | Description |
+| --- | --- |
+| `-f, --format <format>` | `pretty` (default), `compact`, `github`, `json` |
+| `--root <dir>` | Project root for config files and relative paths |
+| `--max-warnings <n>` | Exit non-zero above this many warnings |
+| `-q, --quiet` | Only report errors |
+
+Exits `1` when there are errors, or when `--max-warnings` is exceeded. Otherwise `0`.
+
+<Note>
+  The whole project gets indexed even when you lint a single file. Cross-file rules — an unhandled net message, a duplicate hook identifier, a missing `AddCSLuaFile` — are only correct once the index has seen everything.
+</Note>
+
+### Output formats
+
+<CodeGroup>
+
+```text pretty
+lua/autorun/sh_mistakes.lua
+  9:11   info     'PlayerSpawned' is not a documented gamemode hook…  unknown-hook
+  41:9   error    Compound assignment '+=' is not valid Lua.          compound-assignment
+
+Summary
+───────────────────
+
+  1 error  •  5 warnings  in 5 files
+```
+
+```text compact
+lua/autorun/sh_mistakes.lua:41:9: error: Compound assignment '+=' is not valid Lua. [compound-assignment]
+```
+
+```text github
+::error file=lua/autorun/sh_mistakes.lua,line=41,col=9,title=glua(compound-assignment)::Compound assignment '+=' is not valid Lua.
+```
+
+```json json
+[
+  {
+    "file": "lua/autorun/sh_mistakes.lua",
+    "line": 41,
+    "column": 9,
+    "severity": "error",
+    "code": "compound-assignment",
+    "message": "Compound assignment '+=' is not valid Lua."
+  }
+]
+```
+
+</CodeGroup>
+
+## `glua fmt`
+
+```bash
+glua fmt lua/            # report what would change
+glua fmt lua/ --write    # apply it
+glua fmt lua/ --check    # verify, for CI
+```
+
+| Flag | Description |
+| --- | --- |
+| `-w, --write` | Rewrite files in place |
+| `-c, --check` | Exit non-zero if anything would change, write nothing |
+| `--root <dir>` | Project root for config files |
+
+<Warning>
+  Files that do not parse are skipped and reported, never rewritten. Formatting broken code is how one problem becomes two.
+</Warning>
+
+## `glua rules`
+
+Lists every diagnostic code alongside its settings key. Worth knowing because
+the two are different: `net-payload-mismatch` is what you suppress inline,
+`netReadWriteMismatch` is what you set in `.glua.json`.
+
+## Configuration
+
+The CLI reads exactly the same files as the editor — `.glua.json`,
+`.gluafmtrc.json`, `.editorconfig`, `.prettierrc` — resolved from `--root` or the
+working directory. See [Configuration](/configuration/overview).
+
+## In GitHub Actions
+
+The `github` format emits workflow annotations, so findings appear inline on the
+pull request diff.
+
+```yaml
+name: Lint
+on: [push, pull_request]
+
+jobs:
+  glua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec glua lint lua/ --format github
+      - run: pnpm exec glua fmt lua/ --check
+```
+
+## Colour
+
+Honours [`NO_COLOR`](https://no-color.org) and turns itself off when piped.
+`--no-color` disables it explicitly, `FORCE_COLOR=1` forces it on through a pipe.

@@ -40,6 +40,11 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      # The linter run against its own deliberately-broken example addon. The
+      # findings are expected, so only a crash should fail the build.
+      - name: Lint the example addon
+        run: pnpm run lint:example -- --format github || true
+
       - name: Package
         run: pnpm run package
 
