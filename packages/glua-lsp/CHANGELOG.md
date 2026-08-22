@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.2.2
+
 ### Changed
 
 - `pnpm run release` now rolls the `Unreleased` section into the new version
