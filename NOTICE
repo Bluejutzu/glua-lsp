@@ -1,0 +1,13 @@
+Third-party content
+===================
+
+The bundled Garry's Mod API dataset
+(packages/glua-lsp/src/api/data/gmod-api.json) is generated from the Garry's Mod
+wiki at https://wiki.facepunch.com/gmod. That documentation content — function
+descriptions, parameter names, type information and examples — belongs to
+Facepunch Studios and the wiki's contributors, not to this project.
+
+It is redistributed here so the extension works offline. The scraper that
+produces it is at packages/glua-lsp/tools/generate-api.mjs.
+
+The MIT licence in LICENSE covers this project's own source code.

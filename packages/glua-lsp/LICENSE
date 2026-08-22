@@ -19,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The bundled Garry's Mod API dataset (src/api/data/gmod-api.json) is generated
-from the Garry's Mod wiki at https://wiki.facepunch.com/gmod. That documentation
-content belongs to Facepunch Studios and the wiki's contributors.
