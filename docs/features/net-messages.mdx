@@ -5,7 +5,7 @@ icon: "tower-broadcast"
 sidebarTitle: "Net Messages"
 ---
 
-GLua Language Server indexes every `net.Start`, `net.Receive`, and `util.AddNetworkString` call across your workspace. It pairs the sending and receiving halves of each net message to detect registration errors, orphaned handlers, and mismatched data payloads.
+Every `net.Start`, `net.Receive`, and `util.AddNetworkString` call in your workspace is checked against its counterpart, so registration errors, orphaned handlers, and mismatched payloads show up before you test in-game.
 
 ## What is checked
 

@@ -5,7 +5,7 @@ icon: "server"
 sidebarTitle: "Realms"
 ---
 
-GLua Language Server understands Garry's Mod's three execution contexts: Client, Server, and Shared. It assigns a realm to every file in your workspace, narrows that assignment inside conditional blocks, and then warns you when you call an API that does not exist in that realm.
+Every file in your workspace gets a realm — Client, Server, or Shared — based on its path, narrowed further inside `if SERVER` / `if CLIENT` blocks. Call an API that doesn't exist in the current realm and you get a warning for it.
 
 ## How realms are assigned
 

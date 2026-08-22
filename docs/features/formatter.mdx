@@ -5,11 +5,7 @@ icon: "align-left"
 sidebarTitle: "Formatter"
 ---
 
-The GLua Language Server includes a built-in code formatter that reprints your Lua files from the parsed syntax tree. It is designed to be safe: it refuses to format files that do not parse, and it never drops a comment even when the layout is complex.
-
-## How it works
-
-The formatter reads your file into a syntax tree and then prints it back with consistent indentation and spacing. It follows two safety rules:
+The built-in formatter reprints your Lua files with consistent indentation and spacing, and follows two safety rules:
 
 1. **Refuses unparseable files** — If your file contains a syntax error, the formatter exits without making changes.
 2. **Never drops a comment** — If the formatter cannot determine where to place a comment in the output, it falls back to the original text for that statement rather than discarding it.
