@@ -94,21 +94,32 @@ jobs:
         run: |
           previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
 
-          # One line per commit: subject, a linked short hash, and the GitHub
-          # username. Taken from the API rather than git log because only the
-          # API can map a commit author to their account.
-          format='- \(.commit.message | split("\n")[0]) ([`\(.sha[0:7])`](\(.html_url)))\(if .author.login then " — @\(.author.login)" else "" end)'
-          changes=$(
-            if [ -n "$previous" ]; then
-              gh api --paginate \
-                "repos/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}" \
-                --jq ".commits[] | select((.parents | length) < 2) | \"${format}\""
+          # GitHub's own generator builds this list from merged pull requests,
+          # so it produces nothing for a commit pushed straight to main. Same
+          # shape, but a commit that has no PR links its hash instead.
+          jqline='[.sha, (.commit.message | split("\n")[0]), (.author.login // .commit.author.name)] | @tsv'
+          if [ -n "$previous" ]; then
+            raw=$(gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}" \
+              --jq ".commits[] | select((.parents | length) < 2) | ${jqline}")
+          else
+            raw=$(gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/commits?sha=${GITHUB_REF_NAME}&per_page=100" \
+              --jq ".[] | select((.parents | length) < 2) | ${jqline}")
+          fi
+
+          changes=""
+          while IFS=$'\t' read -r sha subject author; do
+            [ -z "$sha" ] && continue
+            pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls" \
+                   --jq '.[0].number // empty' 2>/dev/null || true)
+            if [ -n "$pr" ]; then
+              ref="#${pr}"
             else
-              gh api --paginate \
-                "repos/${GITHUB_REPOSITORY}/commits?sha=${GITHUB_REF_NAME}&per_page=100" \
-                --jq ".[] | select((.parents | length) < 2) | \"${format}\""
+              ref="[\`${sha:0:7}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${sha})"
             fi
-          )
+            changes="${changes}- ${subject} by @${author} in ${ref}"$'\n'
+          done <<< "$raw"
 
           {
             echo "## Install"
@@ -136,7 +147,7 @@ jobs:
             echo " · [Documentation](https://glua.bluejutzu.dev)"
             echo " · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-lsp/CHANGELOG.md)"
             echo
-            echo "## Changes"
+            echo "## What's Changed"
             echo
             echo "$changes"
             if [ -n "$previous" ]; then
