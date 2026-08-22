@@ -19,14 +19,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Needed to generate release notes from the commits since last tag.
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -80,7 +80,7 @@ jobs:
           echo "size=$(du -h "$vsix" | cut -f1)" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: ${{ steps.artifact.outputs.path }}
@@ -88,28 +88,60 @@ jobs:
 
       - name: Write release notes
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VSIX: ${{ steps.artifact.outputs.name }}
         run: |
           previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+
+          # One line per commit: subject, a linked short hash, and the GitHub
+          # username. Taken from the API rather than git log because only the
+          # API can map a commit author to their account.
+          format='- \(.commit.message | split("\n")[0]) ([`\(.sha[0:7])`](\(.html_url)))\(if .author.login then " — @\(.author.login)" else "" end)'
+          changes=$(
+            if [ -n "$previous" ]; then
+              gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}" \
+                --jq ".commits[] | select((.parents | length) < 2) | \"${format}\""
+            else
+              gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/commits?sha=${GITHUB_REF_NAME}&per_page=100" \
+                --jq ".[] | select((.parents | length) < 2) | \"${format}\""
+            fi
+          )
+
           {
             echo "## Install"
             echo
+            echo "| Editor | Command |"
+            echo "| --- | --- |"
+            echo "| VS Code | \`code --install-extension bluejutzu.glua-lsp\` |"
+            echo "| Cursor | \`cursor --install-extension bluejutzu.glua-lsp\` |"
+            echo "| VSCodium | \`codium --install-extension bluejutzu.glua-lsp\` |"
+            echo "| Windsurf | \`windsurf --install-extension bluejutzu.glua-lsp\` |"
+            echo
+            echo "Cursor, VSCodium and Windsurf resolve that from"
+            echo "[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp);"
+            echo "VS Code resolves it from the Marketplace."
+            echo
+            echo "Or install the \`${VSIX}\` attached below, which works in any of them:"
+            echo
             echo '```bash'
-            echo "code --install-extension ${{ steps.artifact.outputs.name }}"
+            echo "code --install-extension ${VSIX}"
             echo '```'
             echo
-            echo "Download the \`.vsix\` below, then run that from the folder you saved it in."
-            echo "Cursor keeps a separate extension directory, so use \`cursor --install-extension\` there."
+            echo "In the editor instead: **Extensions** → the \`···\` menu → **Install from VSIX…**"
             echo
-            echo "Full documentation: <https://glua.bluejutzu.dev>"
+            echo "📖 [Full installation guide](https://glua.bluejutzu.dev/installation)"
+            echo " · [Documentation](https://glua.bluejutzu.dev)"
+            echo " · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-lsp/CHANGELOG.md)"
             echo
             echo "## Changes"
             echo
+            echo "$changes"
             if [ -n "$previous" ]; then
-              git log --no-merges --pretty='- %s' "$previous..${GITHUB_REF_NAME}"
               echo
-              echo "**Full diff:** https://github.com/${GITHUB_REPOSITORY}/compare/$previous...${GITHUB_REF_NAME}"
-            else
-              git log --no-merges --pretty='- %s'
+              echo "**Full diff:** https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}"
             fi
           } > RELEASE_NOTES.md
           cat RELEASE_NOTES.md
