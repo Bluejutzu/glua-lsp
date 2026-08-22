@@ -30,6 +30,7 @@ Run from the repository root.
 | `pnpm run bench -- <path>` | Benchmark against a real addon |
 | `pnpm run generate-api` | Rebuild the wiki dataset |
 | `pnpm run package` | Produce a `.vsix` |
+| `pnpm run release <version>` | Bump, commit and tag a release |
 | `pnpm run docs` | Serve this site locally |
 
 ## Tests
@@ -101,6 +102,32 @@ ones rather than inventing their own.
 | Text / muted / faint | `#E5E5E5` / `#9CA3AF` / `#6B7280` |
 
 Terminal output honours `NO_COLOR` and disables itself when piped.
+
+## Cutting a release
+
+Releases go to GitHub Releases, not the Marketplace. The whole flow is one
+command plus a push:
+
+```bash
+pnpm run release minor      # or patch, major, or an explicit 0.2.0
+git push origin main --follow-tags
+```
+
+`release` bumps `packages/glua-lsp/package.json`, commits, and creates an
+annotated `v<version>` tag. Pushing the tag triggers the release workflow, which
+typechecks, tests, builds, packages, and attaches the `.vsix` to a new release
+with notes generated from the commits since the previous tag.
+
+<Note>
+  The workflow refuses to build when the tag and the manifest version disagree.
+  That is the mistake the script exists to prevent — a release whose filename
+  says one version and whose contents say another.
+</Note>
+
+A tag containing a hyphen (`v0.2.0-beta.1`) is published as a prerelease.
+
+`--dry-run` shows what would happen without writing anything. **Actions → Release
+→ Run workflow** does a build-only run without tagging.
 
 ## Docs
 

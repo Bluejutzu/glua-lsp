@@ -5,6 +5,15 @@
   "version": "0.1.0",
   "publisher": "bluejutzu",
   "license": "MIT",
+  "homepage": "https://glua.bluejutzu.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bluejutzu/glua-lsp.git",
+    "directory": "packages/glua-lsp"
+  },
+  "bugs": {
+    "url": "https://github.com/Bluejutzu/glua-lsp/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -415,6 +424,7 @@
     "bench": "pnpm run compile && node --expose-gc test/bench-real.mjs",
     "generate-api": "node tools/generate-api.mjs",
     "package": "vsce package --no-dependencies",
+    "package:ls": "vsce ls --no-dependencies",
     "vscode:prepublish": "node esbuild.mjs --production"
   },
   "dependencies": {
@@ -424,6 +434,7 @@
     "vscode-uri": "^3.0.8"
   },
   "devDependencies": {
+    "@vscode/vsce": "^3.2.2",
     "@types/node": "^24.13.3",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.25.0",

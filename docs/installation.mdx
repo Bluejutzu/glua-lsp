@@ -1,27 +1,63 @@
 ---
 title: "Install GLua Language Server for VS Code"
-description: "Install the GLua Language Server VS Code extension from a prebuilt .vsix file or build it from source with pnpm in three steps."
+description: "Install the GLua Language Server VS Code extension from a GitHub release or build it from source with pnpm in three steps."
 icon: "download"
 sidebarTitle: "Installation"
 ---
 
-You can install GLua Language Server from a packaged `.vsix` file or build it yourself from the GitHub repository. Both methods take only a few minutes.
+GLua Language Server is distributed through GitHub Releases rather than the VS Code Marketplace, so you install the `.vsix` file directly. You can also build it yourself from source. Both methods take only a few minutes.
 
-## From a packaged build
+<Note>
+  This extension is not on the VS Code Marketplace. Every release is published to GitHub with the packaged `.vsix` attached.
+</Note>
 
-Download the latest `.vsix` release, then install it with your editor's CLI.
+## From a release
 
-<CodeGroup>
+<Steps>
+  <Step title="Download the VSIX">
+    Grab `glua-lsp-<version>.vsix` from the [latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest).
+  </Step>
 
-```bash VS Code
-$ code --install-extension glua-lsp-0.1.0.vsix
-```
+  <Step title="Install it">
+    Run this from the folder you saved the file in.
 
-```bash Cursor
-$ cursor --install-extension glua-lsp-0.1.0.vsix
-```
+    <CodeGroup>
 
-</CodeGroup>
+    ```bash VS Code
+    code --install-extension glua-lsp-0.1.0.vsix
+    ```
+
+    ```bash Cursor
+    cursor --install-extension glua-lsp-0.1.0.vsix
+    ```
+
+    </CodeGroup>
+
+    Or from inside the editor: **Extensions** → the `···` menu → **Install from VSIX…**
+  </Step>
+
+  <Step title="Open a GLua file">
+    The extension activates when you open a `.lua` file in a Garry's Mod workspace.
+  </Step>
+</Steps>
+
+<Warning>
+  Cursor, VS Code and VSCodium keep separate extension directories. Install into each editor you use.
+</Warning>
+
+### Updating
+
+A `.vsix` install does not auto-update. Download the newer file and run the same install command — it replaces the previous version in place.
+
+To hear about new versions, watch the repository: **Watch** → **Custom** → **Releases**.
+
+### Unreleased builds
+
+Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pick up a fix before it is tagged. Open the [latest CI run](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml), scroll to **Artifacts**, and download `glua-lsp-vsix-<sha>`.
+
+<Note>
+  GitHub wraps workflow artifacts in a `.zip`. Unzip it to get the `.vsix` inside.
+</Note>
 
 ## From source
 
@@ -35,25 +71,28 @@ $ cursor --install-extension glua-lsp-0.1.0.vsix
     pnpm install
     ```
   </Step>
-  <Step title="Build the extension">
-    Compile the extension with the build script.
+
+  <Step title="Build and package">
+    Compile the extension and produce a `.vsix`.
 
     ```bash
     pnpm run build
-    ```
-  </Step>
-  <Step title="Run or package">
-    Press **F5** in VS Code to launch the extension in a new Extension Development Host window, or package it for distribution.
-
-    ```bash
     pnpm run package
     ```
 
-    After packaging, install the generated `.vsix` with the CLI command above.
+    That writes `packages/glua-lsp/glua-lsp-<version>.vsix`.
+  </Step>
+
+  <Step title="Run or install">
+    Press **F5** to launch the extension in a new Extension Development Host window, or install the package you just built.
+
+    ```bash
+    code --install-extension packages/glua-lsp/glua-lsp-0.1.0.vsix
+    ```
   </Step>
 </Steps>
 
-## Checking it is working
+## Verify the installation
 
 Open any `.lua` file inside a Garry's Mod addon folder. The VS Code status bar should show a realm label such as `GLua · Server`. If you see that label, the language server is active and indexing your workspace.
 
@@ -68,7 +107,8 @@ To format GLua files with the extension, register it as the default formatter fo
 ```json
 {
   "[glua]": {
-    "editor.defaultFormatter": "bluejutzu.glua-lsp"
+    "editor.defaultFormatter": "bluejutzu.glua-lsp",
+    "editor.formatOnSave": true
   }
 }
 ```

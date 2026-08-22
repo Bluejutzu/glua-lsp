@@ -13,6 +13,7 @@
     "bench": "pnpm --filter glua-lsp bench",
     "generate-api": "pnpm --filter glua-lsp generate-api",
     "package": "pnpm --filter glua-lsp package",
+    "release": "node scripts/release.mjs",
     "docs": "cd docs && mint dev --port 3333",
     "docs:check": "cd docs && mint broken-links"
   },

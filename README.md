@@ -8,6 +8,22 @@ Backed by 5,586 API entries from the Garry's Mod wiki — 331 globals, 1,257
 library functions, 2,376 class methods, 551 hooks, 1,069 panel methods, 100
 enums, 72 structures — plus an index of your own workspace.
 
+**Docs: [glua.bluejutzu.dev](https://glua.bluejutzu.dev)**
+
+## Installing
+
+Not on the Marketplace — releases go to GitHub. Download
+`glua-lsp-<version>.vsix` from the
+[latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest), then:
+
+```bash
+code --install-extension glua-lsp-0.1.0.vsix
+```
+
+Every push to `main` also attaches a build to its
+[CI run](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml), if you
+want a fix before it is tagged.
+
 ## Features
 
 ### IntelliSense that tracks types
@@ -259,9 +275,10 @@ pnpm install
 pnpm run build
 ```
 
-Then <kbd>F5</kbd>. That opens a window on `examples/my_addon`, which exercises
-most of this; `lua/autorun/sh_mistakes.lua` in it is wrong on purpose, one
-mistake per diagnostic.
+Then <kbd>F5</kbd>. That opens a window on
+`packages/glua-lsp/examples/my_addon`, which exercises most of this;
+`lua/autorun/sh_mistakes.lua` in it is wrong on purpose, one mistake per
+diagnostic.
 
 ```bash
 pnpm test                                   # parser, analysis, features, formatter, performance
@@ -269,23 +286,40 @@ pnpm run typecheck                          # TypeScript 7
 pnpm run watch                              # rebuild on change
 pnpm run bench -- path/to/a/gmod/addon      # run it against a real codebase
 pnpm run generate-api                       # rebuild the wiki dataset after a GMod update
+pnpm run docs                               # serve the docs site locally
 ```
 
 `pnpm run bench` prints index time, memory, per-feature latency, and every
 diagnostic grouped by rule with an example of each. It's the quickest way to see
 whether a change made the output noisier.
 
+### Releasing
+
+```bash
+pnpm run release minor      # or patch, major, or an explicit 0.2.0
+git push origin main --follow-tags
+```
+
+That bumps the manifest, commits, and tags. Pushing the tag runs the release
+workflow: typecheck, test, build, package, then a GitHub release with the
+`.vsix` attached and notes generated from the commits since the last tag. The
+workflow refuses to build if the tag and the manifest version disagree.
+
 ### Layout
 
 ```
-src/parser/     lexer, AST, error-tolerant parser
-src/analyze/    scopes, type inference, realm rules, workspace index
-src/format/     the formatter
-src/config/     config file loading and precedence
-src/api/        the wiki dataset and lookups over it
-src/server/     LSP handlers, one file per feature
-src/client/     the VS Code extension
-tools/          the wiki scraper, and the terminal colour palette
+packages/glua-lsp/
+  src/parser/     lexer, AST, error-tolerant parser
+  src/analyze/    scopes, type inference, realm rules, workspace index
+  src/format/     the formatter
+  src/config/     config file loading and precedence
+  src/api/        the wiki dataset and lookups over it
+  src/server/     LSP handlers, one file per feature
+  src/client/     the VS Code extension
+  tools/          the wiki scraper, and the terminal colour palette
+docs/             the Mintlify site
+scripts/          the release helper
+.github/          CI and release workflows
 ```
 
 ## Known limits
