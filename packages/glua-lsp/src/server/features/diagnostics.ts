@@ -5,7 +5,7 @@ import {
 } from 'vscode-languageserver';
 import { walk, type CallExpression } from '../../parser/ast.js';
 import { GmodApi } from '../../api/index.js';
-import type { ApiFunction, ApiParam } from '../../api/types.js';
+import type { ApiFunction, ApiParam, Realm } from '../../api/types.js';
 import type { FileAnalysis, Span } from '../../analyze/binder.js';
 import { realmAt } from '../../analyze/realm.js';
 import { Suppressions } from '../../analyze/suppressions.js';
@@ -47,6 +47,8 @@ export const enum Code {
   MissingAddCSLuaFile = 'missing-addcsluafile',
   GlobalWrite = 'global-write',
   CompoundAssignment = 'compound-assignment',
+  DuplicateHookIdentifier = 'duplicate-hook-identifier',
+  DuplicateTimerName = 'duplicate-timer-name',
 }
 
 export interface DiagnoseContext {
@@ -406,6 +408,59 @@ export function diagnose(
         severity,
         Code.NetPayloadMismatch,
         { data: { name: receive.name } },
+      );
+    }
+  }
+
+  /* ------------------------------------------- duplicate registrations */
+
+  if (d.duplicateIdentifier !== 'off') {
+    const severity = severityOf(d.duplicateIdentifier);
+    const duplicates = workspace.duplicateRegistrations();
+
+    // Two registrations in different realms never actually collide.
+    const overlaps = (a: Realm, b: Realm) =>
+      a === 'shared' || b === 'shared' || a === b;
+
+    const report = (
+      sites: { uri: string; value: { span: Span; realm: Realm } }[],
+      describe: (others: number) => string,
+      code: Code,
+    ) => {
+      const mine = sites.filter((s) => s.uri === analysis.uri);
+      for (const site of mine) {
+        const clashing = sites.filter(
+          (other) => other !== site && overlaps(other.value.realm, site.value.realm),
+        );
+        if (!clashing.length) continue;
+        push(
+          { start: site.value.span.start + 1, end: site.value.span.end - 1 },
+          describe(clashing.length),
+          severity,
+          code,
+        );
+      }
+    };
+
+    for (const [key, sites] of duplicates.hooks) {
+      const [event, identifier] = key.split(' ');
+      report(
+        sites,
+        (n) =>
+          `'${identifier}' is already used as the identifier for '${event}' in ` +
+          `${n} other place${n === 1 ? '' : 's'}. Only the last hook.Add wins; ` +
+          `the others are silently replaced.`,
+        Code.DuplicateHookIdentifier,
+      );
+    }
+
+    for (const [name, sites] of duplicates.timers) {
+      report(
+        sites,
+        (n) =>
+          `A timer named '${name}' is created in ${n} other place${n === 1 ? '' : 's'}. ` +
+          `timer.Create replaces an existing timer with the same name.`,
+        Code.DuplicateTimerName,
       );
     }
   }

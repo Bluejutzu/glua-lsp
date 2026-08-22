@@ -559,6 +559,135 @@ test('hook tables are never reported as undefined globals', () => {
   }
 });
 
+/* ------------------------------------------------ generated accessors */
+
+test('NetworkVar generates Get and Set completions on self', () => {
+  const { text, offset } = withCursor(`
+function ENT:SetupDataTables()
+  self:NetworkVar("Int", 0, "Ammo")
+  self:NetworkVar("Entity", 0, "Owner")
+end
+
+function ENT:Think()
+  self:|
+end
+`);
+  const { workspace, analyses } = makeWorkspace({ 'lua/entities/turret/shared.lua': text });
+  const analysis = analyses['lua/entities/turret/shared.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('GetAmmo'), 'NetworkVar("Int", 0, "Ammo") should give GetAmmo');
+  assert.ok(names.includes('SetAmmo'));
+  assert.ok(names.includes('GetOwner'));
+  assert.ok(names.includes('SetModel'), 'real Entity methods are still there');
+});
+
+test('NetworkVars carry across the files of one entity', () => {
+  const { text, offset } = withCursor('function ENT:Think()\n  self:|\nend\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/turret/shared.lua':
+      'function ENT:SetupDataTables()\n  self:NetworkVar("Bool", 0, "Active")\nend\n',
+    'lua/entities/turret/init.lua': text,
+  });
+  const analysis = analyses['lua/entities/turret/init.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('GetActive'), 'declared in shared.lua, used from init.lua');
+});
+
+test('AccessorFunc generates accessors too', () => {
+  const { text, offset } = withCursor(`
+AccessorFunc(ENT, "m_Speed", "Speed", FORCE_NUMBER)
+
+function ENT:Think()
+  self:|
+end
+`);
+  const { workspace, analyses } = makeWorkspace({ 'lua/entities/car/shared.lua': text });
+  const analysis = analyses['lua/entities/car/shared.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('GetSpeed'));
+  assert.ok(names.includes('SetSpeed'));
+});
+
+test('accessors from an unrelated entity do not leak in', () => {
+  const { text, offset } = withCursor('function ENT:Think()\n  self:|\nend\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/turret/shared.lua':
+      'function ENT:SetupDataTables()\n  self:NetworkVar("Int", 0, "Ammo")\nend\n',
+    'lua/entities/door/shared.lua': text,
+  });
+  const analysis = analyses['lua/entities/door/shared.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(!names.includes('GetAmmo'), 'the turret is a different entity');
+});
+
+/* ------------------------------------------------ duplicate registrations */
+
+test('two hook.Add calls with the same event and identifier are flagged', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/sh_a.lua': 'hook.Add("Think", "myaddon.tick", function() end)\n',
+    'lua/autorun/sh_b.lua': 'hook.Add("Think", "myaddon.tick", function() end)\n',
+  });
+
+  for (const key of Object.keys(analyses)) {
+    const found = diagnose(analyses[key], api, workspace, DEFAULT_SETTINGS);
+    const duplicate = found.find((d) => d.code === 'duplicate-hook-identifier');
+    assert.ok(duplicate, `${key} should report the clash`);
+    assert.match(duplicate.message, /myaddon\.tick/);
+  }
+});
+
+test('the same identifier for different events is fine', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/sh_a.lua':
+      'hook.Add("Think", "shared.id", function() end)\nhook.Add("Tick", "shared.id", function() end)\n',
+  });
+  const found = diagnose(analyses['lua/autorun/sh_a.lua'], api, workspace, DEFAULT_SETTINGS);
+  assert.equal(found.filter((d) => d.code === 'duplicate-hook-identifier').length, 0);
+});
+
+test('registrations in different realms do not clash', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/client/cl_a.lua': 'hook.Add("Think", "myaddon.tick", function() end)\n',
+    'lua/autorun/server/sv_a.lua': 'hook.Add("Think", "myaddon.tick", function() end)\n',
+  });
+  for (const key of Object.keys(analyses)) {
+    const found = diagnose(analyses[key], api, workspace, DEFAULT_SETTINGS);
+    assert.equal(
+      found.filter((d) => d.code === 'duplicate-hook-identifier').length,
+      0,
+      `${key}: client and server hooks never collide`,
+    );
+  }
+});
+
+test('duplicate timer names are flagged', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/sh_t.lua':
+      'timer.Create("myaddon.loop", 1, 0, function() end)\ntimer.Create("myaddon.loop", 5, 0, function() end)\n',
+  });
+  const found = diagnose(analyses['lua/autorun/sh_t.lua'], api, workspace, DEFAULT_SETTINGS);
+  const duplicates = found.filter((d) => d.code === 'duplicate-timer-name');
+  assert.equal(duplicates.length, 2, 'both sites are reported');
+  assert.match(duplicates[0].message, /myaddon\.loop/);
+});
+
+test('duplicate detection can be turned off', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/sh_a.lua': 'hook.Add("Think", "dup", function() end)\n',
+    'lua/autorun/sh_b.lua': 'hook.Add("Think", "dup", function() end)\n',
+  });
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    diagnostics: { ...DEFAULT_SETTINGS.diagnostics, duplicateIdentifier: 'off' },
+  };
+  const found = diagnose(analyses['lua/autorun/sh_a.lua'], api, workspace, settings);
+  assert.equal(found.filter((d) => d.code === 'duplicate-hook-identifier').length, 0);
+});
+
 /* ---------------------------------------------------------------- scopes */
 
 test('shadowing and declaration order follow Lua scoping', () => {

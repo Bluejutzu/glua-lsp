@@ -2,7 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { URI } from 'vscode-uri';
 import type { GmodApi } from '../api/index.js';
-import { analyseFile, type FileAnalysis, type GlobalDefinition, type Span } from './binder.js';
+import {
+  analyseFile,
+  type FileAnalysis,
+  type GeneratedAccessor,
+  type GlobalDefinition,
+  type Span,
+} from './binder.js';
+import type { Realm } from '../api/types.js';
 import { Scope } from './scope.js';
 import { tableType, UNKNOWN, type GType } from './types.js';
 
@@ -58,6 +65,11 @@ export class Workspace {
   private netStartNames: Map<string, Located<Span>[]> | null = null;
   private netReceiveNames: Map<string, Located<Span>[]> | null = null;
   private clientFiles: Set<string> | null = null;
+  private readonly accessorCache = new Map<string, Located<GeneratedAccessor>[]>();
+  private duplicateCache: {
+    hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
+    timers: Map<string, Located<{ span: Span; realm: Realm }>[]>;
+  } | null = null;
 
   constructor(
     private readonly api: GmodApi,
@@ -92,6 +104,8 @@ export class Workspace {
     this.netStartNames = null;
     this.netReceiveNames = null;
     this.clientFiles = null;
+    this.accessorCache.clear();
+    this.duplicateCache = null;
   }
 
   /**
@@ -116,6 +130,15 @@ export class Workspace {
     if (!cached) return undefined;
     if (cached.hasAst) return cached;
     return this.analyse(uri, cached.text, cached.version, true);
+  }
+
+  /**
+   * Drops a file's syntax tree again after a one-off use, so scanning the whole
+   * workspace does not end up holding every tree at once.
+   */
+  releaseAst(uri: string): void {
+    const cached = this.files.get(uri);
+    if (cached?.hasAst) this.files.set(uri, releaseAst(cached));
   }
 
   remove(uri: string): void {
@@ -277,6 +300,73 @@ export class Workspace {
     return out;
   }
 
+  /**
+   * Generated accessors visible to a file.
+   *
+   * An entity's NetworkVars are declared in one of its files (usually
+   * shared.lua) and used from all of them, so the whole directory contributes.
+   */
+  accessorsNear(fsPath: string): Located<GeneratedAccessor>[] {
+    const dir = path.dirname(fsPath).replace(/\\/g, '/').toLowerCase();
+    const cached = this.accessorCache.get(dir);
+    if (cached) return cached;
+
+    const out: Located<GeneratedAccessor>[] = [];
+    for (const file of this.files.values()) {
+      if (path.dirname(file.fsPath).replace(/\\/g, '/').toLowerCase() !== dir) continue;
+      for (const accessor of file.accessors) out.push({ uri: file.uri, value: accessor });
+    }
+
+    this.accessorCache.set(dir, out);
+    return out;
+  }
+
+  /**
+   * `hook.Add` calls that share an event and identifier, and `timer.Create`
+   * calls that share a name. Registering twice silently replaces the first.
+   */
+  duplicateRegistrations(): {
+    hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
+    timers: Map<string, Located<{ span: Span; realm: Realm }>[]>;
+  } {
+    if (this.duplicateCache) return this.duplicateCache;
+
+    const hooks = new Map<string, Located<{ span: Span; realm: Realm }>[]>();
+    const timers = new Map<string, Located<{ span: Span; realm: Realm }>[]>();
+
+    const add = (
+      map: Map<string, Located<{ span: Span; realm: Realm }>[]>,
+      key: string,
+      uri: string,
+      span: Span,
+      realm: Realm,
+    ) => {
+      const list = map.get(key);
+      if (list) list.push({ uri, value: { span, realm } });
+      else map.set(key, [{ uri, value: { span, realm } }]);
+    };
+
+    for (const file of this.files.values()) {
+      for (const hook of file.hookAdds) {
+        // An anonymous identifier is a different situation; skip it.
+        if (!hook.identifier) continue;
+        add(hooks, `${hook.hookName} ${hook.identifier}`, file.uri, hook.nameSpan, hook.realm);
+      }
+      for (const timer of file.timers) {
+        add(timers, timer.path, file.uri, timer.span, file.realm.file);
+      }
+    }
+
+    for (const map of [hooks, timers]) {
+      for (const [key, sites] of map) {
+        if (sites.length < 2) map.delete(key);
+      }
+    }
+
+    this.duplicateCache = { hooks, timers };
+    return this.duplicateCache;
+  }
+
   /** The file an `include()` / `AddCSLuaFile()` argument points at, if indexed. */
   resolveReference(fromFsPath: string, includePath: string): FileAnalysis | undefined {
     for (const candidate of resolveGluaPath(fromFsPath, includePath)) {
@@ -352,6 +442,7 @@ function releaseAst(analysis: FileAnalysis): FileAnalysis {
     root: new Scope(null, 0, 0, true),
     unusedLocals: [],
     guardedGlobals: new Set(),
+    // Facts survive; only the tree and its closures are dropped.
     typeOf: () => UNKNOWN,
     scopeAt: () => new Scope(null, 0, 0, true),
     docFor: () => undefined,

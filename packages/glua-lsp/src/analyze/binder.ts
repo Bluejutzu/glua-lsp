@@ -105,6 +105,23 @@ export interface FileReference {
   span: Span;
 }
 
+/**
+ * A getter/setter pair Garry's Mod generates at runtime.
+ *
+ * `self:NetworkVar("Int", 0, "Ammo")` creates `GetAmmo` and `SetAmmo`, and
+ * `AccessorFunc(ENT, "m_Speed", "Speed")` does the same. Neither exists in the
+ * source, so without recording them every call to one looks unresolvable.
+ */
+export interface GeneratedAccessor {
+  /** The bare name, e.g. `Ammo` — the methods are `GetAmmo` and `SetAmmo`. */
+  name: string;
+  /** Wiki type name of the value, or `any`. */
+  valueType: string;
+  /** `NetworkVar`, `NetworkVarElement`, `DTVar` or `AccessorFunc`. */
+  origin: string;
+  span: Span;
+}
+
 export type SymbolKindName = 'function' | 'method' | 'variable' | 'table' | 'field';
 
 export interface SymbolFact {
@@ -144,6 +161,8 @@ export interface FileAnalysis {
   addCSLuaFiles: FileReference[];
   concommands: FileReference[];
   convars: FileReference[];
+  timers: FileReference[];
+  accessors: GeneratedAccessor[];
   symbols: SymbolFact[];
   /**
    * Globals the file tests for existence before using — `if eightbit and ...`.
@@ -267,6 +286,48 @@ function rootIdentifier(expr: Expression): Identifier | null {
   }
 }
 
+/** NetworkVar's type string to a wiki type name. */
+function networkVarType(kind: string | undefined): string {
+  switch (kind) {
+    case 'Int':
+    case 'Float':
+      return 'number';
+    case 'Bool':
+      return 'boolean';
+    case 'String':
+      return 'string';
+    case 'Entity':
+      return 'Entity';
+    case 'Vector':
+      return 'Vector';
+    case 'Angle':
+      return 'Angle';
+    default:
+      return 'any';
+  }
+}
+
+/** AccessorFunc's optional FORCE_* argument. */
+function forceTypeOf(arg: Expression | undefined): string {
+  if (arg?.type !== 'Identifier') return 'any';
+  switch (arg.name) {
+    case 'FORCE_STRING':
+      return 'string';
+    case 'FORCE_NUMBER':
+      return 'number';
+    case 'FORCE_BOOL':
+      return 'boolean';
+    case 'FORCE_ANGLE':
+      return 'Angle';
+    case 'FORCE_COLOR':
+      return 'Color';
+    case 'FORCE_VECTOR':
+      return 'Vector';
+    default:
+      return 'any';
+  }
+}
+
 const stringArg = (args: Expression[], i: number): { value: string; span: Span } | null => {
   const arg = args[i];
   if (!arg || arg.type !== 'StringLiteral') return null;
@@ -297,6 +358,8 @@ export function analyseFile(
   const addCSLuaFiles: FileReference[] = [];
   const concommands: FileReference[] = [];
   const convars: FileReference[] = [];
+  const timers: FileReference[] = [];
+  const accessors: GeneratedAccessor[] = [];
   const symbols: SymbolFact[] = [];
 
   const typeCache = new WeakMap<Expression, GType>();
@@ -726,8 +789,44 @@ export function analyseFile(
         if (name) convars.push({ path: name.value, span: name.span });
         break;
       }
+      case 'timer.Create':
+      case 'timer.Adjust':
+      case 'timer.Remove': {
+        const name = stringArg(args, 0);
+        if (name && path === 'timer.Create') timers.push({ path: name.value, span: name.span });
+        break;
+      }
+      case 'AccessorFunc': {
+        // AccessorFunc(table, key, name, [force]) -> GetName / SetName
+        const name = stringArg(args, 2);
+        if (name) {
+          accessors.push({
+            name: name.value,
+            valueType: forceTypeOf(args[3]),
+            origin: 'AccessorFunc',
+            span: name.span,
+          });
+        }
+        break;
+      }
       default:
         break;
+    }
+
+    // `self:NetworkVar("Int", 0, "Ammo")`, and the older DTVar spelling.
+    const method = path.includes(':') ? path.slice(path.lastIndexOf(':') + 1) : '';
+    if (method === 'NetworkVar' || method === 'DTVar' || method === 'NetworkVarElement') {
+      const kind = stringArg(args, 0);
+      // NetworkVarElement takes an extra element name before the accessor name.
+      const name = stringArg(args, method === 'NetworkVarElement' ? 3 : 2);
+      if (name) {
+        accessors.push({
+          name: name.value,
+          valueType: networkVarType(kind?.value),
+          origin: method,
+          span: name.span,
+        });
+      }
     }
 
     // net.WriteX / net.ReadX sequencing.
@@ -1303,6 +1402,8 @@ export function analyseFile(
     addCSLuaFiles,
     concommands,
     convars,
+    timers,
+    accessors,
     symbols,
     guardedGlobals,
     unusedLocals,

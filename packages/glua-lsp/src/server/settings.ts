@@ -21,6 +21,9 @@ export interface Settings {
     netReadWriteMismatch: SeveritySetting;
     missingAddCSLuaFile: SeveritySetting;
     globalWrite: SeveritySetting;
+    duplicateIdentifier: SeveritySetting;
+    /** `open` reports only files you have open; `workspace` reports everything. */
+    scope: 'open' | 'workspace';
   };
   inlayHints: {
     parameterNames: boolean;
@@ -65,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
     netReadWriteMismatch: 'warning',
     missingAddCSLuaFile: 'warning',
     globalWrite: 'off',
+    duplicateIdentifier: 'warning',
+    scope: 'open',
   },
   inlayHints: {
     parameterNames: true,

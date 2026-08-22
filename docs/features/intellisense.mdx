@@ -59,6 +59,30 @@ function ENT:Initialize()
 end
 ```
 
+## Generated accessors
+
+Garry's Mod creates getters and setters at runtime that appear nowhere in your
+source, so nothing else knows they exist. Both forms are tracked:
+
+```lua
+function ENT:SetupDataTables()
+    self:NetworkVar("Int", 0, "Ammo")
+    self:NetworkVar("Entity", 0, "Owner")
+end
+
+AccessorFunc(ENT, "m_Speed", "Speed", FORCE_NUMBER)
+
+function ENT:Think()
+    self:GetAmmo()      -- number
+    self:SetOwner(ply)  -- Entity
+    self:GetSpeed()     -- number, from AccessorFunc
+end
+```
+
+Declarations carry across the whole entity directory, so a `NetworkVar` in
+`shared.lua` completes in `init.lua` and `cl_init.lua` as well. Entities in other
+directories keep their accessors to themselves.
+
 ## Typing your own functions
 
 You can add explicit types to your own functions with annotations, or let the server infer them from usage.
