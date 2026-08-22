@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}/examples/my_addon"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: build"
+    },
+    {
+      "name": "Attach to Language Server",
+      "type": "node",
+      "request": "attach",
+      "port": 6019,
+      "restart": true,
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Extension + Server",
+      "configurations": ["Run Extension", "Attach to Language Server"]
+    }
+  ]
+}

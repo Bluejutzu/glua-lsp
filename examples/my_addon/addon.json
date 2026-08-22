@@ -1,0 +1,6 @@
+{
+  "title": "GLua LSP Example Addon",
+  "type": "tool",
+  "tags": ["build"],
+  "ignore": ["*.md"]
+}

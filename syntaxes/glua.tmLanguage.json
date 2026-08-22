@@ -1,0 +1,166 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GLua",
+  "scopeName": "source.glua",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#number" },
+    { "include": "#keyword" },
+    { "include": "#realm" },
+    { "include": "#function-definition" },
+    { "include": "#operator" },
+    { "include": "#call" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.block.glua",
+          "begin": "--\\[(=*)\\[",
+          "end": "\\]\\1\\]"
+        },
+        {
+          "name": "comment.block.glua",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "comment.line.double-dash.glua",
+          "match": "--.*$"
+        },
+        {
+          "name": "comment.line.double-slash.glua",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.other.multiline.glua",
+          "begin": "\\[(=*)\\[",
+          "end": "\\]\\1\\]"
+        },
+        {
+          "name": "string.quoted.double.glua",
+          "begin": "\"",
+          "end": "\"|(?<!\\\\)$",
+          "patterns": [{ "include": "#escape" }]
+        },
+        {
+          "name": "string.quoted.single.glua",
+          "begin": "'",
+          "end": "'|(?<!\\\\)$",
+          "patterns": [{ "include": "#escape" }]
+        }
+      ]
+    },
+    "escape": {
+      "name": "constant.character.escape.glua",
+      "match": "\\\\(?:[abfnrtv\\\\\"'\\n]|x[0-9A-Fa-f]{2}|[0-9]{1,3})"
+    },
+    "number": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.glua",
+          "match": "\\b0[xX][0-9A-Fa-f]+(?:[uU]?[lL][lL])?\\b"
+        },
+        {
+          "name": "constant.numeric.binary.glua",
+          "match": "\\b0[bB][01]+\\b"
+        },
+        {
+          "name": "constant.numeric.glua",
+          "match": "\\b\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?(?:[uU]?[lL][lL])?\\b"
+        }
+      ]
+    },
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.control.glua",
+          "match": "\\b(?:if|elseif|else|then|end|do|while|repeat|until|for|in|return|break|continue|goto)\\b"
+        },
+        {
+          "name": "keyword.other.glua",
+          "match": "\\b(?:local|function)\\b"
+        },
+        {
+          "name": "constant.language.glua",
+          "match": "\\b(?:true|false|nil)\\b"
+        },
+        {
+          "name": "variable.language.self.glua",
+          "match": "\\bself\\b"
+        }
+      ]
+    },
+    "realm": {
+      "patterns": [
+        {
+          "name": "constant.language.realm.glua",
+          "match": "\\b(?:SERVER|CLIENT|MENU_DLL|CLIENT_DLL|SERVER_DLL)\\b"
+        },
+        {
+          "comment": "GMod enums are SCREAMING_SNAKE with a known prefix.",
+          "name": "constant.other.enum.glua",
+          "match": "\\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\\b"
+        }
+      ]
+    },
+    "function-definition": {
+      "patterns": [
+        {
+          "match": "\\b(function)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*([.:])\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.glua" },
+            "2": { "name": "entity.name.namespace.glua" },
+            "3": { "name": "punctuation.accessor.glua" },
+            "4": { "name": "entity.name.function.glua" }
+          }
+        },
+        {
+          "match": "\\b(function)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.glua" },
+            "2": { "name": "entity.name.function.glua" }
+          }
+        }
+      ]
+    },
+    "operator": {
+      "patterns": [
+        {
+          "comment": "GLua's C-style aliases for Lua operators.",
+          "name": "keyword.operator.cstyle.glua",
+          "match": "!=|&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.glua",
+          "match": "\\+|-|\\*|/|%|\\^|#|==|~=|<=|>=|<|>|=|\\.\\.\\.|\\.\\."
+        },
+        {
+          "name": "keyword.operator.word.glua",
+          "match": "\\b(?:and|or|not)\\b"
+        }
+      ]
+    },
+    "call": {
+      "patterns": [
+        {
+          "match": "([A-Za-z_][A-Za-z0-9_]*)\\s*([.:])\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(?=[({\"'])",
+          "captures": {
+            "1": { "name": "entity.name.namespace.glua" },
+            "2": { "name": "punctuation.accessor.glua" },
+            "3": { "name": "entity.name.function.call.glua" }
+          }
+        },
+        {
+          "name": "entity.name.function.call.glua",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*[({\"'])"
+        }
+      ]
+    }
+  }
+}
