@@ -33,7 +33,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --test-reporter=../glua-lsp/test/reporter.mjs test/*.test.mjs"
+    "test": "pnpm run build && node --test --test-reporter=../glua-lsp/test/reporter.mjs test/*.test.mjs"
   },
   "dependencies": {
     "commander": "^13.1.0",

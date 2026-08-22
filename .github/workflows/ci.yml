@@ -31,14 +31,15 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
+      # Before the tests: the CLI's tests exercise its built bundle.
+      - name: Build
+        run: pnpm run build
+
       - name: Test
         run: pnpm test
         env:
           # The reporter honours NO_COLOR; Actions renders ANSI fine.
           FORCE_COLOR: '1'
-
-      - name: Build
-        run: pnpm run build
 
       # The linter run against its own deliberately-broken example addon. The
       # findings are expected, so only a crash should fail the build.

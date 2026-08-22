@@ -5,11 +5,55 @@ icon: "download"
 sidebarTitle: "Installation"
 ---
 
-GLua Language Server is distributed through GitHub Releases, so you install the `.vsix` file directly. You can also build it yourself from source. Both methods take only a few minutes.
+Pick whichever matches your editor. All three carry the same build.
+
+<CardGroup cols={3}>
+  <Card
+    title="GitHub Releases"
+    icon="github"
+    href="https://github.com/Bluejutzu/glua-lsp/releases/latest"
+  >
+    **Available now.** Download the `.vsix` and install it in any editor.
+  </Card>
+
+  <Card
+    title="Open VSX"
+    icon="box"
+    href="https://open-vsx.org/extension/bluejutzu/glua-lsp"
+  >
+    For **Cursor**, VSCodium, Gitpod and Theia.
+  </Card>
+
+  <Card
+    title="VS Code Marketplace"
+    icon="microsoft"
+    href="https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp"
+  >
+    For **VS Code**.
+  </Card>
+</CardGroup>
 
 <Note>
-  Every release is published to GitHub with the packaged `.vsix` attached. Registry publishing to [Open VSX](https://open-vsx.org) — the registry Cursor, VSCodium and Gitpod install from — is set up but not yet enabled; until then, use the `.vsix` below.
+  Registry publishing is wired into the release pipeline but the listings may not be live yet. If a link above 404s, that registry has not been published to — use the `.vsix` from GitHub Releases in the meantime; it is the same artefact.
 </Note>
+
+## Quick install
+
+<CodeGroup>
+
+```bash VS Code
+code --install-extension bluejutzu.glua-lsp
+```
+
+```bash Cursor
+cursor --install-extension bluejutzu.glua-lsp
+```
+
+```bash From a .vsix
+code --install-extension glua-lsp-0.2.0.vsix
+```
+
+</CodeGroup>
 
 ## From a release
 

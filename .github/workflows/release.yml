@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   release:
-    name: Build and publish to GitHub Releases
+    name: Build and publish
     runs-on: ubuntu-latest
 
     steps:
@@ -51,13 +51,14 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
+      # Before the tests: the CLI's tests exercise its built bundle.
+      - name: Build
+        run: pnpm run build
+
       - name: Test
         run: pnpm test
         env:
           FORCE_COLOR: '1'
-
-      - name: Build
-        run: pnpm run build
 
       - name: Package
         run: pnpm run package

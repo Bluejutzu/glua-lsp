@@ -102,7 +102,7 @@
     "eyebrows": "breadcrumbs",
     "codeblocks": {
       "theme": {
-        "light": "catppuccin-frappe",
+        "light": "catppuccin-latte",
         "dark": "catppuccin-macchiato"
       }
     }
