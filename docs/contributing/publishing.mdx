@@ -5,9 +5,22 @@ icon: "upload"
 sidebarTitle: "Publishing"
 ---
 
-Every release goes to GitHub Releases with the `.vsix` attached. Marketplace and
-Open VSX publishing are layered on top and are opt-in — the workflow skips them
-cleanly when their tokens are not configured.
+Every release goes to GitHub Releases with the `.vsix` attached. Registry
+publishing is layered on top and is opt-in — each registry is gated on its own
+token, and the workflow skips one cleanly when its token is absent.
+
+There are two registries, and they are independent:
+
+| | Reaches | Needs |
+| --- | --- | --- |
+| **[Open VSX](#open-vsx)** | Cursor, VSCodium, Gitpod, Theia | A GitHub account |
+| **[VS Code Marketplace](#vs-code-marketplace)** | VS Code | A Microsoft account |
+
+<Tip>
+  Cursor moved to Open VSX in June 2025, because Microsoft's terms restrict the
+  VS Code Marketplace to Microsoft's own products. If you only publish to one,
+  Open VSX is the one with no Microsoft dependency.
+</Tip>
 
 ## Cutting a release
 
@@ -30,7 +43,59 @@ typecheck, test, build, package, GitHub release, then publish.
 A tag containing a hyphen (`v0.2.0-beta.1`) is published as a GitHub prerelease
 and is **not** pushed to either marketplace.
 
+## Open VSX
+
+The registry Cursor, VSCodium, Gitpod and Theia install from. Free, and the only
+account involved is GitHub.
+
+<Steps>
+  <Step title="Sign in and create a token">
+    Sign in to [open-vsx.org](https://open-vsx.org) with GitHub, then
+    **Settings → Access Tokens → Generate New Token**. Copy it now; it is not
+    shown again.
+  </Step>
+
+  <Step title="Sign the publisher agreement">
+    Open VSX requires the Eclipse Foundation Publisher Agreement before your
+    first publish. There is a prompt in the UI, it is free, and it is a one-off.
+  </Step>
+
+  <Step title="Claim the namespace">
+    The namespace must match the `publisher` field in the manifest.
+
+    ```bash
+    npx ovsx create-namespace bluejutzu --pat <token>
+    ```
+  </Step>
+
+  <Step title="Add the token to GitHub">
+    Repository **Settings → Secrets and variables → Actions → New repository
+    secret**, named `OVSX_PAT`.
+  </Step>
+</Steps>
+
+To publish by hand:
+
+```bash
+pnpm run build
+pnpm run package
+npx ovsx publish packages/glua-lsp/glua-lsp-0.1.0.vsix --pat <token>
+```
+
+<Note>
+  Open VSX namespaces are unverified by default, which shows as a small warning
+  on the listing. You can request verification through the Eclipse Foundation
+  once the extension is up, but it is not required to publish or install.
+</Note>
+
 ## VS Code Marketplace
+
+<Warning>
+  **Azure DevOps is not Azure.** Publishing uses
+  [dev.azure.com](https://dev.azure.com), which is free and does not ask for a
+  payment method. `portal.azure.com` — the cloud platform that wants a card — is
+  a different product and is not involved here.
+</Warning>
 
 <Steps>
   <Step title="Create an Azure DevOps organisation">
@@ -83,47 +148,9 @@ pnpm run package
 pnpm --filter glua-lsp exec vsce publish --no-dependencies --packagePath glua-lsp-0.1.0.vsix
 ```
 
-## Open VSX
-
-Cursor, VSCodium and Windsurf do not use the Microsoft marketplace, so this is a
-separate registry with its own namespace.
-
-<Steps>
-  <Step title="Sign in and create a token">
-    Sign in to [open-vsx.org](https://open-vsx.org) with GitHub, then
-    **Settings → Access Tokens → Generate New Token**.
-  </Step>
-
-  <Step title="Sign the publisher agreement">
-    Open VSX requires the Eclipse Foundation Publisher Agreement before your
-    first publish. There is a prompt in the UI; it is a one-off.
-  </Step>
-
-  <Step title="Claim the namespace">
-    ```bash
-    npx ovsx create-namespace bluejutzu --pat <token>
-    ```
-  </Step>
-
-  <Step title="Add the token to GitHub">
-    Add it as a repository secret named `OVSX_PAT`.
-  </Step>
-</Steps>
-
 ## Before the first publish
 
-<Warning>
-  **The repository is private.** The Marketplace listing links to the
-  `repository` field in the manifest, so that link will 404 for everyone who is
-  not a collaborator. The same applies to the issues link and to every
-  `github.com` link in the README.
-
-  Either make the repository public before publishing, or remove `repository`
-  and `bugs` from `packages/glua-lsp/package.json` and drop the GitHub links
-  from its README.
-</Warning>
-
-A checklist for the rest:
+A checklist:
 
 - **Publisher ID** matches what you registered
 - **Icon** is present at `packages/glua-lsp/resources/icon.png`. Regenerate with
