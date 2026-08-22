@@ -1,0 +1,132 @@
+---
+title: "Architecture"
+description: "How a keystroke becomes a completion list."
+icon: "diagram-project"
+---
+
+```
+lexer → error-tolerant parser → binder (scopes + types + facts) → workspace index
+```
+
+Each stage is independently testable and none of them can throw on bad input.
+
+## Lexer
+
+Lua 5.1 as Garry's Mod actually runs it: LuaJIT, plus GLua's C-style aliases
+`!`, `!=`, `&&`, `||`, `//`, `/* */` and `continue`. Also LuaJIT's `0x`, `0b`,
+`LL` and `ULL` literal forms, and a UTF-8 BOM, because a surprising number of
+addon files have one.
+
+It never throws. Malformed input produces an `Invalid` token plus a recorded
+error, so later stages keep working.
+
+## Parser
+
+Recursive descent, and the contract that matters is that **it always returns a
+tree**. Half-typed code produces real nodes with `missing` holes rather than an
+exception:
+
+```lua
+local ply = player.GetByID(1)
+ply:
+--  ^ MemberExpression with a missing identifier; the base still resolves
+```
+
+That single property is what lets completion, hover and signature help keep
+working on the line you are editing — which, mid-keystroke, is never valid Lua.
+
+Parentheses are recorded rather than discarded, since they change precedence and
+also truncate multiple return values.
+
+## Binder
+
+One traversal produces everything downstream needs:
+
+<AccordionGroup>
+  <Accordion title="Scopes" icon="brackets-curly">
+    Position-aware, so `local x = x` resolves the right-hand `x` to the outer
+    one, exactly as Lua does. Shadowing, upvalues, `self`, varargs and loop
+    variables all handled.
+  </Accordion>
+
+  <Accordion title="Types" icon="shapes">
+    A small structural lattice: primitives, tables with known fields, classes
+    with an inheritance chain, unions and functions. Deliberately unsound — it
+    answers "what can follow this dot" and stays quiet when unsure.
+  </Accordion>
+
+  <Accordion title="Facts" icon="database">
+    Global definitions and references, `hook.Add` and `hook.Run` sites, net
+    registrations, sends, receives and their payload sequences, `include` and
+    `AddCSLuaFile` references, console commands and convars.
+  </Accordion>
+
+  <Accordion title="Realm regions" icon="server">
+    The file's realm from its path, plus the ranges covered by `if SERVER then`
+    style blocks.
+  </Accordion>
+</AccordionGroup>
+
+## Workspace index
+
+Every `.lua` file in the workspace, indexed for cross-file resolution: global
+paths, hook names, net messages, and the include graph.
+
+The important detail is memory. Syntax trees dominate — on a 232,000-line
+gamemode they were 770 MB — so files that are not open in the editor keep only
+their extracted facts and release the tree, along with every closure that
+captured it. That brings retained heap to 59 MB. A file gets re-parsed on demand
+if a feature actually needs its tree.
+
+## Server
+
+One file per LSP feature under `src/server/features/`. Every handler is wrapped
+so a single bad node can never take the server down; a failing feature returns
+empty and logs.
+
+Analysis is lazy: a burst of keystrokes costs one parse when diagnostics fire,
+not one per keystroke.
+
+## Client
+
+Deliberately thin. Its one real job is deciding whether a `.lua` file should be
+adopted as GLua, which is what keeps the extension from fighting other Lua
+extensions over unrelated workspaces.
+
+## The API dataset
+
+`tools/generate-api.mjs` scrapes the Garry's Mod wiki. Every page is served as
+JSON with a structured `markup` field — an XML-ish dialect that is regular
+enough to extract from, but not well-formed enough for an XML parser.
+
+The result is checked in, so nothing hits the network at install or run time.
+Rebuild it after a Garry's Mod update:
+
+```bash
+pnpm run generate-api
+```
+
+Responses are cached in `.cache/wiki/`, so re-runs are fast.
+
+<Note>
+  Two extraction details worth knowing if you touch the scraper. Function-typed
+  arguments document their callback's parameters in a nested `<callback>` block,
+  and a naive non-greedy match flattens those into the parent's parameter list —
+  which made `concommand.Add` look like it took eight arguments. Overloads are
+  multiple `<args>` blocks inside one `<function>`, not multiple functions.
+</Note>
+
+## Layout
+
+```
+packages/glua-lsp/
+  src/parser/     lexer, AST, error-tolerant parser
+  src/analyze/    scopes, type inference, realm rules, workspace index
+  src/format/     the formatter
+  src/config/     config file loading and precedence
+  src/api/        the wiki dataset and lookups over it
+  src/server/     LSP handlers, one file per feature
+  src/client/     the VS Code extension
+  tools/          the wiki scraper, the terminal colour palette
+docs/             this site
+```

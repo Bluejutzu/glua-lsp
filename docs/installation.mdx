@@ -1,0 +1,94 @@
+---
+title: "Installation"
+description: "Install the extension from a build, or from source."
+icon: "download"
+---
+
+## From a packaged build
+
+Grab the `.vsix` and install it:
+
+<CodeGroup>
+
+```bash VS Code
+code --install-extension glua-lsp-0.1.0.vsix
+```
+
+```bash Cursor
+cursor --install-extension glua-lsp-0.1.0.vsix
+```
+
+</CodeGroup>
+
+Cursor keeps a separate extension directory, so install into both if you use both.
+
+## From source
+
+<Steps>
+  <Step title="Clone and install">
+    ```bash
+    git clone https://github.com/Bluejutzu/glua-lsp
+    cd glua-lsp
+    pnpm install
+    ```
+  </Step>
+
+  <Step title="Build">
+    ```bash
+    pnpm run build
+    ```
+
+    This bundles the client and server into `packages/glua-lsp/dist/` and copies
+    the API dataset alongside them.
+  </Step>
+
+  <Step title="Run it">
+    Press <kbd>F5</kbd>. A second VS Code window opens on the bundled example
+    addon with the extension loaded.
+
+    To install it into your real editor instead:
+
+    ```bash
+    pnpm run package
+    code --install-extension packages/glua-lsp/glua-lsp-0.1.0.vsix
+    ```
+  </Step>
+</Steps>
+
+## Checking it is working
+
+Open a `.lua` file inside a Garry's Mod addon. The status bar should show
+**GLua** and the file's realm:
+
+```
+GLua · Server
+```
+
+<Warning>
+  If the status bar says **Plain Lua**, the workspace was not recognised as a
+  Garry's Mod project. Click the status bar item to switch this file over, or set
+  `glua.activation` to `always` for the whole workspace.
+</Warning>
+
+## Setting it as your formatter
+
+The extension registers itself as a formatter for the `glua` language. Point
+VS Code at it:
+
+```json settings.json
+{
+  "[glua]": {
+    "editor.defaultFormatter": "bluejutzu.glua-lsp",
+    "editor.formatOnSave": true
+  }
+}
+```
+
+See [the formatter page](/features/formatter) for what it will and will not
+change.
+
+## Requirements
+
+- VS Code 1.85 or newer
+- Nothing else — the Garry's Mod API dataset is bundled, so the extension never
+  reaches out to the network at install or run time

@@ -1,0 +1,118 @@
+---
+title: "Formatter"
+description: "Reprints from the syntax tree, refuses to touch broken files, and never drops a comment."
+icon: "align-left"
+---
+
+The formatter rebuilds your file from its syntax tree rather than patching text.
+Two rules make that safe to run on code you did not write.
+
+<CardGroup cols={2}>
+  <Card title="It will not touch a broken file" icon="shield">
+    If the file does not parse, formatting returns no edits at all. Half-broken
+    code never gets rewritten into differently-broken code.
+  </Card>
+  <Card title="It never drops a comment" icon="comment">
+    Comments are placed at statement and table-field boundaries. Anything sitting
+    somewhere it cannot be placed makes that one statement fall back to its
+    original text, verbatim.
+  </Card>
+</CardGroup>
+
+## Enabling it
+
+```json settings.json
+{
+  "[glua]": {
+    "editor.defaultFormatter": "bluejutzu.glua-lsp",
+    "editor.formatOnSave": true
+  }
+}
+```
+
+Format selection works too, on whole statements — reflowing half a statement is
+not meaningful, so the selection is widened to the statements it touches.
+
+## What it does
+
+```lua
+-- before
+local   x=1
+if x>0    then
+print(   x )
+end
+
+-- after
+local x = 1
+if x > 0 then
+	print(x)
+end
+```
+
+Beyond spacing and indentation:
+
+- Long tables and argument lists wrap at `maxLineWidth`
+- A trailing function or table argument expands on its own, so
+  `hook.Add("X", "Y", function() … end)` stays readable instead of exploding
+- Runs of blank lines collapse to `maxBlankLines`
+- Optional trailing semicolons are removed
+
+### One-liners stay one-liners
+
+```lua
+if not IsValid(ent) then return end
+```
+
+This is idiomatic GLua and expanding it to three lines is the fastest way to
+make a formatter unwelcome. Any block the author wrote on one line stays on one
+line, as long as it still fits. Turn that off with `keepSingleLineBlocks` if you
+prefer everything expanded.
+
+## Options
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `useTabs` | `true` | Editor's setting is used when nothing else specifies |
+| `indentSize` | `4` | |
+| `maxLineWidth` | `120` | Where tables and argument lists wrap |
+| `quoteStyle` | `preserve` | `double` or `single`; only rewrites when no new escaping is needed |
+| `operatorStyle` | `preserve` | `lua` rewrites `!=` `&&` `\|\|` `!` to `~=` `and` `or` `not` |
+| `commentStyle` | `preserve` | `lua` rewrites `//` and `/* */` to `--` and `--[[ ]]` |
+| `spaceInsideParens` | `false` | `true` gives `func( a, b )`, the style used across the wiki |
+| `keepSingleLineBlocks` | `true` | |
+| `maxBlankLines` | `2` | |
+| `semicolons` | `remove` | |
+
+Set them in the settings UI, or in [`.gluafmtrc.json`](/configuration/config-files)
+to share them with everyone working on the project.
+
+## GLua's C-style operators
+
+GLua accepts `!=`, `&&`, `||` and `!` as aliases for `~=`, `and`, `or` and
+`not`. The formatter leaves them alone by default, since which you use is a
+style choice. Set `operatorStyle` to `lua` to normalise them, or use the
+**Convert C-style operators to Lua** code action for a one-off pass.
+
+## How it is verified
+
+Every formatter test asserts three things, not just the output text:
+
+<Steps>
+  <Step title="Idempotence">
+    Formatting twice gives the same result as formatting once.
+  </Step>
+  <Step title="Meaning is preserved">
+    The syntax tree of the formatted output is compared against the original,
+    positions stripped. A format can never change what the code does.
+  </Step>
+  <Step title="No comment is lost">
+    Every comment present before is present after.
+  </Step>
+</Steps>
+
+<Note>
+  That second check is why the parser records parentheses rather than discarding
+  them. Dropping them would reprint `(a + b) * c` as `a + b * c`, and in Lua
+  parentheses also truncate multiple return values, so `local a, b = (f())`
+  leaves `b` as nil.
+</Note>

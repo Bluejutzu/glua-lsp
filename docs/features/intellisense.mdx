@@ -1,0 +1,110 @@
+---
+title: "IntelliSense"
+description: "How completion, hover and signature help resolve what a value actually is."
+icon: "wand-magic-sparkles"
+---
+
+Completion is driven by a real parse and a type model, not by matching the text
+on the current line. That is what lets it follow a value across statements.
+
+## Where types come from
+
+<Steps>
+  <Step title="The wiki dataset">
+    5,586 scraped entries give every documented function its parameter and
+    return types. `player.GetByID` returns `Player|NULL`, so the result gets
+    `Player` methods plus everything inherited from `Entity`.
+  </Step>
+
+  <Step title="String arguments">
+    Some constructors carry their real type in a literal.
+    `vgui.Create("DFrame")` is documented as returning `Panel`, but the string
+    says `DFrame`, so that is what you get. Same for `FindMetaTable("Player")`.
+  </Step>
+
+  <Step title="Your workspace">
+    Every `.lua` file is indexed, so globals your addon defines complete and
+    resolve across files.
+  </Step>
+
+  <Step title="How the value is used">
+    A parameter with no annotation is typed from the methods called on it.
+  </Step>
+</Steps>
+
+## Worked examples
+
+```lua
+local ply = player.GetByID(1)
+ply:SetHealth(100)        -- inherited from Entity
+ply:Kick("bye")           -- Player's own
+
+local frame = vgui.Create("DFrame")
+frame:SetTitle("Hello")   -- DFrame's own
+frame:SetSize(400, 300)   -- inherited from Panel
+
+for _, p in ipairs(player.GetAll()) do
+  p:Nick()                -- element type carried through ipairs
+end
+
+hook.Add("PlayerSay", "x", function(sender, text)
+  sender:Nick()           -- from the wiki's PlayerSay signature
+end)
+
+function ENT:Initialize()
+  self:SetModel("...")    -- Entity, because this is an entity file
+end
+```
+
+`self` depends on the hook table: `ENT` gives you an `Entity`, `SWEP` a
+`Weapon`, `PANEL` a `Panel`, `TOOL` a `Tool`.
+
+## Completing string arguments
+
+Several string positions get real completion rather than nothing:
+
+| Where | What completes |
+| --- | --- |
+| `hook.Add("…")` | Documented hooks, plus custom ones your workspace fires |
+| `net.Start("…")` / `net.Receive("…")` | Net messages known anywhere in the workspace |
+| `vgui.Create("…")` | Every VGUI panel class |
+| `include("…")` / `AddCSLuaFile("…")` | Real files, as `lua/`-relative paths |
+| `FindMetaTable("…")` | Every class with a metatable |
+| `function ENT:` | The ENTITY hook table, inserted as a full stub |
+
+## It works on unfinished code
+
+The parser is error-tolerant: it always returns a tree, filling holes with
+`missing` nodes rather than throwing. A half-typed member access still knows
+what its base is.
+
+```lua
+hook.Add("Think", "x", function()
+  local e = ents.GetByIndex(1)
+  if IsValid(e) and e:
+--                    ^ still offers Entity methods, despite the
+--                      unclosed call, unfinished if, and missing end
+```
+
+<Note>
+  This is the main practical difference from line-scanning approaches. Mid-edit,
+  your code is almost never syntactically valid, so a parser that gives up on the
+  first error cannot help you at exactly the moment you need it.
+</Note>
+
+## Hover and signature help
+
+Hover shows the resolved type, the wiki documentation, the realm, and a link to
+the wiki page. If what you are hovering cannot exist in this file's realm, that
+warning comes first.
+
+Signature help shows every documented call form, so overloaded functions like
+`surface.SetDrawColor(r, g, b, a)` and `surface.SetDrawColor(color)` both appear
+and the right one is highlighted for what you have typed.
+
+## Limits
+
+Type inference is deliberately shallow and unsound. It answers "what can follow
+this dot" and "is this argument obviously wrong", and stays quiet when it is not
+sure. Metatable tricks, `setmetatable` chains and dynamic dispatch are not
+followed.

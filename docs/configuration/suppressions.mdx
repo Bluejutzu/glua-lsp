@@ -1,0 +1,93 @@
+---
+title: "Inline suppressions"
+description: "For the one finding that is wrong when the rule itself is not."
+icon: "comment-slash"
+---
+
+Any linter that runs on real code needs an escape hatch. Without one, the only
+way to silence a single wrong finding is to turn the whole rule off, which
+costs you every correct finding it would have made.
+
+## Directives
+
+```lua
+-- glua-ignore                             next line, every rule
+-- glua-ignore realm-violation             next line, one rule
+-- glua-ignore net-unregistered, unused-local   next line, several
+
+foo()  -- glua-ignore unused-local         this line
+
+-- glua-disable net-unregistered           from here on
+-- glua-enable net-unregistered            until here
+
+-- glua-disable-file                       the whole file
+-- glua-disable-file unused-local          the whole file, one rule
+```
+
+`glua-ignore` on its own line applies to the **next** line. The same directive
+after code applies to **that** line. `glua-disable` without a matching
+`glua-enable` runs to the end of the file.
+
+Rule names are the codes shown in the Problems panel — see the
+[rule reference](/reference/rules).
+
+## Examples
+
+Depending on an optional addon:
+
+```lua
+-- glua-ignore undefined-global
+if MyOptionalAddon then MyOptionalAddon.Init() end
+```
+
+<Tip>
+  Actually, you do not need the directive here. `if x and x.y then` is recognised
+  as an existence check, so guarded globals are never reported. Prefer declaring
+  them in [`globals`](/configuration/config-files#declared-globals) when the
+  dependency is real.
+</Tip>
+
+A message with a branching payload, where the mismatch report is a false
+positive:
+
+```lua
+-- glua-ignore net-payload-mismatch
+net.Receive("my_message", function()
+  local kind = net.ReadUInt(4)
+  if kind == 1 then net.ReadEntity() end
+end)
+```
+
+A vendored file you are not going to fix:
+
+```lua
+-- glua-disable-file
+-- Third-party library, do not edit.
+```
+
+<Warning>
+  For a whole vendored directory, use a
+  [per-path override](/configuration/config-files#glua-json) instead of adding a
+  directive to every file.
+</Warning>
+
+Adding prose after the rule name is fine — it stops at the first word that is
+not a rule name:
+
+```lua
+-- glua-ignore unused-local placeholder until the API lands
+```
+
+## Choosing the right scope
+
+| Situation | Use |
+| --- | --- |
+| One line is a false positive | `-- glua-ignore <rule>` |
+| A block of code is | `-- glua-disable` / `-- glua-enable` |
+| A whole vendored file | `-- glua-disable-file`, or a path override |
+| A directory of code you do not own | `overrides` in `.glua.json` |
+| The rule is wrong for this project | `diagnostics` in `.glua.json` |
+| The rule is wrong for you personally | The settings UI |
+
+Prefer the narrowest scope that fixes the problem. A directive next to the code
+explains itself; a rule switched off project-wide six months ago does not.

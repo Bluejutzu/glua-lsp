@@ -1,0 +1,118 @@
+---
+title: "Development"
+description: "Building, testing, and benchmarking against a real codebase."
+icon: "hammer"
+---
+
+## Setup
+
+```bash
+git clone https://github.com/Bluejutzu/glua-lsp
+cd glua-lsp
+pnpm install
+pnpm run build
+```
+
+Then <kbd>F5</kbd>. A second window opens on `packages/glua-lsp/examples/my_addon`
+with the extension loaded. `lua/autorun/sh_mistakes.lua` in there is wrong on
+purpose — one mistake per diagnostic, so you can see what each looks like.
+
+## Scripts
+
+Run from the repository root.
+
+| Command | |
+| --- | --- |
+| `pnpm run build` | Bundle client and server with esbuild |
+| `pnpm run watch` | Rebuild on change |
+| `pnpm test` | The full suite |
+| `pnpm run typecheck` | TypeScript, no emit |
+| `pnpm run bench -- <path>` | Benchmark against a real addon |
+| `pnpm run generate-api` | Rebuild the wiki dataset |
+| `pnpm run package` | Produce a `.vsix` |
+| `pnpm run docs` | Serve this site locally |
+
+## Tests
+
+The suite covers the parser, analysis and features, the formatter, config
+resolution, and performance budgets.
+
+```bash
+pnpm test
+```
+
+Output is grouped by file with a summary; failures get room and their assert
+diffs are coloured by direction. `pnpm run test:plain` uses Node's default
+reporter if you would rather have machine-readable output.
+
+Three test properties are worth knowing about, because they are what keeps
+changes honest:
+
+<AccordionGroup>
+  <Accordion title="The parser must never hang or throw" icon="infinity">
+    Garbage input is fed in directly. Any statement that fails to consume a token
+    forces a resynchronise, so a malformed file cannot spin the server.
+  </Accordion>
+
+  <Accordion title="Formatting must not change meaning" icon="equals">
+    Every formatter test re-parses its own output and compares the syntax tree
+    against the original with positions stripped. It also asserts idempotence and
+    that no comment was lost.
+  </Accordion>
+
+  <Accordion title="Interactive work has a time budget" icon="stopwatch">
+    Completion, diagnostics and re-analysis are asserted against millisecond
+    budgets on a 2,000-line file, so a change that makes typing feel slow fails
+    the suite rather than being noticed later.
+  </Accordion>
+</AccordionGroup>
+
+## Benchmarking
+
+The most useful tool in the repo. Point it at a real addon or gamemode:
+
+```bash
+pnpm run bench -- C:/path/to/gamemodes/my_gamemode
+```
+
+It reports cold index time, throughput, retained heap, per-feature latency, and
+**every diagnostic grouped by rule with an example of each**.
+
+That last section is the point. A change that makes the output noisier shows up
+immediately as a rule whose count jumped, with a concrete example to check by
+hand. Developing against a real 232,000-line codebase this way turned up a
+left-associativity bug in the precedence table, a BOM at the start of a hundred
+files, Vector arithmetic being inferred as `number`, and the nested-callback
+scraping bug — none of which the unit tests would have caught.
+
+## Colour palette
+
+`packages/glua-lsp/tools/palette.mjs` holds the project's colours as hex values
+in one place, so the test reporter, the benchmark and this site all use the same
+ones rather than inventing their own.
+
+| Role | |
+| --- | --- |
+| Accent | `#D97757` |
+| Success | `#4ADE80` |
+| Failure | `#F87171` |
+| Warning | `#FBBF24` |
+| Highlight | `#60A5FA` |
+| Text / muted / faint | `#E5E5E5` / `#9CA3AF` / `#6B7280` |
+
+Terminal output honours `NO_COLOR` and disables itself when piped.
+
+## Docs
+
+This site is [Mintlify](https://mintlify.com). To preview it:
+
+```bash
+pnpm add -g mint
+pnpm run docs
+```
+
+Pages are MDX under `docs/`, and navigation lives in `docs/docs.json`.
+
+```bash
+pnpm run docs:check   # find broken links
+```

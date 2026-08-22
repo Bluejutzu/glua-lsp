@@ -1,0 +1,80 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "GLua Language Server",
+  "description": "Language support for Garry's Mod Lua in VS Code — IntelliSense, realm awareness, net message analysis and a formatter.",
+  "colors": {
+    "primary": "#D97757",
+    "light": "#E89B80",
+    "dark": "#A85C42"
+  },
+  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["index", "installation", "quickstart"]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/intellisense",
+              "features/typing-your-code",
+              "features/realms",
+              "features/net-messages",
+              "features/hooks",
+              "features/formatter"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/config-files",
+              "configuration/suppressions"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": ["reference/rules", "reference/annotations", "reference/commands"]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Internals",
+            "pages": ["contributing/architecture", "contributing/development"]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/Bluejutzu/glua-lsp"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Bluejutzu/glua-lsp"
+    }
+  },
+  "search": {
+    "prompt": "Search the GLua docs"
+  }
+}

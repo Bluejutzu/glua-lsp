@@ -1,0 +1,109 @@
+---
+title: "Quickstart"
+description: "The handful of things worth knowing before you start writing."
+icon: "rocket"
+---
+
+## Completion follows your values
+
+You do not need to annotate anything for the common cases. The server tracks
+what a value is through calls, string arguments and loops.
+
+```lua
+local ply = player.GetByID(1)        -- Player
+local frame = vgui.Create("DFrame")  -- DFrame, read out of the string literal
+
+for _, p in ipairs(player.GetAll()) do
+  p:Nick()                           -- Player, through ipairs
+end
+```
+
+It also keeps working mid-keystroke. The parser always returns a tree, so
+`ply:` on a line you have not finished still resolves.
+
+## Your own functions
+
+Lua has no type syntax, so a parameter in your own code has nothing to go on.
+Annotate it, or let it be inferred from use:
+
+<CodeGroup>
+
+```lua Annotated
+---@param ply Player
+---@param reason string
+local function punish(ply, reason)
+  ply:Kick(reason)     -- Player methods complete
+end
+```
+
+```lua Inferred
+local function canPlace(ply)
+  return ply:IsAdmin() -- IsAdmin only exists on Player, so ply is a Player
+end
+```
+
+</CodeGroup>
+
+[More on both →](/features/typing-your-code)
+
+## Realms are not a suggestion
+
+Files get a realm from where they live. Call something that does not exist in
+that realm and you hear about it immediately:
+
+```lua lua/autorun/client/cl_thing.lua
+local ply = player.GetByID(1)
+ply:Kick("nope")
+--  ^ Player:Kick only exists Server-side, but this code runs Client-side
+```
+
+[More on realms →](/features/realms)
+
+## Net messages are checked end to end
+
+The sender and the handler usually live in different files. Both are indexed, so
+mismatches surface where you are working:
+
+```lua lua/autorun/server/sv_thing.lua
+util.AddNetworkString("my_message")
+
+net.Start("my_message")
+  net.WriteString("hello")
+  net.WriteEntity(ent)
+net.Broadcast()
+```
+
+```lua lua/autorun/client/cl_thing.lua
+net.Receive("my_message", function()
+  local text = net.ReadString()
+  local n = net.ReadUInt(8)
+  --        ^ Payload mismatch: sender writes [String, Entity],
+  --          this handler reads [String, UInt]
+end)
+```
+
+[More on net analysis →](/features/net-messages)
+
+## Silencing a finding
+
+When one report is wrong but the rule is not, suppress it inline:
+
+```lua
+-- glua-ignore unused-local
+local placeholder = nil
+```
+
+When a rule is wrong for your whole project, turn it off in
+[a config file](/configuration/config-files) so everyone gets the same rules.
+
+## Commands worth knowing
+
+| Command | What it does |
+| --- | --- |
+| `GLua: Show Net Message Graph` | Every net message, who registers, sends and handles it |
+| `GLua: Create Linter Config File` | Writes `.glua.json` from your current settings |
+| `GLua: Create Formatter Config File` | Writes `.gluafmtrc.json` from your current settings |
+| `GLua: Re-index Workspace` | Rescan after big changes on disk |
+| `GLua: Open Settings` | Jump straight to the settings UI |
+
+[Full command list →](/reference/commands)

@@ -1,0 +1,117 @@
+---
+title: "Annotations"
+description: "The ---@ comment tags that are read, and the type expressions they accept."
+icon: "at"
+---
+
+Annotations follow the Lua Language Server dialect, so anything you already have
+works here and anything you write keeps working there.
+
+## Tags
+
+### `@param`
+
+```lua
+---@param ply Player            required
+---@param count? number         optional
+---@param reason string why they were kicked
+function punish(ply, count, reason) end
+```
+
+Text after the type becomes the parameter's documentation.
+
+<Warning>
+  A `@param` with no type is treated as documentation, not a type. Writing
+  `--- @param ply the player who did it` will not create a type called `the`.
+  That is deliberate — the tag is only honoured when the second word is
+  recognisably a type.
+</Warning>
+
+### `@return`
+
+```lua
+---@return boolean
+---@return Player owner the entity's owner
+```
+
+### `@type`
+
+Overrides whatever the initialiser looked like. The escape hatch when inference
+gets it wrong:
+
+```lua
+---@type Player
+local target = nil
+
+---@type table<string, Entity>
+local byName = {}
+```
+
+### `@class` and `@field`
+
+```lua
+---@class MyAddon.Config : BaseConfig
+---@field enabled boolean
+---@field speed number how fast, in units per second
+MyAddon.Config = {}
+```
+
+### `@deprecated`
+
+```lua
+---@deprecated use MyAddon.NewThing instead
+function MyAddon.OldThing() end
+```
+
+Unrecognised tags (`@see`, `@usage`, `@author`) are left as documentation text
+rather than discarded.
+
+## Type expressions
+
+| Form | Meaning |
+| --- | --- |
+| `Player` | A documented class |
+| `number`, `string`, `boolean`, `table`, `function`, `any`, `nil` | Primitives |
+| `Entity\|nil` | A union |
+| `Player?` | Shorthand for `Player\|nil` |
+| `Entity[]` | An array of Entity |
+| `table<string, Player>` | A map; the value type is what gets used |
+| `fun(a: number): boolean` | A function |
+| `PlayerInfo` | A documented wiki structure |
+
+Any class name from the Garry's Mod API works: `Entity`, `Player`, `Weapon`,
+`NPC`, `Vehicle`, `NextBot`, `Panel`, `Vector`, `Angle`, `VMatrix`, `PhysObj`,
+`CUserCmd`, `CMoveData`, `ConVar`, `IMaterial`, and the rest.
+
+## Placement
+
+The comment block must sit directly above the declaration, with no blank line
+between:
+
+<CodeGroup>
+
+```lua Works
+--- Gives a player their loadout.
+---@param ply Player
+function GiveLoadout(ply) end
+```
+
+```lua Does not work
+--- Gives a player their loadout.
+---@param ply Player
+
+function GiveLoadout(ply) end
+```
+
+</CodeGroup>
+
+Both `---` and `--` are accepted, as are GLua's `//` comments.
+
+## When you do not need them
+
+Parameters with no annotation are typed from the methods called on them, so a
+lot of helper functions need nothing at all. See
+[typing your own code](/features/typing-your-code#or-annotate-nothing).
+
+An explicit `@param` always wins over inference, which makes it the right tool
+when inference picks a base class and you want the specific one.

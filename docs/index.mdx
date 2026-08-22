@@ -1,0 +1,113 @@
+---
+title: "GLua Language Server"
+sidebarTitle: "Overview"
+description: "Language support for Garry's Mod Lua in VS Code: IntelliSense that follows your values, diagnostics that catch realm and net message bugs before you launch the game, and a formatter."
+---
+
+GLua Language Server is a VS Code extension for Garry's Mod Lua. It reads your
+whole workspace, tracks what your values actually are, and reports the mistakes
+that normally only show up as `attempt to call a nil value` in the server
+console.
+
+It is backed by 5,586 API entries scraped from the Garry's Mod wiki, plus an
+index of the addon you are working on.
+
+<CardGroup cols={2}>
+  <Card title="Install it" icon="download" href="/installation">
+    Get the extension running, from the marketplace or a local build.
+  </Card>
+  <Card title="Five minute tour" icon="rocket" href="/quickstart">
+    The things worth knowing before you start writing.
+  </Card>
+  <Card title="Configure it" icon="sliders" href="/configuration/overview">
+    Settings, committed config files, and inline rule suppressions.
+  </Card>
+  <Card title="Rule reference" icon="list-check" href="/reference/rules">
+    Every diagnostic, what it catches, and when to turn it off.
+  </Card>
+</CardGroup>
+
+## What it does
+
+<AccordionGroup>
+  <Accordion title="IntelliSense that tracks types" icon="wand-magic-sparkles">
+    Completion follows values through calls, loops, callbacks and metatables.
+    `vgui.Create("DFrame")` resolves to `DFrame`, `player.GetAll()` iterates as
+    `Player`, and `self` inside `function ENT:Think()` is an `Entity`.
+
+    [Read more →](/features/intellisense)
+  </Accordion>
+
+  <Accordion title="Realm awareness" icon="server">
+    Every file gets a realm from its path, narrowed further by `if SERVER then`
+    blocks. Calling `Player:Kick` from a clientside file is flagged before you
+    run the game, and serverside-only functions do not appear in completion
+    where they cannot exist.
+
+    [Read more →](/features/realms)
+  </Accordion>
+
+  <Accordion title="Net message analysis" icon="tower-broadcast">
+    Both halves of a net message live in different files and usually different
+    realms. Unregistered messages, messages that are never sent, handlers that
+    never run, and **payload mismatches between the writes and the reads** are
+    all reported across files.
+
+    [Read more →](/features/net-messages)
+  </Accordion>
+
+  <Accordion title="Hook intelligence" icon="anchor">
+    Hook name completion, typo detection with suggestions, and callback
+    parameters typed from the hook's documented signature. `function ENT:`
+    completes the ENTITY hook table and inserts a full stub.
+
+    [Read more →](/features/hooks)
+  </Accordion>
+
+  <Accordion title="A formatter" icon="align-left">
+    Reprints from the syntax tree. It refuses to touch a file that does not
+    parse, never drops a comment, and leaves idiomatic one-liners like
+    `if not IsValid(ent) then return end` alone.
+
+    [Read more →](/features/formatter)
+  </Accordion>
+</AccordionGroup>
+
+## It stays out of the way
+
+The extension does **not** claim `.lua` in its manifest. Anything that claims
+`.lua` globally ends up competing for Love2D, Luau and Neovim workspaces, so
+this one only adopts a file when the workspace actually looks like Garry's Mod —
+a `lua/` tree, an `addon.json`, a `gamemodes/` directory, or GMod-only API use in
+the file itself.
+
+<Tip>
+  `glua.activation` switches that to `always` or `never`, and the status bar item
+  toggles it for the current file.
+</Tip>
+
+## Performance
+
+Measured on a 932-file, 232,000-line gamemode.
+
+| | |
+| --- | --- |
+| Cold index | 4.8 s (~48k lines/sec), batched so it never blocks the editor |
+| Retained heap | 59 MB — syntax trees are released for files you do not have open |
+| Re-analyse a 3,200-line file on edit | 31 ms |
+| Completion | 1.2 ms member, 4.1 ms global scope |
+| Diagnostics | 3.5 ms |
+
+Parse errors on that codebase: zero.
+
+## Prior art
+
+Heavily inspired by
+[vscode-glua-enhanced](https://github.com/WilliamVenner/vscode-glua-enhanced),
+which is where a lot of these ideas come from — wiki-backed completion, realm
+flags, net message discovery. Go use it.
+
+This is another attempt at the same problem from a different angle: a language
+server with a parser and a type model underneath, rather than providers running
+in the extension host. That is the structural difference, and most of what is
+above follows from it.

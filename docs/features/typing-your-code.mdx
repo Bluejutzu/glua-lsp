@@ -1,0 +1,110 @@
+---
+title: "Typing your own code"
+description: "Lua has no type syntax. Two ways to give your own functions types anyway."
+icon: "signature"
+---
+
+The API dataset covers everything Garry's Mod ships. Your own functions are the
+gap: `function MyAddon.CanPlace(ply)` gives the editor nothing to work with.
+
+There are two ways to close it, and you can mix them freely.
+
+## Annotations
+
+The same `---@param` dialect the Lua Language Server uses, so annotations you
+already have work here, and anything you write keeps working there.
+
+```lua
+--- Returns true when the player may place a turret.
+---@param ply Player
+---@param count? number how many they already have
+---@return boolean
+function MyAddon.CanPlace(ply, count)
+  return ply:IsAdmin()
+end
+```
+
+<Note>
+  Prose stays prose. `--- Returns true when…` shows up in hover; the `@param`
+  lines do not.
+</Note>
+
+### Supported tags
+
+| Tag | Example |
+| --- | --- |
+| `@param` | `---@param ply Player` |
+| `@return` | `---@return boolean ok` |
+| `@type` | `---@type Player` |
+| `@class` | `---@class MyThing : Base` |
+| `@field` | `---@field name string` |
+| `@deprecated` | `---@deprecated use MyAddon.Other instead` |
+
+### Type expressions
+
+| Form | Meaning |
+| --- | --- |
+| `Player` | A class, struct or primitive |
+| `Entity\|nil` | A union |
+| `Player?` | Shorthand for `Player\|nil` |
+| `Entity[]` | An array |
+| `table<string, Player>` | A map; the value type is what gets used |
+| `fun(a: number)` | A function |
+
+`---@type` overrides whatever the initialiser looked like, which is the escape
+hatch when inference gets it wrong:
+
+```lua
+---@type Player
+local target = nil
+```
+
+<Tip>
+  A `@param` with no type is treated as documentation, not a type. Writing
+  `--- @param ply the player who did it` will not create a type called `the`.
+</Tip>
+
+## Or annotate nothing
+
+Parameters with no annotation are typed from the methods called on them.
+
+```lua
+local function canPlace(ply)
+  return ply:IsAdmin()       -- IsAdmin exists only on Player -> Player
+end
+
+local function move(ent)
+  ent:SetPos(ent:GetPos())   -- shared by many classes -> Entity
+end
+```
+
+How the guess is made:
+
+<Steps>
+  <Step title="Collect the methods">
+    Every `:` call on that parameter inside the function body.
+  </Step>
+  <Step title="Find the classes that have all of them">
+    Searching the types people actually pass around first, so the ninety-odd
+    panel classes cannot outvote `Entity` on a method they happen to share.
+  </Step>
+  <Step title="Prefer the common ancestor">
+    When several match, the one the others inherit from wins — as long as it
+    accounts for most of them.
+  </Step>
+  <Step title="Otherwise, stay quiet">
+    An unrecognisable method set leaves the parameter as `any` rather than
+    guessing.
+  </Step>
+</Steps>
+
+An explicit `---@param` always beats inference.
+
+## Which to use
+
+Inference is free and covers most helper functions. Reach for annotations when:
+
+- the parameter is only passed through, never called on
+- the function is part of an API other people use
+- inference picked a base class and you want the specific one
+- you want the parameter documented in hover anyway

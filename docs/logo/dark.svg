@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 32" width="190" height="32" role="img" aria-label="GLua Language Server">
+  <rect width="32" height="32" rx="7" fill="#D97757"/>
+  <circle cx="12.5" cy="19.5" r="5.5" fill="#fff"/>
+  <circle cx="22" cy="12" r="2.6" fill="#fff"/>
+  <text x="42" y="21.5" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#F3F4F6">GLua</text>
+  <text x="88" y="21.5" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="400" fill="#9CA3AF">Language Server</text>
+</svg>

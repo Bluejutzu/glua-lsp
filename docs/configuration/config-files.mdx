@@ -1,0 +1,143 @@
+---
+title: "Config files"
+description: "Committed rules, so everyone working on the project gets the same ones."
+icon: "file-code"
+---
+
+Editor settings are per person. A linter a team shares needs its rules in the
+repository, next to the code they apply to.
+
+Two files do that. Both accept comments and trailing commas, and both get
+completion and validation while you edit them.
+
+## `.glua.json`
+
+Rules, declared globals, and per-path overrides.
+
+```jsonc .glua.json
+{
+  "$schema": "./node_modules/glua-lsp/schemas/glua.schema.json",
+
+  // Addons outside this workspace, so they are not reported as undefined.
+  "globals": ["ULib", "ulx", "pac"],
+
+  "diagnostics": {
+    "unusedLocal": "off",
+    "realmViolation": "error",
+    "netReadWriteMismatch": "error"
+  },
+
+  // Rules can vary by path. Later entries win.
+  "overrides": [
+    {
+      "files": ["lua/vendor/**", "lua/thirdparty/**"],
+      "diagnostics": {
+        "undefinedGlobal": "off",
+        "unusedLocal": "off"
+      }
+    }
+  ]
+}
+```
+
+Also accepted: `glua.json`, `.gluarc.json`.
+
+### Declared globals
+
+The single most useful key. If your addon depends on ULX, every `ULib.…` is
+reported as an undefined global — correctly, since it is not in your workspace,
+but uselessly.
+
+```json
+{ "globals": ["ULib", "ulx"] }
+```
+
+<Tip>
+  On a real 932-file gamemode this one line removed 49 of the 59 remaining
+  undefined-global reports.
+</Tip>
+
+## `.gluafmtrc.json`
+
+Formatting only. Wins over `.editorconfig`, `.prettierrc` and your editor
+settings.
+
+```jsonc .gluafmtrc.json
+{
+  "$schema": "./node_modules/glua-lsp/schemas/gluafmtrc.schema.json",
+
+  "useTabs": true,
+  "indentSize": 4,
+  "maxLineWidth": 120,
+  "quoteStyle": "double",
+  "keepSingleLineBlocks": true,
+
+  "overrides": [
+    {
+      "files": ["lua/vendor/**"],
+      "options": { "maxLineWidth": 200 }
+    }
+  ]
+}
+```
+
+Also accepted: `.gluafmtrc`, `gluafmt.json`.
+
+See [the formatter page](/features/formatter#options) for every option.
+
+## Generating them
+
+You do not have to write these by hand:
+
+- `GLua: Create Formatter Config File`
+- `GLua: Create Linter Config File`
+
+Both write the file into your workspace root, seeded from whatever you have
+already set in the settings UI, and open it.
+
+## Glob patterns
+
+`files` patterns are relative to the config file's directory.
+
+| Pattern | Matches |
+| --- | --- |
+| `lua/vendor/**` | Everything under `lua/vendor`, including directly inside it |
+| `*.lua` | `.lua` files in the root only — `*` does not cross a `/` |
+| `**/cl_*.lua` | Any `cl_` file at any depth |
+| `{*.lua,*.glua}` | Either extension |
+| `sh_?.lua` | `sh_a.lua`, `sh_b.lua`, … |
+
+## Existing config files
+
+If your repo already pins formatting, it is read rather than ignored:
+
+<CodeGroup>
+
+```ini .editorconfig
+[*.lua]
+indent_style = space
+indent_size = 2
+max_line_length = 100
+end_of_line = lf
+```
+
+```json .prettierrc
+{
+  "useTabs": false,
+  "tabWidth": 2,
+  "printWidth": 100,
+  "singleQuote": true
+}
+```
+
+</CodeGroup>
+
+Both map onto the formatter options that have a Lua equivalent. Prettier's
+`semi: false` maps to removing optional semicolons; anything JavaScript-specific
+is ignored.
+
+<Note>
+  These are read from the workspace root only. If a `.gluafmtrc.json` sets the
+  same option, it wins — but anything it does not set still comes from the
+  generic files, so the two combine rather than one replacing the other.
+</Note>

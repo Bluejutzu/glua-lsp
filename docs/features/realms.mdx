@@ -1,0 +1,137 @@
+---
+title: "Realms"
+description: "How the server works out whether a file runs on the client, the server, or both — and what it does with that."
+icon: "server"
+---
+
+Garry's Mod runs the same language in two places with different APIs available.
+Calling a serverside function from a clientside file is not a syntax error, it
+is a `nil` at runtime, usually noticed in the server console much later.
+
+Every file gets a realm, and that drives diagnostics, completion filtering and
+hover.
+
+## How a file's realm is decided
+
+Rules are tried in order. The first match wins.
+
+| Signal | Realm | Confidence |
+| --- | --- | --- |
+| `cl_init.lua` | Client | Certain |
+| `init.lua` in an entity, weapon or gamemode | Server | Certain |
+| `shared.lua` | Shared | Certain |
+| `lua/autorun/client/` | Client | Certain |
+| `lua/autorun/server/` | Server | Certain |
+| `lua/menu/` | Menu | Certain |
+| `lua/effects/`, `lua/vgui/`, `lua/postprocess/` | Client | Certain |
+| A `client/` or `server/` directory | Client / Server | Certain |
+| `cl_` filename prefix | Client | Convention |
+| `sv_` filename prefix | Server | Convention |
+| `sh_` filename prefix | Shared | Convention |
+| Nothing matched | Shared | Guess |
+
+<Note>
+  The confidence column matters. Path-based conclusions are treated as facts.
+  Filename prefixes are a convention people break — plenty of addons include a
+  `cl_` file on both realms — so findings based on a prefix are reported as
+  **information** rather than warnings.
+</Note>
+
+## Narrowing inside a file
+
+A shared file is not uniformly shared. `if SERVER then` blocks narrow the realm
+for everything inside them, including the matching `else`:
+
+```lua lua/autorun/sh_thing.lua
+-- shared here
+
+if SERVER then
+  -- server here; Player:Kick is fine
+  ply:Kick("bye")
+else
+  -- client here; surface.SetDrawColor is fine
+  surface.SetDrawColor(255, 0, 0)
+end
+```
+
+`if not CLIENT then`, `if SERVER and something then` and `if MENU_DLL then` are
+all understood.
+
+## What it is used for
+
+<AccordionGroup>
+  <Accordion title="Diagnostics" icon="triangle-exclamation">
+    Calling something that cannot exist here is reported with the reason the
+    realm was decided, so you can tell whether the finding or the detection is
+    wrong:
+
+    ```
+    'Player:Kick' only exists Server-side, but this code runs
+    Client-side (cl_init.lua is loaded clientside only). It will be nil here.
+    ```
+
+    Quick fix: wrap the statement in `if SERVER then ... end`.
+  </Accordion>
+
+  <Accordion title="Completion filtering" icon="filter">
+    Serverside-only functions do not appear in a clientside file at all. Turn
+    this off with `glua.completion.filterByRealm` if you would rather see
+    everything.
+  </Accordion>
+
+  <Accordion title="Hover" icon="hand-pointer">
+    Hovering something out of realm puts a warning above the documentation
+    rather than leaving you to notice the realm badge.
+  </Accordion>
+
+  <Accordion title="AddCSLuaFile checking" icon="file-arrow-up">
+    A clientside file that is `include`d but never passed to `AddCSLuaFile` will
+    never reach clients. That is reported at the `include` site, with a quick fix
+    that adds the call.
+
+    Files in `lua/autorun`, `lua/entities`, `lua/weapons`, `lua/effects` and
+    `lua/vgui` are skipped, since the engine networks those itself.
+  </Accordion>
+</AccordionGroup>
+
+## When detection is wrong
+
+If a `cl_` file really does run on both realms, you have three options, in
+increasing order of scope:
+
+<CodeGroup>
+
+```lua Inline
+-- glua-disable realm-violation
+```
+
+```json Per path
+{
+  "overrides": [
+    {
+      "files": ["lua/myaddon/shared/**"],
+      "diagnostics": { "realmViolation": "off" }
+    }
+  ]
+}
+```
+
+```json Everywhere
+{
+  "diagnostics": { "realmViolation": "off" }
+}
+```
+
+</CodeGroup>
+
+Renaming the file to `sh_` is usually the better fix — it makes the intent
+obvious to people as well as to the tooling.
+
+## Seeing a file's realm
+
+The status bar shows it for the active file. To see it inline for every file,
+turn on `glua.inlayHints.realm`:
+
+```
+Shared · library — no realm convention matched; assuming shared
+```
