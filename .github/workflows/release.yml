@@ -65,7 +65,15 @@ jobs:
       - name: Resolve artifact
         id: artifact
         run: |
-          vsix=$(ls packages/glua-lsp/*.vsix | head -n1)
+          # Name it explicitly rather than globbing: a stray .vsix in the tree
+          # would otherwise be picked up and published in place of the build.
+          version=$(node -p "require('./packages/glua-lsp/package.json').version")
+          vsix="packages/glua-lsp/glua-lsp-${version}.vsix"
+          if [ ! -f "$vsix" ]; then
+            echo "::error::Expected $vsix, but packaging did not produce it."
+            ls -la packages/glua-lsp/*.vsix || true
+            exit 1
+          fi
           echo "path=$vsix" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$vsix")" >> "$GITHUB_OUTPUT"
           echo "size=$(du -h "$vsix" | cut -f1)" >> "$GITHUB_OUTPUT"
