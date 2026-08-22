@@ -1,117 +1,61 @@
 ---
-title: "Annotations"
-description: "The ---@ comment tags that are read, and the type expressions they accept."
+title: "GLua Annotation Reference"
+description: "Reference for all annotation tags supported by GLua Language Server, using the same ---@tag dialect as the Lua Language Server for compatibility."
 icon: "at"
+sidebarTitle: "Annotations"
 ---
 
-Annotations follow the Lua Language Server dialect, so anything you already have
-works here and anything you write keeps working there.
+GLua Language Server uses the same annotation dialect as the Lua Language Server. If you already annotate Lua projects with `---@param`, `---@class`, and similar tags, those annotations work here without changes. This page lists every supported tag and the type syntax you can use with it.
 
-## Tags
+## Annotation tags
 
-### `@param`
+| Tag | Syntax | Purpose |
+| --- | --- | --- |
+| `---@param` | `---@param name type` or `---@param name? type` | Documents a function parameter. Add `?` after the name to mark it optional. |
+| `---@return` | `---@return type` | Documents the return type of a function. |
+| `---@type` | `---@type type` | Overrides the inferred type of the following expression or variable. |
+| `---@class` | `---@class ClassName` | Declares a new class or table shape. |
+| `---@field` | `---@field name type` | Declares a field on a class declared with `---@class`. |
+| `---@deprecated` | `---@deprecated` | Marks a function or field as deprecated. The server will surface a diagnostic at call sites. |
 
-```lua
----@param ply Player            required
----@param count? number         optional
----@param reason string why they were kicked
-function punish(ply, count, reason) end
-```
+## Type syntax
 
-Text after the type becomes the parameter's documentation.
+You can compose types with unions, optionals, arrays, and generic tables.
 
-<Warning>
-  A `@param` with no type is treated as documentation, not a type. Writing
-  `--- @param ply the player who did it` will not create a type called `the`.
-  That is deliberate — the tag is only honoured when the second word is
-  recognisably a type.
-</Warning>
+| Pattern | Example | Meaning |
+| --- | --- | --- |
+| Union | `Entity \| nil` | Either an `Entity` or `nil`. |
+| Optional parameter | `count?` | The parameter may be omitted. |
+| Array | `Entity[]` | An array (table) of `Entity` values. |
+| Generic table | `table<string, Player>` | A table with string keys and `Player` values. |
 
-### `@return`
-
-```lua
----@return boolean
----@return Player owner the entity's owner
-```
-
-### `@type`
-
-Overrides whatever the initialiser looked like. The escape hatch when inference
-gets it wrong:
+## Full example
 
 ```lua
----@type Player
-local target = nil
+---@class VehicleConfig
+---@field model string
+---@field maxSpeed number
+---@field isAdminOnly boolean
 
----@type table<string, Entity>
-local byName = {}
+---Create a vehicle config entry.
+---@param model string The model path.
+---@param maxSpeed number Top speed in source units.
+---@param isAdminOnly? boolean Defaults to false.
+---@return VehicleConfig
+local function makeVehicleConfig(model, maxSpeed, isAdminOnly)
+  ---@type VehicleConfig
+  local config = {
+    model = model,
+    maxSpeed = maxSpeed,
+    isAdminOnly = isAdminOnly or false,
+  }
+  return config
+end
+
+---@deprecated Use makeVehicleConfig instead.
+local function oldVehicleConfig() end
 ```
 
-### `@class` and `@field`
-
-```lua
----@class MyAddon.Config : BaseConfig
----@field enabled boolean
----@field speed number how fast, in units per second
-MyAddon.Config = {}
-```
-
-### `@deprecated`
-
-```lua
----@deprecated use MyAddon.NewThing instead
-function MyAddon.OldThing() end
-```
-
-Unrecognised tags (`@see`, `@usage`, `@author`) are left as documentation text
-rather than discarded.
-
-## Type expressions
-
-| Form | Meaning |
-| --- | --- |
-| `Player` | A documented class |
-| `number`, `string`, `boolean`, `table`, `function`, `any`, `nil` | Primitives |
-| `Entity\|nil` | A union |
-| `Player?` | Shorthand for `Player\|nil` |
-| `Entity[]` | An array of Entity |
-| `table<string, Player>` | A map; the value type is what gets used |
-| `fun(a: number): boolean` | A function |
-| `PlayerInfo` | A documented wiki structure |
-
-Any class name from the Garry's Mod API works: `Entity`, `Player`, `Weapon`,
-`NPC`, `Vehicle`, `NextBot`, `Panel`, `Vector`, `Angle`, `VMatrix`, `PhysObj`,
-`CUserCmd`, `CMoveData`, `ConVar`, `IMaterial`, and the rest.
-
-## Placement
-
-The comment block must sit directly above the declaration, with no blank line
-between:
-
-<CodeGroup>
-
-```lua Works
---- Gives a player their loadout.
----@param ply Player
-function GiveLoadout(ply) end
-```
-
-```lua Does not work
---- Gives a player their loadout.
----@param ply Player
-
-function GiveLoadout(ply) end
-```
-
-</CodeGroup>
-
-Both `---` and `--` are accepted, as are GLua's `//` comments.
-
-## When you do not need them
-
-Parameters with no annotation are typed from the methods called on them, so a
-lot of helper functions need nothing at all. See
-[typing your own code](/features/typing-your-code#or-annotate-nothing).
-
-An explicit `@param` always wins over inference, which makes it the right tool
-when inference picks a base class and you want the specific one.
+<Note>
+  When you write an explicit `---@param` or `---@type`, it always wins over automatic inference. Use this to correct the server when your code shape is too dynamic for it to follow.
+</Note>

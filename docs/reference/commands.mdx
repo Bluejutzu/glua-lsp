@@ -1,61 +1,20 @@
 ---
-title: "Commands"
-description: "Everything in the command palette, and the code actions available on a finding."
+title: "GLua Language Server Commands"
+description: "All VS Code commands provided by GLua Language Server, with what each one does and when to reach for it during Garry's Mod addon development."
 icon: "terminal"
+sidebarTitle: "Commands"
 ---
 
-## Command palette
+GLua Language Server adds several commands to the VS Code Command Palette. Use them to inspect your addon, regenerate config files, or force a re-scan after large file changes.
 
-All of these are under the **GLua** category.
-
-| Command | What it does |
+| Command | Description |
 | --- | --- |
-| **Show Net Message Graph** | Opens a markdown report of every net message: who registers, sends and handles each one, and whether the payloads line up |
-| **Create Formatter Config File** | Writes `.gluafmtrc.json` seeded from your current settings, and opens it |
-| **Create Linter Config File** | Writes `.glua.json` seeded from your current settings, and opens it |
-| **Open Settings** | Jumps to this extension's section of the settings editor |
-| **Re-index Workspace** | Rescans every Lua file. Useful after a large change on disk, like a branch switch |
-| **Restart Language Server** | Restarts the server process |
-| **Treat This File As GLua** | Forces GLua analysis for the current file |
-| **Treat This File As Plain Lua** | Hands the current file back to your other Lua extension |
+| `GLua: Show Net Message Graph` | Opens a graph of every net message in your workspace. Shows who registers the message, who sends it, and who handles it. Use this to find orphaned or mismatched net traffic. |
+| `GLua: Create Linter Config File` | Writes a `.glua.json` file into the workspace root using your current settings as the baseline. Edit the file afterward to tune rule severity. |
+| `GLua: Create Formatter Config File` | Writes a `.gluafmtrc.json` file into the workspace root using your current formatter settings as the baseline. |
+| `GLua: Re-index Workspace` | Forces a full rescan of the workspace. Reach for this after large disk changes (for example, switching Git branches or bulk file moves) when the incremental watcher may have missed events. |
+| `GLua: Open Settings` | Opens the GLua Language Server settings page in the VS Code Settings UI. |
 
-The last two are also reachable by clicking the status bar item, which shows the
-current file's realm.
-
-## Code actions
-
-Offered on the lightbulb when the cursor is on a relevant finding.
-
-### Quick fixes
-
-| On | Fix |
-| --- | --- |
-| `compound-assignment` | Rewrite `x += 1` as `x = x + 1` |
-| `unused-local` | Rename to `_name` to mark it intentionally unused |
-| `net-unregistered` | Add `util.AddNetworkString("…")` at the top of the file |
-| `net-never-received` | Append a `net.Receive` handler stub |
-| `missing-addcsluafile` | Add `AddCSLuaFile("…")` above the include |
-| `realm-violation` | Wrap the statement in `if SERVER then … end` |
-| `unknown-hook` | Change to the closest matching hook names |
-
-### Refactors
-
-| Action | What it does |
-| --- | --- |
-| **Localise `math.floor`** | Hoists a repeatedly-used library function to `local math_floor = math.floor` at the top of the file. Offered when it is used at least twice |
-| **Convert C-style operators to Lua** | Rewrites every `!=`, `&&`, `\|\|` and `!` in the document to `~=`, `and`, `or` and `not` |
-
-## Editor features
-
-Standard LSP features, available without a command:
-
-- Completion, hover, signature help with overloads
-- Go to definition, find all references, rename
-- Document and workspace symbols
-- Document highlights
-- Semantic highlighting
-- Inlay parameter hints
-- Format document and format selection
-
-Rename works on more than identifiers: renaming a **net message** or a **hook
-name** string updates every registration, send and handler across the workspace.
+<Tip>
+  Open any command quickly from the Command Palette with **Ctrl\+Shift\+P** (Windows/Linux) or **Cmd\+Shift\+P** (macOS), then type the command name.
+</Tip>

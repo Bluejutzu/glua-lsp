@@ -1,0 +1,43 @@
+---
+title: "GLua Language Server Performance"
+sidebarTitle: "Performance"
+description: "GLua Language Server is designed to stay fast on large codebases, with measured benchmarks on a 932-file, 232,000-line Garry's Mod gamemode."
+---
+
+All numbers on this page were measured on a real-world gamemode: 932 files and 232,000 lines of Garry's Mod Lua. The server is built to stay responsive on codebases of that size and larger.
+
+## Benchmarks
+
+| Metric | Result |
+| --- | --- |
+| Cold index | 4.8 s (about 48,000 lines per second) |
+| Retained heap | 59 MB |
+| Re-analyse 3,200-line file | 31 ms |
+| Completion (member) | 1.2 ms |
+| Completion (global scope) | 4.1 ms |
+| Diagnostics | 3.5 ms |
+
+## How it stays fast
+
+- **Lazy indexing**: The initial scan is batched and non-blocking. The server indexes files in chunks so the editor UI stays responsive while the workspace loads.
+- **Syntax tree eviction**: Syntax trees for closed files are released from memory. Only open files and their dependencies are retained, which keeps the heap bounded even in large workspaces.
+
+## Running your own benchmark
+
+You can benchmark the server against your own addon. Run the following from the server source directory:
+
+```bash
+pnpm run bench -- path/to/addon
+```
+
+The output prints:
+
+- Total index time and memory usage
+- Per-feature latency (completion, diagnostics, hover)
+- All diagnostics grouped by rule
+
+## Known limits
+
+- **Shallow type inference**: Type inference is designed to answer "what follows a dot" quickly. It stays quiet in situations where deep inference would be expensive, so you may need explicit `---@type` or `---@param` annotations for complex generics or heavily metatable-driven code.
+- **Whole-file reanalysis**: When a file changes, the server re-analyses the entire file. At 31 ms for a 3,200-line file and with a 250 ms debounce, incremental reparsing is not currently worth the added complexity.
+- **Wiki as source of truth**: The dataset is built from the Garry's Mod wiki. If the wiki is missing an entry or lists incorrect signatures, the server will reflect that gap.

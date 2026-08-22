@@ -1,105 +1,81 @@
 ---
-title: "Hooks"
-description: "Hook name completion, typo detection, and callbacks whose parameters are already typed."
+title: "Hook Intelligence and Callback Typing"
+description: "GLua Language Server completes hook names, detects typos with quick fixes, types callback parameters from wiki signatures, and generates ENTITY stubs."
 icon: "anchor"
+sidebarTitle: "Hooks"
 ---
 
-A hook is a string and a function. Neither half is checked by Lua, so a typo in
-the name produces a callback that simply never runs.
+GLua Language Server provides dedicated support for Garry's Mod's hook system. It completes hook names from the bundled wiki dataset, detects typos, types callback parameters automatically, and generates stub tables for scripted entities, weapons, and panels.
 
-## Name completion and typo detection
+## Hook name completion
 
-`hook.Add` completes from 551 documented hooks, plus any custom hook your
-workspace fires with `hook.Run` or `hook.Call`.
-
-A name that is neither is reported, with the closest matches offered as quick
-fixes:
+When you type `hook.Add("`, the server suggests hook names from the 551 hooks in the bundled wiki dataset. It also includes custom hooks that your workspace fires with `hook.Run`.
 
 ```lua
-hook.Add("PlayerSpawned", "x", function(ply) end)
---        ^ 'PlayerSpawned' is not a documented gamemode hook, and nothing
---          in this workspace fires it. Check for a typo.
---          Quick fix: change to "PlayerSpawn"
+hook.Add("PlayerSay", "MyAddon", function(sender, text, teamChat)
+    -- sender is typed as Player, text as string, teamChat as boolean
+end)
 ```
 
-<Note>
-  Custom hooks are fine. If anything in the workspace calls
-  `hook.Run("MyAddon.Ready")`, then `hook.Add("MyAddon.Ready", ...)` is
-  recognised. Engine events registered with `gameevent.Listen` count too.
-</Note>
+## Typo detection
+
+If you enter a hook name that does not exist, the server flags it and offers a quick fix based on edit distance.
+
+```lua
+hook.Add("PlayerSpawned", "MyAddon", function(ply)
+    -- Error: "PlayerSpawned" is not a known hook
+    -- Quick fix: Did you mean "PlayerSpawn"?
+end)
+```
 
 ## Typed callback parameters
 
-Callback parameters come from the hook's documented signature:
+The server reads hook signatures from the wiki and applies them to your callback parameters automatically. You do not need to annotate them yourself.
 
 ```lua
-hook.Add("PlayerSay", "x", function(sender, text, teamChat)
-  sender:Nick()    -- Player
-  text:upper()     -- string
+hook.Add("PlayerSay", "ChatFilter", function(sender, text, teamChat)
+    sender:Kick("Spam") -- sender is typed as Player
+    return ""            -- return type is inferred from hook signature
 end)
 ```
 
-This also applies to `function GM:PlayerSay(sender, text)` style definitions.
+## ENT / SWEP / PANEL stubs
 
-If a callback declares more parameters than the hook actually passes, that is
-reported — the extra ones would always be `nil`:
+When you define a scripted entity, weapon, or panel, the server can generate the full hook table for you.
+
+### Scripted entity stub
+
+Typing `function ENT:` triggers completion of the entity hook table. The server inserts a full stub with the most common hooks.
 
 ```lua
-hook.Add("Think", "x", function(ply)
---                              ^ 'Think' passes 0 arguments,
---                                but this callback declares 1
-end)
-```
+ENT.Type = "anim"
+ENT.Base = "base_anim"
 
-## Hook tables
-
-Entity, weapon, panel and tool files define hooks as methods on a table rather
-than through `hook.Add`. Typing `function ENT:` completes that table and inserts
-a full stub with the right parameters:
-
-<CodeGroup>
-
-```lua ENT
 function ENT:Initialize()
-  self:SetModel("models/props_c17/oildrum001.mdl")
-  -- self is an Entity
+    self:SetModel("models/props_c17/oildrum001.mdl")
+end
+
+function ENT:Think()
+end
+
+function ENT:Use(activator, caller)
+    -- activator is typed as Player, caller as Entity
 end
 ```
 
-```lua SWEP
-function SWEP:PrimaryAttack()
-  self:SetNextPrimaryFire(CurTime() + 0.5)
-  -- self is a Weapon
-end
+The same applies to `SWEP` for scripted weapons and `PANEL` for VGUI panels.
+
+## gameevent.Listen
+
+The server also recognises `gameevent.Listen` as a valid hook source. Events registered this way are included in hook name completion and typo detection.
+
+```lua
+gameevent.Listen("player_connect")
+hook.Add("player_connect", "LogJoins", function(data)
+    -- data is typed from the gameevent signature
+end)
 ```
 
-```lua PANEL
-function PANEL:Paint(w, h)
-  surface.SetDrawColor(0, 0, 0, 200)
-  -- self is a Panel
-end
-```
-
-</CodeGroup>
-
-| Table | Hooks from | `self` is |
-| --- | --- | --- |
-| `ENT` | ENTITY | `Entity` |
-| `SWEP` | WEAPON | `Weapon` |
-| `PANEL` | PANEL | `Panel` |
-| `EFFECT` | EFFECT | `Entity` |
-| `TOOL` | TOOL | `Tool` |
-| `GM` / `GAMEMODE` | GM | the gamemode table |
-
-<Warning>
-  `hook.Add` only dispatches GM and SANDBOX hooks. `ENTITY`, `WEAPON` and the
-  rest are metatable methods — `hook.Add("Initialize", ...)` will not do
-  anything. Completion only offers hook.Add-able names inside `hook.Add`, which
-  makes the distinction hard to get wrong by accident.
-</Warning>
-
-## Navigation
-
-Go-to-definition on a hook name lists every `hook.Add` and `hook.Run` for it.
-Rename updates all of them at once, which is how you rename a custom hook
-without leaving a listener stranded.
+<Tip>
+  Use the quick fix (Ctrl\+.) on an unknown hook name to see the closest match from the wiki. This catches common mistakes like "PlayerDeath" vs "PlayerDeathThink" instantly.
+</Tip>

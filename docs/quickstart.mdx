@@ -1,109 +1,114 @@
 ---
-title: "Quickstart"
-description: "The handful of things worth knowing before you start writing."
+title: "Get Started with GLua Language Server"
+description: "A five-minute tour of GLua Language Server: type tracking, realm checks, net message validation, and inline suppressions with real code examples."
 icon: "rocket"
+sidebarTitle: "Quickstart"
 ---
 
-## Completion follows your values
+This quickstart walks you through the core features of GLua Language Server in about five minutes. You will see how completions follow your values, how realms protect you from runtime errors, how net messages are validated end to end, and how to silence a diagnostic inline.
 
-You do not need to annotate anything for the common cases. The server tracks
-what a value is through calls, string arguments and loops.
+## 1) Completion follows your values
+
+When you assign a known type, the extension suggests the right members. Type a player reference, a panel, or a loop variable, and the completion list updates automatically.
 
 ```lua
-local ply = player.GetByID(1)        -- Player
-local frame = vgui.Create("DFrame")  -- DFrame, read out of the string literal
+local ply = player.GetByID(1)
+ply: -- suggests :GetName, :Alive, :Kick, etc.
 
-for _, p in ipairs(player.GetAll()) do
-  p:Nick()                           -- Player, through ipairs
+local frame = vgui.Create("DFrame")
+frame: -- suggests :SetTitle, :SetSize, :MakePopup, etc.
+
+for _, ent in ipairs(ents.GetAll()) do
+    ent: -- suggests :GetPos, :GetClass, :Remove, etc.
 end
 ```
 
-It also keeps working mid-keystroke. The parser always returns a tree, so
-`ply:` on a line you have not finished still resolves.
+## 2) Your own functions
 
-## Your own functions
-
-Lua has no type syntax, so a parameter in your own code has nothing to go on.
-Annotate it, or let it be inferred from use:
+You can add type annotations so the extension understands your code, or let it infer types from usage.
 
 <CodeGroup>
 
 ```lua Annotated
----@param ply Player
----@param reason string
-local function punish(ply, reason)
-  ply:Kick(reason)     -- Player methods complete
+---@param target Player
+---@param damage number
+---@return boolean
+function HurtPlayer(target, damage)
+    if not IsValid(target) then return false end
+    target:TakeDamage(damage)
+    return true
 end
 ```
 
 ```lua Inferred
-local function canPlace(ply)
-  return ply:IsAdmin() -- IsAdmin only exists on Player, so ply is a Player
+function HurtPlayer(target, damage)
+    if not IsValid(target) then return false end
+    target:TakeDamage(damage)
+    return true
 end
 ```
 
 </CodeGroup>
 
-[More on both →](/features/typing-your-code)
+With annotations, callers get completions and diagnostics for every parameter. Without them, the extension still infers types from how the function is used in your codebase.
 
-## Realms are not a suggestion
+## 3) Realms are not a suggestion
 
-Files get a realm from where they live. Call something that does not exist in
-that realm and you hear about it immediately:
+GLua runs on the server, the client, or both. The extension reads the file path and flags API calls that do not belong in the current realm.
 
-```lua lua/autorun/client/cl_thing.lua
-local ply = player.GetByID(1)
-ply:Kick("nope")
---  ^ Player:Kick only exists Server-side, but this code runs Client-side
+```lua
+-- File: lua/autorun/client/my_addon.lua (clientside file)
+
+local ply = LocalPlayer()
+ply:Kick("Reason") -- realm error: Kick is server-only
 ```
 
-[More on realms →](/features/realms)
+The diagnostic appears immediately, so you know to move that code to a server file or use a net message instead.
 
-## Net messages are checked end to end
+## 4) Net messages checked end to end
 
-The sender and the handler usually live in different files. Both are indexed, so
-mismatches surface where you are working:
+When you define a net message sender and receiver, the extension compares the write and read signatures. If the payload types or order do not match, it reports a diagnostic.
 
-```lua lua/autorun/server/sv_thing.lua
-util.AddNetworkString("my_message")
-
-net.Start("my_message")
-  net.WriteString("hello")
-  net.WriteEntity(ent)
-net.Broadcast()
+```lua
+-- Server: lua/autorun/server/net.lua
+util.AddNetworkString("MyMessage")
+net.Start("MyMessage")
+net.WriteString("Hello")
+net.WriteEntity(someEntity)
+net.Send(ply)
 ```
 
-```lua lua/autorun/client/cl_thing.lua
-net.Receive("my_message", function()
-  local text = net.ReadString()
-  local n = net.ReadUInt(8)
-  --        ^ Payload mismatch: sender writes [String, Entity],
-  --          this handler reads [String, UInt]
+```lua
+-- Client: lua/autorun/client/net.lua
+net.Receive("MyMessage", function()
+    local msg = net.ReadString()
+    local id = net.ReadUInt(8) -- payload mismatch: server sent WriteEntity, client reads ReadUInt
 end)
 ```
 
-[More on net analysis →](/features/net-messages)
+The mismatch between `WriteEntity` and `ReadUInt` is flagged before you run the game.
 
-## Silencing a finding
+## 5) Silencing a finding
 
-When one report is wrong but the rule is not, suppress it inline:
+If a diagnostic is a false positive for your project, you can suppress it inline with a comment:
 
 ```lua
--- glua-ignore unused-local
-local placeholder = nil
+-- glua-ignore
+local x = SomeAmbiguousCall()
 ```
 
-When a rule is wrong for your whole project, turn it off in
-[a config file](/configuration/config-files) so everyone gets the same rules.
+Place the suppression comment on the line before the statement you want to ignore. The extension stops reporting the finding without affecting other diagnostics.
 
-## Commands worth knowing
+## 6) Commands worth knowing
+
+Open the Command Palette (**Ctrl\+Shift\+P** or **Cmd\+Shift\+P**) and type `GLua:` to find these commands:
 
 | Command | What it does |
 | --- | --- |
-| `GLua: Show Net Message Graph` | Every net message, who registers, sends and handles it |
-| `GLua: Create Linter Config File` | Writes `.glua.json` from your current settings |
-| `GLua: Create Formatter Config File` | Writes `.gluafmtrc.json` from your current settings |
-| `GLua: Re-index Workspace` | Rescan after big changes on disk |
-| `GLua: Open Settings` | Jump straight to the settings UI |
+| `GLua: Show Net Message Graph` | Visualise net message senders and receivers across your workspace |
+| `GLua: Create Linter Config File` | Generate a `.glua.json` file in the current workspace root |
+| `GLua: Create Formatter Config File` | Generate a `.gluafmtrc.json` file in the current workspace root |
+| `GLua: Re-index Workspace` | Force a full re-index after large changes or dataset updates |
+| `GLua: Open Settings` | Jump to the GLua Language Server settings panel |
 
-[Full command list →](/reference/commands)
+Try running `GLua: Show Net Message Graph` on your project to see the net message analysis in action.

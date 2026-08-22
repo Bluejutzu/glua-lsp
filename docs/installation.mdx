@@ -1,94 +1,80 @@
 ---
-title: "Installation"
-description: "Install the extension from a build, or from source."
+title: "Install GLua Language Server for VS Code"
+description: "Install the GLua Language Server VS Code extension from a prebuilt .vsix file or build it from source with pnpm in three steps."
 icon: "download"
+sidebarTitle: "Installation"
 ---
+
+You can install GLua Language Server from a packaged `.vsix` file or build it yourself from the GitHub repository. Both methods take only a few minutes.
 
 ## From a packaged build
 
-Grab the `.vsix` and install it:
+Download the latest `.vsix` release, then install it with your editor's CLI.
 
 <CodeGroup>
 
 ```bash VS Code
-code --install-extension glua-lsp-0.1.0.vsix
+$ code --install-extension glua-lsp-0.1.0.vsix
 ```
 
 ```bash Cursor
-cursor --install-extension glua-lsp-0.1.0.vsix
+$ cursor --install-extension glua-lsp-0.1.0.vsix
 ```
 
 </CodeGroup>
 
-Cursor keeps a separate extension directory, so install into both if you use both.
-
 ## From source
 
 <Steps>
-  <Step title="Clone and install">
+  <Step title="Clone and install dependencies">
+    Clone the repository and install packages with pnpm.
+
     ```bash
-    git clone https://github.com/Bluejutzu/glua-lsp
+    git clone https://github.com/Bluejutzu/glua-lsp.git
     cd glua-lsp
     pnpm install
     ```
   </Step>
+  <Step title="Build the extension">
+    Compile the extension with the build script.
 
-  <Step title="Build">
     ```bash
     pnpm run build
     ```
-
-    This bundles the client and server into `packages/glua-lsp/dist/` and copies
-    the API dataset alongside them.
   </Step>
-
-  <Step title="Run it">
-    Press <kbd>F5</kbd>. A second VS Code window opens on the bundled example
-    addon with the extension loaded.
-
-    To install it into your real editor instead:
+  <Step title="Run or package">
+    Press **F5** in VS Code to launch the extension in a new Extension Development Host window, or package it for distribution.
 
     ```bash
     pnpm run package
-    code --install-extension packages/glua-lsp/glua-lsp-0.1.0.vsix
     ```
+
+    After packaging, install the generated `.vsix` with the CLI command above.
   </Step>
 </Steps>
 
 ## Checking it is working
 
-Open a `.lua` file inside a Garry's Mod addon. The status bar should show
-**GLua** and the file's realm:
-
-```
-GLua · Server
-```
+Open any `.lua` file inside a Garry's Mod addon folder. The VS Code status bar should show a realm label such as `GLua · Server`. If you see that label, the language server is active and indexing your workspace.
 
 <Warning>
-  If the status bar says **Plain Lua**, the workspace was not recognised as a
-  Garry's Mod project. Click the status bar item to switch this file over, or set
-  `glua.activation` to `always` for the whole workspace.
+  If the status bar shows `Plain Lua`, the workspace was not recognised as a Garry's Mod project. Click the status bar item to switch the mode manually, or set `glua.activation` to `always` in your VS Code settings.
 </Warning>
 
 ## Setting it as your formatter
 
-The extension registers itself as a formatter for the `glua` language. Point
-VS Code at it:
+To format GLua files with the extension, register it as the default formatter for the `glua` language in your user or workspace `settings.json`:
 
-```json settings.json
+```json
 {
   "[glua]": {
-    "editor.defaultFormatter": "bluejutzu.glua-lsp",
-    "editor.formatOnSave": true
+    "editor.defaultFormatter": "bluejutzu.glua-lsp"
   }
 }
 ```
 
-See [the formatter page](/features/formatter) for what it will and will not
-change.
-
 ## Requirements
 
 - VS Code 1.85 or newer
-- Nothing else — the Garry's Mod API dataset is bundled, so the extension never
-  reaches out to the network at install or run time
+- No network connection required at runtime (the full wiki dataset is bundled)
+- No additional dependencies or external tools needed

@@ -1,110 +1,118 @@
 ---
-title: "IntelliSense"
-description: "How completion, hover and signature help resolve what a value actually is."
+title: "IntelliSense and Type Tracking for GLua"
+description: "GLua Language Server tracks types through calls, string literals, loops, and metatables so completion always resolves to the right class."
 icon: "wand-magic-sparkles"
+sidebarTitle: "Intellisense"
 ---
 
-Completion is driven by a real parse and a type model, not by matching the text
-on the current line. That is what lets it follow a value across statements.
+GLua Language Server uses a combination of static analysis and the bundled Garry's Mod wiki dataset to provide precise IntelliSense across your entire workspace. It tracks types through function calls, string literals, loops, and metatables so that completion and hover information always resolve to the correct class.
 
-## Where types come from
+## Type tracking
 
-<Steps>
-  <Step title="The wiki dataset">
-    5,586 scraped entries give every documented function its parameter and
-    return types. `player.GetByID` returns `Player|NULL`, so the result gets
-    `Player` methods plus everything inherited from `Entity`.
-  </Step>
+The server understands how common GLua functions transform types and propagates that knowledge through your code.
 
-  <Step title="String arguments">
-    Some constructors carry their real type in a literal.
-    `vgui.Create("DFrame")` is documented as returning `Panel`, but the string
-    says `DFrame`, so that is what you get. Same for `FindMetaTable("Player")`.
-  </Step>
+### Player lookup
 
-  <Step title="Your workspace">
-    Every `.lua` file is indexed, so globals your addon defines complete and
-    resolve across files.
-  </Step>
-
-  <Step title="How the value is used">
-    A parameter with no annotation is typed from the methods called on it.
-  </Step>
-</Steps>
-
-## Worked examples
+When you call `player.GetByID`, the server knows the result is a `Player` entity:
 
 ```lua
 local ply = player.GetByID(1)
-ply:SetHealth(100)        -- inherited from Entity
-ply:Kick("bye")           -- Player's own
-
-local frame = vgui.Create("DFrame")
-frame:SetTitle("Hello")   -- DFrame's own
-frame:SetSize(400, 300)   -- inherited from Panel
-
-for _, p in ipairs(player.GetAll()) do
-  p:Nick()                -- element type carried through ipairs
-end
-
-hook.Add("PlayerSay", "x", function(sender, text)
-  sender:Nick()           -- from the wiki's PlayerSay signature
-end)
-
-function ENT:Initialize()
-  self:SetModel("...")    -- Entity, because this is an entity file
-end
+ply:Kick("Reason") -- completion offers Player methods
 ```
 
-`self` depends on the hook table: `ENT` gives you an `Entity`, `SWEP` a
-`Weapon`, `PANEL` a `Panel`, `TOOL` a `Tool`.
+### Panel creation
 
-## Completing string arguments
-
-Several string positions get real completion rather than nothing:
-
-| Where | What completes |
-| --- | --- |
-| `hook.Add("…")` | Documented hooks, plus custom ones your workspace fires |
-| `net.Start("…")` / `net.Receive("…")` | Net messages known anywhere in the workspace |
-| `vgui.Create("…")` | Every VGUI panel class |
-| `include("…")` / `AddCSLuaFile("…")` | Real files, as `lua/`-relative paths |
-| `FindMetaTable("…")` | Every class with a metatable |
-| `function ENT:` | The ENTITY hook table, inserted as a full stub |
-
-## It works on unfinished code
-
-The parser is error-tolerant: it always returns a tree, filling holes with
-`missing` nodes rather than throwing. A half-typed member access still knows
-what its base is.
+`vgui.Create` with a known panel class returns that type:
 
 ```lua
-hook.Add("Think", "x", function()
-  local e = ents.GetByIndex(1)
-  if IsValid(e) and e:
---                    ^ still offers Entity methods, despite the
---                      unclosed call, unfinished if, and missing end
+local frame = vgui.Create("DFrame")
+frame:SetTitle("Hello") -- completion offers DFrame methods
 ```
 
-<Note>
-  This is the main practical difference from line-scanning approaches. Mid-edit,
-  your code is almost never syntactically valid, so a parser that gives up on the
-  first error cannot help you at exactly the moment you need it.
-</Note>
+### Loop iteration
 
-## Hover and signature help
+`ipairs` over a player list types each element as `Player`:
 
-Hover shows the resolved type, the wiki documentation, the realm, and a link to
-the wiki page. If what you are hovering cannot exist in this file's realm, that
-warning comes first.
+```lua
+for _, ply in ipairs(player.GetAll()) do
+    ply:ChatPrint("Hello") -- ply is typed as Player
+end
+```
 
-Signature help shows every documented call form, so overloaded functions like
-`surface.SetDrawColor(r, g, b, a)` and `surface.SetDrawColor(color)` both appear
-and the right one is highlighted for what you have typed.
+### Typed hook sender
 
-## Limits
+When you register a hook with a typed sender parameter, the callback receives the correct type:
 
-Type inference is deliberately shallow and unsound. It answers "what can follow
-this dot" and "is this argument obviously wrong", and stays quiet when it is not
-sure. Metatable tricks, `setmetatable` chains and dynamic dispatch are not
-followed.
+```lua
+hook.Add("PlayerSay", "MyAddon", function(sender, text, teamChat)
+    sender:Kick("Spam") -- sender is typed as Player
+end)
+```
+
+### Entity methods
+
+Inside `ENT` methods, `self` is typed as `Entity`:
+
+```lua
+function ENT:Initialize()
+    self:SetModel("models/props_c17/oildrum001.mdl") -- self is Entity
+end
+```
+
+## Typing your own functions
+
+You can add explicit types to your own functions with annotations, or let the server infer them from usage.
+
+<CodeGroup>
+
+```lua Annotated
+---@param target Player
+---@param message string
+---@return boolean
+function NotifyPlayer(target, message)
+    target:ChatPrint(message)
+    return true
+end
+```
+
+```lua Inferred
+function NotifyPlayer(target, message)
+    target:ChatPrint(message) -- target inferred as Player from ChatPrint call
+    return true               -- return type inferred as boolean
+end
+```
+
+</CodeGroup>
+
+## Supported annotation tags
+
+GLua Language Server uses the same annotation dialect as Lua Language Server.
+
+| Tag | Purpose | Example |
+| --- | --- | --- |
+| `---@param` | Declare parameter type | `---@param ply Player` |
+| `---@return` | Declare return type | `---@return boolean` |
+| `---@type` | Cast an expression | `---@type Player` |
+| `---@class` | Define a custom class | `---@class MyPanel : DPanel` |
+| `---@field` | Add a field to a class | `---@field Name string` |
+| `---@deprecated` | Mark as deprecated | `---@deprecated Use NewFunc instead` |
+
+You can also use union types, optional parameters, and array syntax:
+
+```lua
+---@param items (string|number)[]
+---@param options? table
+---@return string|nil
+```
+
+## How inference falls back
+
+When the server cannot determine an exact type, it uses the following strategy:
+
+1. **Ambiguous sets** — If an object could be one of several types, the server finds the most specific common base class. For example, a value that is sometimes a `Player` and sometimes an `NPC` falls back to `Entity`.
+2. **Unrecognisable values** — If a type cannot be inferred at all, it falls back to `any`. You will still get generic Lua completions, but no Garry's Mod specific methods.
+3. **Explicit annotations always win** — If you add a `---@type` or `---@param` annotation, it overrides any inferred type.
+
+<Tip>
+  Add explicit annotations at module boundaries (shared files called from multiple realms, library functions used by other addons) to improve completion accuracy across your entire workspace.
+</Tip>

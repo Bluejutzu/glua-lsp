@@ -1,114 +1,50 @@
 ---
-title: "Configuration overview"
+title: "Configure GLua Language Server"
 sidebarTitle: "Overview"
-description: "Three places to configure things, and which one wins."
+description: "GLua Language Server is configurable through VS Code settings, committed config files, and inline suppressions that all layer in a defined precedence."
 icon: "sliders"
 ---
 
-Everything is configurable three ways, and they layer rather than compete.
+GLua Language Server gives you three ways to control behavior: VS Code editor settings for personal preferences, committed config files for team-wide rules, and inline suppressions for one-off exceptions. These layers stack so you can enforce standards across a project while still allowing individual overrides where they make sense.
 
 <CardGroup cols={3}>
-  <Card title="In the UI" icon="sliders">
-    Every option is a VS Code setting. Per person, per machine.
+  <Card title="Committed config files" icon="file-code" href="/configuration/config-files">
+    Share linter and formatter settings with `.glua.json` and `.gluafmtrc.json`.
   </Card>
-  <Card title="In a config file" icon="file-code" href="/configuration/config-files">
-    Committed to the repository, so the whole team gets the same rules.
+
+  <Card title="Inline suppressions" icon="message-square-x" href="/configuration/suppressions">
+    Silence a specific diagnostic on a single line or block without changing global rules.
   </Card>
-  <Card title="Inline" icon="comment-slash" href="/configuration/suppressions">
-    For the one finding that is wrong when the rule is not.
+
+  <Card title="Diagnostic rules" icon="list" href="/reference/rules">
+    Browse every diagnostic rule the linter can enforce or ignore.
   </Card>
 </CardGroup>
 
-## Precedence
+## Precedence order
 
-Lowest to highest:
+Settings are resolved from lowest to highest priority. A higher layer always wins when the same option is set in multiple places.
 
-<Steps>
-  <Step title="Built-in defaults" />
-  <Step title="Editor settings (glua.*)">
-    Yours, on this machine.
-  </Step>
-  <Step title=".editorconfig">
-    Generic, shared. `indent_style`, `indent_size`, `max_line_length`,
-    `end_of_line`.
-  </Step>
-  <Step title=".prettierrc">
-    Generic, shared. `useTabs`, `tabWidth`, `printWidth`, `singleQuote`,
-    `endOfLine`, `semi`.
-  </Step>
-  <Step title=".glua.json">
-    This project's rules.
-  </Step>
-  <Step title=".gluafmtrc.json">
-    This project's formatting rules. Most specific, so it wins.
-  </Step>
-</Steps>
+1. Built-in defaults
+2. VS Code editor settings (`settings.json`)
+3. `.editorconfig`
+4. `.prettierrc`
+5. `.glua.json` (linter)
+6. `.gluafmtrc.json` (formatter)
+7. Inline suppression comments
 
-Generic tools get read because a repository that already pins indentation in
-`.editorconfig` should not have to say it twice. Anything written specifically
-for GLua wins over them, because it was written for this formatter.
+<Note>
+  Generic tools like `.editorconfig` and `.prettierrc` are read so you do not repeat yourself. GLua-specific config files (`.glua.json` and `.gluafmtrc.json`) override them when there is a conflict.
+</Note>
 
-## Starting from the UI
+## The `glua.activation` setting
 
-Set things up in the settings editor, then export them:
+Use `glua.activation` to decide when the language server starts. The default is auto-detect, which activates only when GLua files are present in the workspace.
 
-- `GLua: Create Linter Config File` writes `.glua.json`
-- `GLua: Create Formatter Config File` writes `.gluafmtrc.json`
-
-Both are seeded from your current settings, so the two are views of the same
-thing rather than two places to keep in sync by hand. Both files get completion
-and validation while you edit them, from bundled JSON schemas.
-
-<Tip>
-  `GLua: Open Settings` jumps straight to this extension's section of the
-  settings editor.
-</Tip>
-
-## Settings reference
-
-### Activation
-
-| Setting | Default | |
-| --- | --- | --- |
-| `glua.activation` | `auto` | When `.lua` files are treated as GLua. `auto` only claims files in workspaces that look like Garry's Mod |
-
-### Diagnostics
-
-Every rule takes `error`, `warning`, `information`, `hint` or `off`. See the
-[rule reference](/reference/rules) for what each one catches.
-
-| Setting | Default |
+| Value | Behavior |
 | --- | --- |
-| `glua.diagnostics.enable` | `true` |
-| `glua.diagnostics.undefinedGlobal` | `warning` |
-| `glua.diagnostics.realmViolation` | `warning` |
-| `glua.diagnostics.unusedLocal` | `hint` |
-| `glua.diagnostics.deprecated` | `warning` |
-| `glua.diagnostics.argumentCount` | `warning` |
-| `glua.diagnostics.argumentType` | `warning` |
-| `glua.diagnostics.unknownHook` | `information` |
-| `glua.diagnostics.netMessage` | `warning` |
-| `glua.diagnostics.netReadWriteMismatch` | `warning` |
-| `glua.diagnostics.missingAddCSLuaFile` | `warning` |
-| `glua.diagnostics.globalWrite` | `off` |
+| `auto-detect` | Starts only if GLua files are found (default) |
+| `always` | Starts for every workspace |
+| `never` | Never starts; treat everything as plain Lua |
 
-### Completion, hover, hints
-
-| Setting | Default | |
-| --- | --- | --- |
-| `glua.completion.callSnippets` | `true` | Insert parentheses and parameter tab stops |
-| `glua.completion.filterByRealm` | `true` | Hide members that cannot exist in this realm |
-| `glua.hover.wikiLinks` | `true` | Link to the wiki from hover |
-| `glua.inlayHints.parameterNames` | `true` | Parameter names at call sites |
-| `glua.inlayHints.realm` | `false` | The inferred realm at the top of each file |
-
-### Formatting
-
-See [the formatter page](/features/formatter#options) for the full table.
-
-### Workspace
-
-| Setting | Default | |
-| --- | --- | --- |
-| `glua.workspace.maxFiles` | `6000` | Cap on indexed files |
-| `glua.workspace.exclude` | `[…]` | Directory names skipped while indexing |
+When the server is active, the VS Code status bar shows the current realm: `GLua · Server`, `GLua · Client`, `GLua · Shared`, or `Plain Lua`. You can toggle activation manually through the command palette if the auto-detection guess is wrong.

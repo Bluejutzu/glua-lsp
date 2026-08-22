@@ -1,157 +1,81 @@
 ---
-title: "Rule reference"
-description: "Every diagnostic, what it catches, and when turning it off is reasonable."
+title: "GLua Diagnostic Rules Reference"
+description: "Complete reference for every diagnostic rule in GLua Language Server, including what each rule catches and how to configure its severity level."
 icon: "list-check"
+sidebarTitle: "Rules"
 ---
 
-Each rule has a stable code. Use it to set a severity in
-[settings or a config file](/configuration/config-files), or to
-[suppress it inline](/configuration/suppressions).
-
-## Correctness
+GLua Language Server ships with built-in diagnostics that catch common mistakes in Garry's Mod Lua. Each rule can be set to `off`, `warning`, or `error` inside your `.glua.json` file. This page lists every rule, grouped by the area it covers.
 
 <AccordionGroup>
-  <Accordion title="realm-violation" icon="server">
-    **Default: warning** (information when the realm came from a filename prefix)
-
-    Calling a function that does not exist in the realm this code runs in. The
-    message includes why the realm was decided, so you can tell whether the
-    finding or the detection is wrong.
-
-    Quick fix: wrap the statement in `if SERVER then … end`.
-
-    *Turn off if* your project uses a file layout the
-    [realm rules](/features/realms) do not model.
+  <Accordion title="Globals">
+    | Rule | Description |
+    | --- | --- |
+    | `undefinedGlobal` | Flags undefined globals. Respects optional-addon guards so shared code that branches on addon availability does not trigger false positives. |
+    | `unusedLocal` | Flags local variables that are declared but never read. |
   </Accordion>
 
-  <Accordion title="net-payload-mismatch" icon="arrow-right-arrow-left">
-    **Default: warning**
-
-    The `net.Write*` sequence in a sender does not match the `net.Read*`
-    sequence in the handler. Reads must mirror writes in order.
-
-    *Turn off if* you send messages with conditional payloads, which this cannot
-    model. Prefer suppressing those handlers individually.
+  <Accordion title="Realms">
+    | Rule | Description |
+    | --- | --- |
+    | `realmViolation` | Flags calls to API that does not exist in the current realm. For example, calling a serverside-only function inside a clientside file. |
   </Accordion>
 
-  <Accordion title="net-unregistered" icon="circle-xmark">
-    **Default: warning**
-
-    `net.Start` on a message never passed to `util.AddNetworkString`. This fails
-    at runtime.
-
-    Quick fix: add the registration.
+  <Accordion title="Net messages">
+    | Rule | Description |
+    | --- | --- |
+    | `net-unregistered` | Flags `net.Start` with a string that has no matching `net.Receive` registration anywhere in the workspace. |
+    | `net-no-send` | Flags a `net.Start` block that never calls a send method, so the message is constructed but never transmitted. |
+    | `net-no-receiver` | Flags `net.Receive` for a message name that nothing in the workspace ever sends. |
+    | `net-payload-mismatch` | Flags when the sequence of `net.Write*` calls in the sender does not match the sequence of `net.Read*` calls in the receiver. |
   </Accordion>
 
-  <Accordion title="net-never-dispatched" icon="paper-plane">
-    **Default: warning**
-
-    `net.Start` not followed by any send call. The message is built and dropped.
+  <Accordion title="Hooks">
+    | Rule | Description |
+    | --- | --- |
+    | `hook-typo` | Flags a hook name that is not found in the wiki. Offers a quick fix based on edit-distance to the closest known hook name. |
+    | `hook-extra-param` | Flags when a hook callback declares more parameters than the hook is documented to pass. |
   </Accordion>
 
-  <Accordion title="net-never-sent / net-never-received" icon="inbox">
-    **Default: warning**
-
-    A handler for a message nothing sends, or a message nothing handles. Usually
-    dead code or a half-applied rename.
-
-    *Turn off if* another addon sends or receives your messages.
+  <Accordion title="API">
+    | Rule | Description |
+    | --- | --- |
+    | `deprecated` | Flags use of API marked deprecated in the Garry's Mod wiki. |
+    | `argument-count` | Flags calls that pass the wrong number of arguments, including when overloads are available. |
+    | `argument-type` | Flags arguments whose type does not match the documented signature, including overload resolution. |
   </Accordion>
 
-  <Accordion title="missing-addcsluafile" icon="file-arrow-up">
-    **Default: warning**
-
-    A clientside file that is `include`d but never passed to `AddCSLuaFile`, so
-    clients never receive it. Engine-networked directories are skipped.
-
-    Quick fix: add the `AddCSLuaFile` call above the include.
-  </Accordion>
-
-  <Accordion title="argument-count" icon="hashtag">
-    **Default: warning**
-
-    Too few or too many arguments for a documented function, checked against
-    every documented call form. Skipped for the Lua standard library, whose
-    documented signatures are not precise enough.
-  </Accordion>
-
-  <Accordion title="argument-type" icon="shapes">
-    **Default: warning**
-
-    An argument whose inferred type cannot match the documented parameter.
-    Deliberately permissive — it only fires when no documented form accepts what
-    was passed, and stays quiet when the type is unknown.
-  </Accordion>
-
-  <Accordion title="syntax" icon="bug">
-    **Always error**
-
-    The file does not parse. Formatting is disabled for the file while this is
-    present.
-  </Accordion>
-
-  <Accordion title="compound-assignment" icon="equals">
-    **Always error**
-
-    `x += 1` is not valid Lua, though people write it out of habit from other
-    languages.
-
-    Quick fix: rewrite as `x = x + 1`.
+  <Accordion title="Files">
+    | Rule | Description |
+    | --- | --- |
+    | `include-no-addcsluafile` | Flags a clientside `include` of a file that is never sent to the client via `AddCSLuaFile`. A quick fix is available to insert the missing call. |
   </Accordion>
 </AccordionGroup>
 
-## Hygiene
+## Setting severity
 
-<AccordionGroup>
-  <Accordion title="undefined-global" icon="ghost">
-    **Default: warning**
+You can tune every rule in `.glua.json`. The `diagnostics` block accepts `off`, `warning`, or `error` for each rule name.
 
-    A global that is neither a known GMod API member nor assigned anywhere in
-    the workspace. Existence checks (`if x and x.y then`) are respected.
+```json
+{
+  "diagnostics": {
+    "undefinedGlobal": "error",
+    "unusedLocal": "warning",
+    "realmViolation": "error",
+    "net-unregistered": "warning",
+    "net-no-send": "error",
+    "net-no-receiver": "off",
+    "net-payload-mismatch": "error",
+    "hook-typo": "warning",
+    "hook-extra-param": "warning",
+    "deprecated": "warning",
+    "argument-count": "error",
+    "argument-type": "error",
+    "include-no-addcsluafile": "warning"
+  }
+}
+```
 
-    *Before turning this off*, declare external addons in
-    [`globals`](/configuration/config-files#declared-globals) — that is usually
-    the real fix.
-  </Accordion>
-
-  <Accordion title="unknown-hook" icon="anchor">
-    **Default: information**
-
-    `hook.Add` with a name that is neither documented nor fired anywhere in the
-    workspace. Catches typos like `"PlayerSpawned"`.
-
-    Quick fix: the closest matching hook names.
-  </Accordion>
-
-  <Accordion title="deprecated" icon="clock-rotate-left">
-    **Default: warning**
-
-    Use of an API the wiki marks deprecated or removed. The message includes the
-    documented replacement.
-  </Accordion>
-
-  <Accordion title="unused-local" icon="broom">
-    **Default: hint**
-
-    A local declared but never read. Names starting with `_` are exempt.
-
-    Quick fix: rename to `_name`.
-  </Accordion>
-
-  <Accordion title="global-write" icon="globe">
-    **Default: off**
-
-    Writing to a global instead of declaring a local. Noisy by design — most
-    addons intentionally define globals — so it ships off.
-  </Accordion>
-</AccordionGroup>
-
-## Severity levels
-
-| Level | Effect |
-| --- | --- |
-| `error` | Red squiggle, counts as an error in the Problems panel |
-| `warning` | Yellow squiggle |
-| `information` | Blue squiggle |
-| `hint` | Faint underline, folded into the editor's lightbulb |
-| `off` | Not reported |
+<Info>
+  If a rule is omitted, the server uses its built-in default. You only need to list rules you want to override.
+</Info>

@@ -1,143 +1,72 @@
 ---
-title: "Config files"
-description: "Committed rules, so everyone working on the project gets the same ones."
+title: "Committed Config Files for GLua"
+description: "Use .glua.json for linter rules and .gluafmtrc.json for formatter options so your whole team shares the same settings without extra setup."
 icon: "file-code"
+sidebarTitle: "Config Files"
 ---
 
-Editor settings are per person. A linter a team shares needs its rules in the
-repository, next to the code they apply to.
+Committed config files let you store linter and formatter settings in version control. When a teammate opens the project, the language server reads these files automatically. No one has to manually import UI settings or keep personal configs in sync.
 
-Two files do that. Both accept comments and trailing commas, and both get
-completion and validation while you edit them.
+## Creating config files
 
-## `.glua.json`
+You can seed a config file from your current VS Code UI settings with one command. Open the Command Palette and run either of the following:
 
-Rules, declared globals, and per-path overrides.
+- `GLua: Create Linter Config File` (creates `.glua.json`)
+- `GLua: Create Formatter Config File` (creates `.gluafmtrc.json`)
 
-```jsonc .glua.json
+These commands write the file at the workspace root using whatever settings are active in your editor at that moment.
+
+## Linter config (`.glua.json`)
+
+Use `.glua.json` to define globals, diagnostic severity, and per-path overrides.
+
+```json
 {
-  "$schema": "./node_modules/glua-lsp/schemas/glua.schema.json",
-
-  // Addons outside this workspace, so they are not reported as undefined.
-  "globals": ["ULib", "ulx", "pac"],
-
+  "globals": ["ULib", "ulx"],
   "diagnostics": {
-    "unusedLocal": "off",
-    "realmViolation": "error",
-    "netReadWriteMismatch": "error"
+    "unusedLocal": "warning",
+    "realmViolation": "error"
   },
-
-  // Rules can vary by path. Later entries win.
-  "overrides": [
-    {
-      "files": ["lua/vendor/**", "lua/thirdparty/**"],
+  "overrides": {
+    "lua/vendor/**": {
       "diagnostics": {
-        "undefinedGlobal": "off",
         "unusedLocal": "off"
       }
     }
-  ]
+  }
 }
 ```
 
-Also accepted: `glua.json`, `.gluarc.json`.
+- `globals`: declare addon names or libraries that are available at runtime but not defined in your workspace.
+- `diagnostics`: set any rule to `"off"`, `"warning"`, or `"error"`.
+- `overrides`: apply different rules to specific paths. In the example, vendored files under `lua/vendor/**` do not report unused locals.
 
-### Declared globals
+## Formatter config (`.gluafmtrc.json`)
 
-The single most useful key. If your addon depends on ULX, every `ULib.…` is
-reported as an undefined global — correctly, since it is not in your workspace,
-but uselessly.
+Use `.gluafmtrc.json` to control indentation, line width, quotes, and block collapsing.
 
 ```json
-{ "globals": ["ULib", "ulx"] }
-```
-
-<Tip>
-  On a real 932-file gamemode this one line removed 49 of the 59 remaining
-  undefined-global reports.
-</Tip>
-
-## `.gluafmtrc.json`
-
-Formatting only. Wins over `.editorconfig`, `.prettierrc` and your editor
-settings.
-
-```jsonc .gluafmtrc.json
 {
-  "$schema": "./node_modules/glua-lsp/schemas/gluafmtrc.schema.json",
-
-  "useTabs": true,
+  "useTabs": false,
   "indentSize": 4,
   "maxLineWidth": 120,
   "quoteStyle": "double",
   "keepSingleLineBlocks": true,
-
-  "overrides": [
-    {
-      "files": ["lua/vendor/**"],
-      "options": { "maxLineWidth": 200 }
+  "overrides": {
+    "lua/config/**": {
+      "indentSize": 2
     }
-  ]
+  }
 }
 ```
 
-Also accepted: `.gluafmtrc`, `gluafmt.json`.
+- `useTabs`: indent with tabs instead of spaces.
+- `indentSize`: number of spaces per indent level (ignored when `useTabs` is true).
+- `maxLineWidth`: soft wrap target for long lines.
+- `quoteStyle`: `"double"` or `"single"` for string literals.
+- `keepSingleLineBlocks`: preserve one-line `if` blocks instead of forcing expansion.
+- `overrides`: change formatting per path. In the example, files under `lua/config/**` use two-space indentation.
 
-See [the formatter page](/features/formatter#options) for every option.
-
-## Generating them
-
-You do not have to write these by hand:
-
-- `GLua: Create Formatter Config File`
-- `GLua: Create Linter Config File`
-
-Both write the file into your workspace root, seeded from whatever you have
-already set in the settings UI, and open it.
-
-## Glob patterns
-
-`files` patterns are relative to the config file's directory.
-
-| Pattern | Matches |
-| --- | --- |
-| `lua/vendor/**` | Everything under `lua/vendor`, including directly inside it |
-| `*.lua` | `.lua` files in the root only — `*` does not cross a `/` |
-| `**/cl_*.lua` | Any `cl_` file at any depth |
-| `{*.lua,*.glua}` | Either extension |
-| `sh_?.lua` | `sh_a.lua`, `sh_b.lua`, … |
-
-## Existing config files
-
-If your repo already pins formatting, it is read rather than ignored:
-
-<CodeGroup>
-
-```ini .editorconfig
-[*.lua]
-indent_style = space
-indent_size = 2
-max_line_length = 100
-end_of_line = lf
-```
-
-```json .prettierrc
-{
-  "useTabs": false,
-  "tabWidth": 2,
-  "printWidth": 100,
-  "singleQuote": true
-}
-```
-
-</CodeGroup>
-
-Both map onto the formatter options that have a Lua equivalent. Prettier's
-`semi: false` maps to removing optional semicolons; anything JavaScript-specific
-is ignored.
-
-<Note>
-  These are read from the workspace root only. If a `.gluafmtrc.json` sets the
-  same option, it wins — but anything it does not set still comes from the
-  generic files, so the two combine rather than one replacing the other.
-</Note>
+<Info>
+  Both `.glua.json` and `.gluafmtrc.json` ship with bundled JSON schemas, so you get IntelliSense and validation while editing them in VS Code.
+</Info>

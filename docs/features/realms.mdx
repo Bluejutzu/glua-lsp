@@ -1,137 +1,69 @@
 ---
-title: "Realms"
-description: "How the server works out whether a file runs on the client, the server, or both — and what it does with that."
+title: "Realm Awareness in GLua Language Server"
+description: "GLua Language Server assigns every file a realm from its path and narrows it further with if SERVER then blocks, then flags cross-realm API use."
 icon: "server"
+sidebarTitle: "Realms"
 ---
 
-Garry's Mod runs the same language in two places with different APIs available.
-Calling a serverside function from a clientside file is not a syntax error, it
-is a `nil` at runtime, usually noticed in the server console much later.
+GLua Language Server understands Garry's Mod's three execution contexts: Client, Server, and Shared. It assigns a realm to every file in your workspace, narrows that assignment inside conditional blocks, and then warns you when you call an API that does not exist in that realm.
 
-Every file gets a realm, and that drives diagnostics, completion filtering and
-hover.
+## How realms are assigned
 
-## How a file's realm is decided
+The server determines a file's realm from its path and filename conventions.
 
-Rules are tried in order. The first match wins.
+### Path-based assignment
 
-| Signal | Realm | Confidence |
-| --- | --- | --- |
-| `cl_init.lua` | Client | Certain |
-| `init.lua` in an entity, weapon or gamemode | Server | Certain |
-| `shared.lua` | Shared | Certain |
-| `lua/autorun/client/` | Client | Certain |
-| `lua/autorun/server/` | Server | Certain |
-| `lua/menu/` | Menu | Certain |
-| `lua/effects/`, `lua/vgui/`, `lua/postprocess/` | Client | Certain |
-| A `client/` or `server/` directory | Client / Server | Certain |
-| `cl_` filename prefix | Client | Convention |
-| `sv_` filename prefix | Server | Convention |
-| `sh_` filename prefix | Shared | Convention |
-| Nothing matched | Shared | Guess |
+| Path pattern | Realm |
+| --- | --- |
+| `lua/autorun/client/` | Client |
+| `lua/autorun/server/` | Server |
+| `lua/entities/` | Shared |
+| `lua/weapons/` | Shared |
+| `lua/vgui/` | Client |
+| `lua/autorun/` | Shared |
 
-<Note>
-  The confidence column matters. Path-based conclusions are treated as facts.
-  Filename prefixes are a convention people break — plenty of addons include a
-  `cl_` file on both realms — so findings based on a prefix are reported as
-  **information** rather than warnings.
-</Note>
+### Filename prefix conventions
 
-## Narrowing inside a file
+| Prefix | Realm |
+| --- | --- |
+| `cl_` | Client |
+| `sv_` | Server |
 
-A shared file is not uniformly shared. `if SERVER then` blocks narrow the realm
-for everything inside them, including the matching `else`:
+These prefixes are treated as informational hints. The server still respects the directory first, because many projects break the prefix convention.
 
-```lua lua/autorun/sh_thing.lua
--- shared here
+### Narrowing with conditionals
 
+Inside an `if SERVER then` block, the server narrows the realm to Server for everything in that branch. The same applies to `if CLIENT then`.
+
+```lua
 if SERVER then
-  -- server here; Player:Kick is fine
-  ply:Kick("bye")
-else
-  -- client here; surface.SetDrawColor is fine
-  surface.SetDrawColor(255, 0, 0)
+    -- Everything here is treated as serverside
+    Player:Kick("Reason") -- Valid in this branch
 end
 ```
 
-`if not CLIENT then`, `if SERVER and something then` and `if MENU_DLL then` are
-all understood.
+## What it catches
 
-## What it is used for
+### Cross-realm API misuse
 
-<AccordionGroup>
-  <Accordion title="Diagnostics" icon="triangle-exclamation">
-    Calling something that cannot exist here is reported with the reason the
-    realm was decided, so you can tell whether the finding or the detection is
-    wrong:
+The server flags when you call a serverside-only function from a clientside context:
 
-    ```
-    'Player:Kick' only exists Server-side, but this code runs
-    Client-side (cl_init.lua is loaded clientside only). It will be nil here.
-    ```
-
-    Quick fix: wrap the statement in `if SERVER then ... end`.
-  </Accordion>
-
-  <Accordion title="Completion filtering" icon="filter">
-    Serverside-only functions do not appear in a clientside file at all. Turn
-    this off with `glua.completion.filterByRealm` if you would rather see
-    everything.
-  </Accordion>
-
-  <Accordion title="Hover" icon="hand-pointer">
-    Hovering something out of realm puts a warning above the documentation
-    rather than leaving you to notice the realm badge.
-  </Accordion>
-
-  <Accordion title="AddCSLuaFile checking" icon="file-arrow-up">
-    A clientside file that is `include`d but never passed to `AddCSLuaFile` will
-    never reach clients. That is reported at the `include` site, with a quick fix
-    that adds the call.
-
-    Files in `lua/autorun`, `lua/entities`, `lua/weapons`, `lua/effects` and
-    `lua/vgui` are skipped, since the engine networks those itself.
-  </Accordion>
-</AccordionGroup>
-
-## When detection is wrong
-
-If a `cl_` file really does run on both realms, you have three options, in
-increasing order of scope:
-
-<CodeGroup>
-
-```lua Inline
--- glua-disable realm-violation
+```lua
+-- File: lua/autorun/client/my_addon.lua
+local ply = LocalPlayer()
+ply:Kick("Reason") -- Error: Kick is not available on the client
 ```
 
-```json Per path
-{
-  "overrides": [
-    {
-      "files": ["lua/myaddon/shared/**"],
-      "diagnostics": { "realmViolation": "off" }
-    }
-  ]
-}
-```
+### Completion filtering
 
-```json Everywhere
-{
-  "diagnostics": { "realmViolation": "off" }
-}
-```
+When you work in a clientside file, serverside-only functions are hidden from completion. You will not see `Player:Kick` suggested in a `cl_` file or anything under `lua/autorun/client/`.
 
-</CodeGroup>
+## Realm certainty
 
-Renaming the file to `sh_` is usually the better fix — it makes the intent
-obvious to people as well as to the tooling.
+Path-based detection is considered **certain**. If a file lives in `lua/autorun/server/`, the server treats it as strictly serverside.
 
-## Seeing a file's realm
+Filename prefixes (`cl_`, `sv_`) are **informational**. They guide the initial assignment but do not override a conflicting directory. This protects you from false positives when a `cl_` file is included from a shared context.
 
-The status bar shows it for the active file. To see it inline for every file,
-turn on `glua.inlayHints.realm`:
-
-```
-Shared · library — no realm convention matched; assuming shared
-```
+<Note>
+  A `cl_` file that is included serverside (for example, through `AddCSLuaFile` and `include` in a shared file) is not detectable from the path alone. The server will still treat it as clientside based on its location. If you intentionally share a prefixed file, add an explicit `---@realm shared` annotation at the top.
+</Note>

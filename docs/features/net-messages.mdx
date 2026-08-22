@@ -1,96 +1,61 @@
 ---
-title: "Net messages"
-description: "The sender and the handler live in different files. Both get indexed, so mismatches surface while you write."
+title: "Net Message Analysis Across Files"
+description: "GLua Language Server indexes both halves of every net message to catch unregistered strings, missing sends, orphaned receivers, and payload mismatches."
 icon: "tower-broadcast"
+sidebarTitle: "Net Messages"
 ---
 
-A net message has three parts that must agree, and they are almost never in the
-same file:
+GLua Language Server indexes every `net.Start`, `net.Receive`, and `util.AddNetworkString` call across your workspace. It pairs the sending and receiving halves of each net message to detect registration errors, orphaned handlers, and mismatched data payloads.
 
-1. `util.AddNetworkString` registers the name, serverside
-2. `net.Start` … `net.Write*` … `net.Send` builds and sends it
-3. `net.Receive` … `net.Read*` handles it, in the other realm
+## What is checked
 
-Nothing in a normal editor connects those. The workspace index does.
+The server validates net messages against four categories of problems:
 
-## What gets reported
+- **Unregistered strings** — `net.Start` is called with a string that was never passed to `util.AddNetworkString`.
+- **Missing sends** — `net.Start` is called but the message is never followed by `Send`, `Broadcast`, or `SendToServer`.
+- **Orphaned receivers** — `net.Receive` is registered for a message name that nothing in the workspace ever sends.
+- **Payload mismatches** — The sequence of `net.Write*` calls on the sender does not match the `net.Read*` calls on the receiver.
 
-<AccordionGroup>
-  <Accordion title="Never registered" icon="circle-xmark">
-    `net.Start("foo")` where nothing anywhere calls
-    `util.AddNetworkString("foo")`. This fails at runtime.
+## Payload mismatch example
 
-    Quick fix: add the `util.AddNetworkString` call at the top of the file.
-  </Accordion>
+When the server and client read and write data in different orders or with different types, it surfaces a diagnostic.
 
-  <Accordion title="Never sent" icon="paper-plane">
-    `net.Start` that is not followed by `net.Send`, `net.Broadcast`,
-    `net.SendToServer`, `net.SendPVS` or `net.SendPAS`. The message is built and
-    then dropped — easy to do when refactoring.
-  </Accordion>
+<CodeGroup>
 
-  <Accordion title="Never handled" icon="inbox">
-    A message that is sent but has no `net.Receive` anywhere, or a `net.Receive`
-    for a message nothing ever sends. Both usually mean dead code, or a rename
-    that only got applied to one side.
+```lua Server
+util.AddNetworkString("MyMessage")
 
-    Quick fix: generate a `net.Receive` stub.
-  </Accordion>
+net.Start("MyMessage")
+net.WriteString("Hello")
+net.WriteEntity(someEntity)
+net.Broadcast()
+```
 
-  <Accordion title="Payload mismatch" icon="arrow-right-arrow-left">
-    The interesting one. The sequence of `net.Write*` calls after a `net.Start`
-    is compared against the `net.Read*` calls inside the matching handler, in
-    order, across files.
+```lua Client
+net.Receive("MyMessage", function()
+    local msg = net.ReadString()
+    local id = net.ReadUInt(8) -- Mismatch: server wrote Entity, client reads UInt
+end)
+```
 
-    ```
-    Payload mismatch for 'zb_xp_get': sender writes [String, Entity]
-    but this handler reads [String, UInt].
-    ```
+</CodeGroup>
 
-    Reads must mirror writes exactly. Getting this wrong produces garbage values
-    rather than an error, which makes it painful to track down by hand.
-  </Accordion>
-</AccordionGroup>
+The server flags the mismatch because the server writes an `Entity` at position 2, but the client expects a `UInt`.
 
 ## Completion and rename
 
-Typing a message name completes from every name known in the workspace, showing
-where each one is already used:
+### Message name completion
 
-```lua
-net.Start("")
---         ↑ my_message   net message · registered, 2 send, 1 receive
-```
+Inside `net.Start` and `net.Receive`, the server suggests message names that are already registered with `util.AddNetworkString` anywhere in the workspace.
 
-Rename works on the string itself. Renaming a message updates its
-`util.AddNetworkString`, every `net.Start` and every `net.Receive`, across every
-file at once — which is the operation that normally leaves half-renamed messages
-behind.
+### Rename support
 
-Go-to-definition on a message name jumps to its registration and its handlers.
+When you rename a network string in `util.AddNetworkString`, the change propagates to every `net.Start` and `net.Receive` that uses the same name.
 
-## The net graph
+## Net Message Graph
 
-`GLua: Show Net Message Graph` renders every message in the workspace as a
-table:
+Use the **GLua: Show Net Message Graph** command to open a visual overview of every net message in your workspace. The graph shows senders, receivers, and payload shapes in one view.
 
-```markdown
-| Message | Registered | Sent from | Received in | Payload |
-| --- | --- | --- | --- | --- |
-| `my_message` | 1 | 2 | 1 | String → Entity |
-| `orphan` | ⚠ 0 | 1 | ⚠ 0 | UInt |
-```
-
-Followed by a per-message breakdown with file and line for each site, and an
-explicit payload comparison for every handler. Useful for auditing an addon you
-have inherited.
-
-## Limits
-
-- Only literal string names are tracked. `net.Start(name)` with a variable
-  cannot be matched to anything.
-- The write sequence is taken from the first sender found that has writes. If
-  two senders of the same message write different payloads, only one is compared.
-- Conditional writes (`if x then net.WriteBool(...) end`) are counted as if they
-  always happen, so a message with a branching payload can report a false
-  mismatch. Suppress those with `-- glua-ignore net-payload-mismatch`.
+<Tip>
+  Open the Command Palette (Ctrl\+Shift\+P or Cmd\+Shift\+P) and run `GLua: Show Net Message Graph` to explore your net message topology.
+</Tip>
