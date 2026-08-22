@@ -1,54 +1,23 @@
 # GLua Language Server
 
-A language server for Garry's Mod Lua — parser, scope tracking, type inference,
-workspace index, the usual LSP stack.
+Language support for Garry's Mod Lua in VS Code: IntelliSense that follows your
+values, diagnostics that catch realm and net message bugs before you launch the
+game, and a formatter.
 
-It's backed by 5,586 API entries scraped from the GMod wiki (331 globals, 1,257
+Backed by 5,586 API entries from the Garry's Mod wiki — 331 globals, 1,257
 library functions, 2,376 class methods, 551 hooks, 1,069 panel methods, 100
-enums, 72 structures), plus an index of your own workspace so it knows what your
-addon defines too.
+enums, 72 structures — plus an index of your own workspace.
 
-## Where this came from
+## Features
 
-[`vscode-glua-enhanced`](https://github.com/WilliamVenner/vscode-glua-enhanced)
-is where most of these ideas come from — wiki-backed completion, realm flags, net
-message discovery, the whole shape of what GMod tooling should do. Go use it.
+### IntelliSense that tracks types
 
-This is another go at the same problem from a different angle: a language server
-with a parser and a type model under it, instead of providers running in the
-extension host. That's really the only structural difference, but a lot follows
-from it. Resolving `ply:` means knowing `ply` came from `player.GetByID(1)` a few
-lines up. Resolving `frame:` means following `vgui.Create("DFrame")` to the
-`DFrame` class. Both have to work while you're mid-keystroke and the code isn't
-valid Lua yet.
-
-None of that is a Lua problem, for the record. It just needs the standard
-language server plumbing, which is what this repo is.
-
-## How it's put together
-
-```
-lexer  ->  error-tolerant parser  ->  binder (scopes + types + facts)  ->  workspace index
-```
-
-The parser always returns a tree, no matter how broken the input. Half-typed code
-gets real nodes with `missing` holes instead of an exception:
+Completion follows values through calls, loops, callbacks and metatables.
 
 ```lua
-local ply = player.GetByID(1)
-ply:            -- MemberExpression, missing identifier, base still resolves to Player
-```
-
-That one property is what lets completion, hover and signature help keep working
-on the line you're editing. There are tests for it in `test/parser.test.mjs`.
-
-## What it does
-
-### Types follow values
-
-```lua
-local ply = player.GetByID(1)        -- Player|NULL -> Player methods + inherited Entity ones
+local ply = player.GetByID(1)        -- Player: Player methods + inherited Entity ones
 local frame = vgui.Create("DFrame")  -- DFrame, read out of the string literal
+
 for _, p in ipairs(player.GetAll()) do
   p:Nick()                           -- Player, through ipairs
 end
@@ -62,125 +31,122 @@ function ENT:Initialize()
 end
 ```
 
-### Typing your own function parameters
+It keeps working while you type. The parser always returns a tree, so a
+half-written `ply:` still resolves instead of falling back to a word list.
 
-Lua has no type syntax, so a parameter in one of your own functions has nothing
-to go on. Two ways around that.
+### Typing your own functions
 
-**Annotations.** Same `---@param` dialect the Lua Language Server uses, so
-anything already annotated for LuaLS works here, and anything you write here
-keeps working there:
+Lua has no type syntax, so a parameter in your own code has nothing to go on.
+Two ways round that, and you can use either.
+
+**Annotations** — the same `---@param` dialect as the Lua Language Server, so
+anything you already have works, and anything you write here works there:
 
 ```lua
 ---@param ply Player
 ---@param reason string
 ---@return boolean
 local function punish(ply, reason)
-  ply:Kick(reason)   -- ply: completes Player methods
+  ply:Kick(reason)
 end
 
 ---@type Player
-local target = nil   -- overrides whatever the initialiser looked like
+local target = nil
 ```
 
-`@param`, `@return`, `@type`, `@class`, `@field` and `@deprecated` are read.
-Unions (`Entity|nil`), optionals (`count?`, `Player?`), arrays (`Entity[]`) and
-`table<string, Player>` all parse. A `@param` with no type — `--- @param ply the
-player who did it` — is left alone as documentation rather than being read as a
-type called `the`.
+`@param`, `@return`, `@type`, `@class`, `@field`, `@deprecated`. Unions
+(`Entity|nil`), optionals (`count?`), arrays (`Entity[]`), `table<string, Player>`.
 
-**Or don't annotate anything.** Parameters with no annotation get typed from the
-methods called on them:
+**Or nothing at all** — unannotated parameters get typed from how they're used:
 
 ```lua
 local function canPlace(ply)
-  return ply:IsAdmin()   -- IsAdmin only exists on Player, so ply is a Player
+  return ply:IsAdmin()       -- IsAdmin only exists on Player, so ply is a Player
 end
 
 local function move(ent)
-  ent:SetPos(ent:GetPos())   -- shared by lots of classes, so: Entity
+  ent:SetPos(ent:GetPos())   -- shared by many classes, so: Entity
 end
 ```
 
-When the method set matches several classes it picks the one the others inherit
-from, and when it matches nothing recognisable it stays `any` rather than
-guessing. An explicit `---@param` always wins over this.
+Ambiguous method sets fall back to the common base class; unrecognisable ones
+stay `any` rather than guessing. An explicit `---@param` always wins.
 
-### Realms
+### Realm awareness
 
-Every file gets a realm from its path (`lua/autorun/client/`, `cl_init.lua`,
-`sv_` prefixes, entity/effect/vgui directories), and `if SERVER then` blocks
-narrow it further. That gets used for:
+Files get a realm from their path (`lua/autorun/client/`, `cl_init.lua`, `sv_`
+prefixes, entity and vgui directories), and `if SERVER then` narrows it further.
 
-- Diagnostics — calling `Player:Kick` from a clientside file gets flagged before
-  you launch the game.
-- Completion filtering — serverside-only functions don't show up in clientside
-  files.
-- Hover — a note when the thing you're hovering can't exist where you are.
+- Calling `Player:Kick` from a clientside file is flagged before you run it
+- Serverside-only functions don't appear in completion in clientside files
+- Hover tells you when what you're looking at can't exist where you are
 
-Path-based realms (`cl_init.lua`, `lua/autorun/server/`) are treated as certain.
-Filename prefixes (`cl_`, `sv_`) are a convention people break all the time, so
-those get reported as information instead of warnings.
+Path-based realms are treated as certain. Filename prefixes are a convention
+people break, so those findings are informational rather than warnings.
 
-### Net messages
+### Net message analysis
 
-The two halves of a net message live in different files and usually different
-realms, so the editor normally has nothing tying them together. The workspace
-index does:
+Both halves of a net message live in different files and usually different
+realms. The workspace index connects them.
 
 - `net.Start` on a message never passed to `util.AddNetworkString`
 - `net.Start` never followed by `net.Send` / `Broadcast` / `SendToServer`
 - `net.Receive` for a message nothing sends, and the reverse
-- payload mismatches — the `net.Write*` sequence checked against the `net.Read*`
-  calls in the matching handler, across files
-- completion of known message names inside `net.Start` / `net.Receive`
-- rename a message, and every `AddNetworkString`, `Start` and `Receive` follows
-- `GLua: Show Net Message Graph` dumps the whole picture as a table
+- **Payload mismatches** — the `net.Write*` sequence checked against the
+  `net.Read*` calls in the matching handler, across files
+- Completion of known message names inside `net.Start` / `net.Receive`
+- Rename a message and every `AddNetworkString`, `Start` and `Receive` follows
+- `GLua: Show Net Message Graph` lays the whole thing out as a table
 
 ### Hooks
 
-- hook name completion inside `hook.Add`, from the wiki plus any custom hook your
+- Hook name completion in `hook.Add`, from the wiki plus custom hooks your
   workspace fires with `hook.Run`
-- typo detection with edit-distance quick fixes — `"PlayerSpawned"` isn't a hook
-- callback parameters typed from the hook's documented signature
-- callbacks that declare more parameters than the hook actually passes
+- Typo detection with edit-distance quick fixes — `"PlayerSpawned"` isn't a hook
+- Callback parameters typed from the hook's documented signature
+- Callbacks declaring more parameters than the hook passes
 - `gameevent.Listen` registrations count as valid hook names
 - `function ENT:` / `function SWEP:` / `function PANEL:` complete the right hook
-  table and drop in a full stub
+  table and insert a full stub
 
-### Cross-file
+### Cross-file navigation
 
 `MyAddon.Config` completes, resolves and renames across files. `include()` and
 `AddCSLuaFile()` paths resolve to real files, so go-to-definition works on them.
-A clientside file that gets `include`d but never `AddCSLuaFile`d gets flagged,
-with a quick fix that adds the call.
+A clientside file that's `include`d but never `AddCSLuaFile`d gets flagged, with
+a quick fix.
+
+### Formatter
+
+Reprints from the syntax tree, with two rules that make it safe on other
+people's code: it refuses to touch a file that doesn't parse, and it never drops
+a comment — anything it can't place makes that one statement fall back to its
+original text.
+
+Idiomatic one-liners stay one-liners:
+
+```lua
+if not IsValid(ent) then return end   -- not expanded to three lines
+```
+
+Set it as your formatter for GLua files:
+
+```json
+"[glua]": { "editor.defaultFormatter": "bluejutzu.glua-lsp" }
+```
 
 ### Other diagnostics
 
-Undefined globals (with `if someAddon and ...` guards respected, since that's how
+Undefined globals (respecting `if someAddon and ...` guards, since that's how
 you depend on an optional addon), unused locals, deprecated API use, argument
 counts and types against documented signatures — including overloads like
 `surface.SetDrawColor(r, g, b, a)` vs `surface.SetDrawColor(color)`.
 
-Every rule has its own severity setting, and any of them can be turned off.
+### Everything else
 
-### It leaves other Lua projects alone
-
-This doesn't claim `.lua` in `package.json`. Anything that claims `.lua` globally
-ends up fighting over Love2D, Luau and Neovim workspaces, so instead it only
-adopts a file when the workspace actually looks like GMod — a `lua/` tree,
-`addon.json`, a `gamemodes/` directory, or GMod-only API use in the file itself.
-`glua.activation` switches that to `always` or `never`, and the status bar item
-toggles it per file.
-
-Same reasoning behind registering a `glua` language id rather than redefining
-`lua`: it should sit next to your other Lua extensions, not replace them.
-
-### Editor features
-
-Completion, hover, signature help (with overloads), go-to-definition, find
-references, rename, document highlights, document and workspace symbols, semantic
-highlighting, inlay parameter hints, folding, and code actions:
+Hover, signature help with overloads, go-to-definition, find references, rename,
+document highlights, document and workspace symbols, semantic highlighting,
+inlay parameter hints, and code actions:
 
 - rewrite `x += 1` as `x = x + 1` (GLua has no compound assignment)
 - convert C-style operators (`!=`, `&&`, `||`, `!`) to Lua, whole document
@@ -188,96 +154,165 @@ highlighting, inlay parameter hints, folding, and code actions:
 - add a missing `util.AddNetworkString`, `net.Receive` stub, or `AddCSLuaFile`
 - wrap a cross-realm call in `if SERVER then ... end`
 
-## Numbers
+### It leaves other Lua projects alone
 
-Run against a 932-file, 232,000-line gamemode:
+This doesn't claim `.lua` in `package.json`. Anything that claims `.lua` globally
+ends up fighting over Love2D, Luau and Neovim workspaces, so it only adopts a
+file when the workspace actually looks like GMod — a `lua/` tree, `addon.json`, a
+`gamemodes/` directory, or GMod-only API use in the file itself. `glua.activation`
+switches that to `always` or `never`, and the status bar item toggles it per file.
+
+## Configuration
+
+Everything is configurable three ways, and they layer.
+
+**In the UI.** Every option is a VS Code setting — `GLua: Open Settings`, or
+search `@ext:bluejutzu.glua-lsp` in the settings editor.
+
+**In a committed config file**, so the whole team gets the same rules. Two
+commands seed one from whatever you've already set in the UI:
+
+- `GLua: Create Linter Config File` → `.glua.json`
+- `GLua: Create Formatter Config File` → `.gluafmtrc.json`
+
+Both get full IntelliSense — completion, descriptions and validation come from
+bundled JSON schemas.
+
+```jsonc
+// .glua.json
+{
+  // Addons outside this workspace, so they aren't reported as undefined.
+  "globals": ["ULib", "ulx"],
+
+  "diagnostics": {
+    "unusedLocal": "off",
+    "realmViolation": "error"
+  },
+
+  // Rules can vary by path.
+  "overrides": [
+    {
+      "files": ["lua/vendor/**"],
+      "diagnostics": { "undefinedGlobal": "off" }
+    }
+  ]
+}
+```
+
+```jsonc
+// .gluafmtrc.json
+{
+  "useTabs": true,
+  "indentSize": 4,
+  "maxLineWidth": 120,
+  "quoteStyle": "double",
+  "keepSingleLineBlocks": true,
+  "overrides": [
+    { "files": ["lua/vendor/**"], "options": { "maxLineWidth": 200 } }
+  ]
+}
+```
+
+**Inline**, when one finding is wrong and the rule isn't:
+
+```lua
+-- glua-ignore                          next line, every rule
+-- glua-ignore realm-violation          next line, one rule
+foo()  -- glua-ignore unused-local      this line
+-- glua-disable net-unregistered        from here on
+-- glua-enable net-unregistered         until here
+-- glua-disable-file                    the whole file
+```
+
+### Existing config files
+
+If your repo already pins formatting, it's read rather than ignored:
+
+| Source | Read from |
+| --- | --- |
+| `.editorconfig` | `indent_style`, `indent_size`, `max_line_length`, `end_of_line` |
+| `.prettierrc` | `useTabs`, `tabWidth`, `printWidth`, `singleQuote`, `endOfLine`, `semi` |
+
+Precedence, lowest to highest: built-in defaults → editor settings →
+`.editorconfig` → `.prettierrc` → `.glua.json` → `.gluafmtrc.json`. Generic tools
+get read because you shouldn't have to say the same thing twice; anything written
+specifically for GLua wins over them.
+
+## Performance
+
+Measured on a 932-file, 232,000-line gamemode:
 
 | | |
 | --- | --- |
-| Cold index | 6.4 s (~36k lines/sec), batched so it doesn't block the server |
-| Retained heap | 58 MB — syntax trees get dropped for files you don't have open |
-| Re-analyse a 3,200-line file on edit | 33 ms |
-| Completion | 1.3 ms (member), 5.9 ms (global scope) |
-| Diagnostics | 4.7 ms |
-| Cross-file index rebuild | 26 ms |
+| Cold index | 4.8 s (~48k lines/sec), batched so it doesn't block |
+| Retained heap | 59 MB — syntax trees are dropped for files you don't have open |
+| Re-analyse a 3,200-line file on edit | 31 ms |
+| Completion | 1.2 ms (member), 4.1 ms (global scope) |
+| Diagnostics | 3.5 ms |
 
 Parse errors on that codebase: 0.
 
-Running it on real code changed a bunch of things. It turned up a
-left-associativity bug in the precedence table, a BOM at the start of 100 files,
-Vector arithmetic being inferred as `number`, and the wiki's nested `<callback>`
-blocks getting flattened into the parent function's parameters — which made
-`concommand.Add` look like it took eight arguments. Diagnostics on a 200-file
-sample went from 1,547 (mostly noise) to 688 (mostly real) once those were fixed.
-
-If you point it at your own addon and it says something dumb, that's a bug — the
-bench script below prints a breakdown of every rule that fired so it's easy to
-tell noise from real findings.
-
-## Running it
+## Development
 
 ```bash
 pnpm install
 pnpm run build
 ```
 
-Then hit <kbd>F5</kbd>. That opens a new window on `examples/my_addon`, a small
-addon that exercises most of this. `lua/autorun/sh_mistakes.lua` in there is
-wrong on purpose — one mistake per diagnostic, so you can see what each looks
-like.
-
-## Refreshing the API data
-
-The dataset is checked in, so nothing hits the network at install or run time.
-After a GMod update:
+Then <kbd>F5</kbd>. That opens a window on `examples/my_addon`, which exercises
+most of this; `lua/autorun/sh_mistakes.lua` in it is wrong on purpose, one
+mistake per diagnostic.
 
 ```bash
-pnpm run generate-api
-```
-
-It reads `wiki.facepunch.com/gmod/~pagelist?format=json`, fetches every API page
-as JSON, and parses the structured `markup` field. Responses get cached in
-`.cache/wiki/`, so re-runs are quick; `--fresh` forces a refetch.
-
-## Development
-
-```bash
-pnpm test                                   # 47 tests: parser, analysis, features, performance
+pnpm test                                   # parser, analysis, features, formatter, performance
 pnpm run typecheck                          # TypeScript 7
 pnpm run watch                              # rebuild on change
-pnpm run bench -- path/to/some/gmod/addon   # run it against a real codebase
+pnpm run bench -- path/to/a/gmod/addon      # run it against a real codebase
+pnpm run generate-api                       # rebuild the wiki dataset after a GMod update
 ```
 
 `pnpm run bench` prints index time, memory, per-feature latency, and every
-diagnostic it produced grouped by rule with an example of each. It's the quickest
-way to tell whether a change made the output noisier.
+diagnostic grouped by rule with an example of each. It's the quickest way to see
+whether a change made the output noisier.
 
 ### Layout
 
 ```
 src/parser/     lexer, AST, error-tolerant parser
 src/analyze/    scopes, type inference, realm rules, workspace index
+src/format/     the formatter
+src/config/     config file loading and precedence
 src/api/        the wiki dataset and lookups over it
 src/server/     LSP handlers, one file per feature
-src/client/     the VS Code extension (activation, status bar)
-tools/          the wiki scraper
+src/client/     the VS Code extension
+tools/          the wiki scraper, and the terminal colour palette
 ```
 
 ## Known limits
 
 - Type inference is shallow and unsound on purpose. It answers "what can follow
-  this dot" and "is this argument obviously wrong", and shuts up when it isn't
-  sure. Metatable tricks, `setmetatable` chains and dynamic dispatch aren't
-  followed.
+  this dot" and "is this argument obviously wrong", and stays quiet otherwise.
+  Metatable tricks and dynamic dispatch aren't followed.
 - Reanalysis is whole-file. Incremental reparsing would help past a few thousand
-  lines, but at 33 ms behind a 250 ms debounce it hasn't been worth it yet.
-- The wiki is the source of truth for the API, so gaps in the wiki are gaps here.
-  Argument checks are skipped for the Lua standard library, because its
-  documented signatures aren't precise enough to check against (`table.insert` is
-  only documented in its three-argument form, `math.atan` only in its
-  one-argument form, and both omitted forms are everywhere in real code).
-- Realm inference can't know that a `cl_` file also gets included serverside,
-  which is why prefix-based findings are informational rather than warnings.
+  lines, but at 31 ms behind a 250 ms debounce it hasn't been worth it.
+- The wiki is the source of truth for the API, so gaps there are gaps here.
+  Argument checks are skipped for the Lua standard library, whose documented
+  signatures aren't precise enough to check against — `table.insert` is only
+  documented in its three-argument form, `math.atan` only in its one-argument
+  form, and both omitted forms are everywhere in real code.
+- Realm inference can't know a `cl_` file is also included serverside, which is
+  why prefix-based findings are informational.
+
+## Prior art
+
+Heavily inspired by
+[`vscode-glua-enhanced`](https://github.com/WilliamVenner/vscode-glua-enhanced),
+which is where a lot of these ideas come from — wiki-backed completion, realm
+flags, net message discovery. Go use it.
+
+This is another go at the same problem from a different angle: a language server
+with a parser and a type model under it, rather than providers in the extension
+host. That's the structural difference, and most of what's above follows from it.
 
 ## Licence
 
