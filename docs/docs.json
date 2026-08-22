@@ -66,5 +66,31 @@
   },
   "search": {
     "prompt": "Search the GLua docs"
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "download-pdf"
+    ],
+    "display": "header"
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs",
+    "codeblocks": {
+      "theme": {
+        "light": "catppuccin-macchiato",
+        "dark": "catppuccin-macchiato"
+      }
+    }
+  },
+  "fonts": {
+    "heading": {
+      "family": "Poppins",
+      "weight": 600
+    },
+    "body": {
+      "family": "Inter"
+    }
   }
 }
