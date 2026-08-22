@@ -50,7 +50,7 @@ Create a `.gluafmtrc.json` file in your workspace root to share formatting rules
   "overrides": [
     {
       "files": ["sh_*.lua"],
-      "indentSize": 2
+      "options": { "indentSize": 2 }
     }
   ]
 }
@@ -63,7 +63,7 @@ Create a `.gluafmtrc.json` file in your workspace root to share formatting rules
 | `maxLineWidth` | number | Maximum characters per line |
 | `quoteStyle` | `"single"` or `"double"` | Preferred string quote style |
 | `keepSingleLineBlocks` | boolean | Preserve one-line blocks like guard clauses |
-| `overrides` | array | Per-file-pattern overrides |
+| `overrides` | array | Per-path overrides, each `{ "files": [...], "options": {...} }` |
 
 ## Existing config files
 

@@ -30,7 +30,15 @@
         "netMessage": { "$ref": "#/definitions/severity", "description": "Unregistered, unsent or unhandled net messages." },
         "netReadWriteMismatch": { "$ref": "#/definitions/severity", "description": "net.Write sequence not matching the net.Read sequence in the handler." },
         "missingAddCSLuaFile": { "$ref": "#/definitions/severity", "description": "Clientside file that is included but never sent with AddCSLuaFile." },
-        "globalWrite": { "$ref": "#/definitions/severity", "description": "Writing to a global instead of declaring a local." }
+        "globalWrite": { "$ref": "#/definitions/severity", "description": "Writing to a global instead of declaring a local." },
+        "duplicateIdentifier": {
+          "$ref": "#/definitions/severity",
+          "description": "Two hook.Add calls sharing an event and identifier, or two timer.Create calls sharing a name, in overlapping realms. The second silently replaces the first."
+        },
+        "scope": {
+          "enum": ["open", "workspace"],
+          "description": "Whether to report problems only in open files, or in every indexed file."
+        }
       }
     }
   },

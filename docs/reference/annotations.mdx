@@ -16,7 +16,7 @@ GLua Language Server uses the same annotation dialect as the Lua Language Server
 | `---@type` | `---@type type` | Overrides the inferred type of a `local` declaration. |
 | `---@class` | `---@class ClassName` | Declares a new class or table shape. |
 | `---@field` | `---@field name type` | Declares a field on a class declared with `---@class`. |
-| `---@deprecated` | `---@deprecated` | Marks a function or field as deprecated. The server will surface a diagnostic at call sites. |
+| `---@deprecated` | `---@deprecated reason` | Marks a function or field as deprecated. The reason shows in hover. |
 
 ## Type syntax
 
@@ -63,3 +63,9 @@ local function oldVehicleConfig() end
 <Warning>
   `---@type` only takes effect on a `local` declaration, and only for the first name when a statement declares several (`local a, b = ...`). It has no effect on a plain assignment (`x = value`) or a table field (`self.x = value`). See [Casting with `---@type`](/features/typing-your-code#casting-with-type) for examples.
 </Warning>
+
+<Warning>
+  A `---@param` with no type is treated as documentation, not a type. Writing `--- @param ply the player who did it` will not create a type called `the` — the tag is only honoured when the second word is recognisably a type.
+</Warning>
+
+The `deprecated` diagnostic is raised for API that the Garry's Mod wiki marks deprecated. `---@deprecated` on your own functions is currently documentation only; it does not yet produce a diagnostic at call sites.

@@ -101,6 +101,16 @@
         "command": "glua.openSettings",
         "title": "GLua: Open Settings",
         "category": "GLua"
+      },
+      {
+        "command": "glua.checkWorkspace",
+        "title": "GLua: Check Whole Workspace",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.clearWorkspaceDiagnostics",
+        "title": "GLua: Clear Workspace Problems",
+        "category": "GLua"
       }
     ],
     "configuration": {
@@ -264,6 +274,31 @@
           "default": "warning",
           "markdownDescription": "A clientside file that is never passed to `AddCSLuaFile`, so it will never reach clients."
         },
+        "glua.diagnostics.duplicateIdentifier": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "markdownDescription": "Two `hook.Add` calls sharing an event and identifier, or two `timer.Create` calls sharing a name, in overlapping realms. The second silently replaces the first."
+        },
+        "glua.diagnostics.scope": {
+          "type": "string",
+          "enum": [
+            "open",
+            "workspace"
+          ],
+          "default": "open",
+          "markdownEnumDescriptions": [
+            "Only report problems in files you have open.",
+            "Report problems in every indexed file, so cross-file issues show up without opening anything."
+          ],
+          "markdownDescription": "How much of the workspace to report problems for. `workspace` costs one extra pass over every file after indexing."
+        },
         "glua.diagnostics.globalWrite": {
           "type": "string",
           "enum": [
@@ -381,11 +416,19 @@
     },
     "jsonValidation": [
       {
-        "fileMatch": [".gluafmtrc.json", ".gluafmtrc", "gluafmt.json"],
+        "fileMatch": [
+          ".gluafmtrc.json",
+          ".gluafmtrc",
+          "gluafmt.json"
+        ],
         "url": "./schemas/gluafmtrc.schema.json"
       },
       {
-        "fileMatch": [".glua.json", "glua.json", ".gluarc.json"],
+        "fileMatch": [
+          ".glua.json",
+          "glua.json",
+          ".gluarc.json"
+        ],
         "url": "./schemas/glua.schema.json"
       }
     ],
@@ -409,11 +452,6 @@
     ]
   },
   "packageManager": "pnpm@10.33.0",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
@@ -434,9 +472,10 @@
     "vscode-uri": "^3.0.8"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.2.2",
     "@types/node": "^24.13.3",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.2",
+    "ajv": "^8.20.0",
     "esbuild": "^0.25.0",
     "typescript": "^7.0.2"
   }

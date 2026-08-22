@@ -27,19 +27,20 @@ Use `.glua.json` to define globals, diagnostic severity, and per-path overrides.
     "unusedLocal": "warning",
     "realmViolation": "error"
   },
-  "overrides": {
-    "lua/vendor/**": {
+  "overrides": [
+    {
+      "files": ["lua/vendor/**"],
       "diagnostics": {
         "unusedLocal": "off"
       }
     }
-  }
+  ]
 }
 ```
 
 - `globals`: declare addon names or libraries that are available at runtime but not defined in your workspace.
-- `diagnostics`: set any rule to `"off"`, `"warning"`, or `"error"`.
-- `overrides`: apply different rules to specific paths. In the example, vendored files under `lua/vendor/**` do not report unused locals.
+- `diagnostics`: set any rule to `"error"`, `"warning"`, `"information"`, `"hint"` or `"off"`. See the [rule reference](/reference/rules) for the key names.
+- `overrides`: an **array** of `{ "files": [...], "diagnostics": {...} }`, applied in order so later entries win. In the example, vendored files under `lua/vendor/**` do not report unused locals.
 
 ## Formatter config (`.gluafmtrc.json`)
 
@@ -52,20 +53,21 @@ Use `.gluafmtrc.json` to control indentation, line width, quotes, and block coll
   "maxLineWidth": 120,
   "quoteStyle": "double",
   "keepSingleLineBlocks": true,
-  "overrides": {
-    "lua/config/**": {
-      "indentSize": 2
+  "overrides": [
+    {
+      "files": ["lua/config/**"],
+      "options": { "indentSize": 2 }
     }
-  }
+  ]
 }
 ```
 
 - `useTabs`: indent with tabs instead of spaces.
-- `indentSize`: number of spaces per indent level (ignored when `useTabs` is true).
+- `indentSize`: spaces per indent level. Still used when `useTabs` is true, as the assumed display width of a tab when measuring line length.
 - `maxLineWidth`: soft wrap target for long lines.
 - `quoteStyle`: `"double"` or `"single"` for string literals.
 - `keepSingleLineBlocks`: preserve one-line `if` blocks instead of forcing expansion.
-- `overrides`: change formatting per path. In the example, files under `lua/config/**` use two-space indentation.
+- `overrides`: an **array** of `{ "files": [...], "options": {...} }`, applied in order. In the example, files under `lua/config/**` use two-space indentation.
 
 <Info>
   Both `.glua.json` and `.gluafmtrc.json` ship with bundled JSON schemas, so you get IntelliSense and validation while editing them in VS Code.

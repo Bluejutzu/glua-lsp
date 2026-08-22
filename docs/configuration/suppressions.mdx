@@ -11,27 +11,39 @@ Sometimes a diagnostic fires on a line that is actually correct. Instead of weak
 
 GLua Language Server recognizes several suppression styles in Lua comments.
 
+Suppressions take a **diagnostic code** — the kebab-case name shown in the
+Problems panel, such as `unused-local`. That is not the same as the camelCase
+settings key (`unusedLocal`) you would use in `.glua.json`. See the
+[rule reference](/reference/rules) for both names.
+
 ```lua
 -- Suppress all rules on the next line
 -- glua-ignore
 local x = 1
 
 -- Suppress one rule on the next line
--- glua-ignore unusedLocal
+-- glua-ignore unused-local
 local y = 2
 
+-- Suppress several
+-- glua-ignore unused-local, undefined-global
+local z = SomeAddon.Thing
+
 -- Suppress inline on the same line
-local z = 3 -- glua-ignore unusedLocal
+local w = 3 -- glua-ignore unused-local
 
 -- Disable a rule across a range
--- glua-disable realmViolation
+-- glua-disable realm-violation
 if SERVER then
-    -- client-only code that triggers a realm violation
+    -- server-only code inside a file detected as clientside
 end
--- glua-enable realmViolation
+-- glua-enable realm-violation
 
 -- Suppress an entire file
 -- glua-disable-file
+
+-- Suppress one rule for an entire file
+-- glua-disable-file net-payload-mismatch
 ```
 
 ## When to use suppressions

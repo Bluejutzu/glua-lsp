@@ -5,77 +5,102 @@ icon: "list-check"
 sidebarTitle: "Rules"
 ---
 
-GLua Language Server ships with built-in diagnostics that catch common mistakes in Garry's Mod Lua. Each rule can be set to `off`, `warning`, or `error` inside your `.glua.json` file. This page lists every rule, grouped by the area it covers.
+GLua Language Server ships with built-in diagnostics that catch common mistakes in Garry's Mod Lua. This page lists every rule, grouped by the area it covers.
+
+Each rule has two names, and they are not the same thing:
+
+- a **diagnostic code** such as `net-payload-mismatch`, shown in the Problems panel and used by [inline suppressions](/configuration/suppressions)
+- a **settings key** such as `netReadWriteMismatch`, used in `.glua.json` and in VS Code settings
+
+Severity accepts `error`, `warning`, `information`, `hint` or `off`.
 
 <AccordionGroup>
   <Accordion title="Globals">
-    | Rule | Description |
-    | --- | --- |
-    | `undefinedGlobal` | Flags undefined globals. Respects optional-addon guards so shared code that branches on addon availability does not trigger false positives. |
-    | `unusedLocal` | Flags local variables that are declared but never read. |
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `undefined-global` | `undefinedGlobal` | `warning` | A global that is neither a known GMod API member nor assigned anywhere in the workspace. Existence checks like `if x and x.y then` are respected, so depending on an optional addon does not trigger it. Declare external addons under [`globals`](/configuration/config-files) rather than turning this off. |
+    | `global-write` | `globalWrite` | `off` | Writing to a global instead of declaring a local. Noisy by design, so it ships off. |
+    | `unused-local` | `unusedLocal` | `hint` | A local declared but never read. Names starting with `_` are exempt. |
   </Accordion>
 
   <Accordion title="Realms">
-    | Rule | Description |
-    | --- | --- |
-    | `realmViolation` | Flags calls to API that does not exist in the current realm. For example, calling a serverside-only function inside a clientside file. |
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `realm-violation` | `realmViolation` | `warning` | A call to API that cannot exist in this file's realm, for example a serverside-only function in a clientside file. Reported as `information` instead when the realm came from a `cl_`/`sv_` filename prefix, since that is a convention rather than a guarantee. |
   </Accordion>
 
   <Accordion title="Net messages">
-    | Rule | Description |
-    | --- | --- |
-    | `net-unregistered` | Flags `net.Start` with a string that has no matching `net.Receive` registration anywhere in the workspace. |
-    | `net-no-send` | Flags a `net.Start` block that never calls a send method, so the message is constructed but never transmitted. |
-    | `net-no-receiver` | Flags `net.Receive` for a message name that nothing in the workspace ever sends. |
-    | `net-payload-mismatch` | Flags when the sequence of `net.Write*` calls in the sender does not match the sequence of `net.Read*` calls in the receiver. |
+    All four share the `netMessage` settings key, except the payload check.
+
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `net-unregistered` | `netMessage` | `warning` | `net.Start` on a message never passed to `util.AddNetworkString`. Fails at runtime. |
+    | `net-never-dispatched` | `netMessage` | `warning` | A `net.Start` block that never calls `net.Send`, `net.Broadcast` or `net.SendToServer`, so the message is built and dropped. |
+    | `net-never-received` | `netMessage` | `warning` | A message that is sent but has no `net.Receive` anywhere. |
+    | `net-never-sent` | `netMessage` | `warning` | A `net.Receive` for a message nothing ever sends. |
+    | `net-payload-mismatch` | `netReadWriteMismatch` | `warning` | The `net.Write*` sequence in the sender does not match the `net.Read*` sequence in the handler. |
   </Accordion>
 
-  <Accordion title="Hooks">
-    | Rule | Description |
-    | --- | --- |
-    | `hook-typo` | Flags a hook name that is not found in the wiki. Offers a quick fix based on edit-distance to the closest known hook name. |
-    | `hook-extra-param` | Flags when a hook callback declares more parameters than the hook is documented to pass. |
+  <Accordion title="Hooks and timers">
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `unknown-hook` | `unknownHook` | `information` | A hook name that is neither documented nor fired anywhere in the workspace. Quick fixes offer the closest known names by edit distance. |
+    | `duplicate-hook-identifier` | `duplicateIdentifier` | `warning` | Two `hook.Add` calls with the same event and identifier in overlapping realms. The second silently replaces the first. |
+    | `duplicate-timer-name` | `duplicateIdentifier` | `warning` | Two `timer.Create` calls with the same name in overlapping realms. |
   </Accordion>
 
-  <Accordion title="API">
-    | Rule | Description |
-    | --- | --- |
-    | `deprecated` | Flags use of API marked deprecated in the Garry's Mod wiki. |
-    | `argument-count` | Flags calls that pass the wrong number of arguments, including when overloads are available. |
-    | `argument-type` | Flags arguments whose type does not match the documented signature, including overload resolution. |
+  <Accordion title="API calls">
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `deprecated` | `deprecated` | `warning` | Use of API the wiki marks deprecated or removed. The message includes the documented replacement. |
+    | `argument-count` | `argumentCount` | `warning` | The wrong number of arguments, checked against every documented call form. Skipped for the Lua standard library, whose documented signatures are not precise enough. |
+    | `argument-type` | `argumentType` | `warning` | An argument whose inferred type cannot match the documented parameter. Only fires when no documented overload accepts what was passed. |
   </Accordion>
 
   <Accordion title="Files">
-    | Rule | Description |
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `missing-addcsluafile` | `missingAddCSLuaFile` | `warning` | A clientside file that is `include`d but never sent with `AddCSLuaFile`, so clients never receive it. Directories the engine networks itself are skipped. A quick fix inserts the missing call. |
+  </Accordion>
+
+  <Accordion title="Syntax">
+    Always reported as errors, and not configurable.
+
+    | Code | Description |
     | --- | --- |
-    | `include-no-addcsluafile` | Flags a clientside `include` of a file that is never sent to the client via `AddCSLuaFile`. A quick fix is available to insert the missing call. |
+    | `syntax` | The file does not parse. Formatting is disabled for the file while this is present. |
+    | `compound-assignment` | `x += 1` is not valid Lua. A quick fix rewrites it as `x = x + 1`. |
   </Accordion>
 </AccordionGroup>
 
 ## Setting severity
 
-You can tune every rule in `.glua.json`. The `diagnostics` block accepts `off`, `warning`, or `error` for each rule name.
+Tune rules in `.glua.json` using the **settings key** column above. Each accepts
+`error`, `warning`, `information`, `hint` or `off`.
 
 ```json
 {
   "diagnostics": {
     "undefinedGlobal": "error",
-    "unusedLocal": "warning",
+    "unusedLocal": "off",
     "realmViolation": "error",
-    "net-unregistered": "warning",
-    "net-no-send": "error",
-    "net-no-receiver": "off",
-    "net-payload-mismatch": "error",
-    "hook-typo": "warning",
-    "hook-extra-param": "warning",
+    "netMessage": "warning",
+    "netReadWriteMismatch": "error",
+    "unknownHook": "warning",
+    "duplicateIdentifier": "error",
     "deprecated": "warning",
-    "argument-count": "error",
-    "argument-type": "error",
-    "include-no-addcsluafile": "warning"
+    "argumentCount": "warning",
+    "argumentType": "warning",
+    "missingAddCSLuaFile": "warning",
+    "globalWrite": "off"
   }
 }
 ```
 
 <Info>
-  If a rule is omitted, the server uses its built-in default. You only need to list rules you want to override.
+  Omitted rules keep their built-in default, so you only list what you want to change. The bundled JSON schema validates these keys as you type — an unknown key is flagged in the editor.
 </Info>
+
+<Warning>
+  Do not use the diagnostic code as a settings key. `"net-payload-mismatch": "error"` is not a valid entry; the key is `netReadWriteMismatch`. Codes are for the Problems panel and for `-- glua-ignore`.
+</Warning>

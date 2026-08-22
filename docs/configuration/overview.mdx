@@ -31,7 +31,10 @@ Settings are resolved from lowest to highest priority. A higher layer always win
 4. `.prettierrc`
 5. `.glua.json` (linter)
 6. `.gluafmtrc.json` (formatter)
-7. Inline suppression comments
+
+[Inline suppressions](/configuration/suppressions) sit outside this chain. They
+do not change a rule's severity — they hide individual findings from a rule that
+is otherwise still running.
 
 <Note>
   Generic tools like `.editorconfig` and `.prettierrc` are read so you do not repeat yourself. GLua-specific config files (`.glua.json` and `.gluafmtrc.json`) override them when there is a conflict.
@@ -43,8 +46,8 @@ Use `glua.activation` to decide when the language server starts. The default is 
 
 | Value | Behavior |
 | --- | --- |
-| `auto-detect` | Starts only if GLua files are found (default) |
-| `always` | Starts for every workspace |
-| `never` | Never starts; treat everything as plain Lua |
+| `auto` | Takes over `.lua` files only in workspaces that look like Garry's Mod (default) |
+| `always` | Takes over every `.lua` file |
+| `never` | Never takes over `.lua` files; only `.glua` files are handled |
 
 When the server is active, the VS Code status bar shows the current realm: `GLua · Server`, `GLua · Client`, `GLua · Shared`, or `Plain Lua`. You can toggle activation manually through the command palette if the auto-detection guess is wrong.
