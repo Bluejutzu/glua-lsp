@@ -9,6 +9,15 @@
 export interface NodeBase {
   start: number;
   end: number;
+  /**
+   * The expression was written inside parentheses.
+   *
+   * Worth recording rather than dropping: parentheses change precedence, and in
+   * Lua they also truncate a multiple-value expression to one value, so
+   * `local a, b = (f())` leaves `b` nil. Anything that reprints source needs to
+   * put them back.
+   */
+  parenthesized?: boolean;
 }
 
 export type Node = Statement | Expression | Chunk | TableKeyField | IfClause;

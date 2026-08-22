@@ -155,9 +155,12 @@ export function parse(src: string): ParseResult {
         next();
         const inner = parseExpression();
         expect(T.RParen, 'to close a parenthesised expression');
-        // Parenthesised expressions are truncated to one value in Lua, but for
-        // our purposes the inner node with widened bounds is enough.
-        return { ...inner, start: tok.start, end: peek(-1)?.end ?? inner.end };
+        return {
+          ...inner,
+          start: tok.start,
+          end: peek(-1)?.end ?? inner.end,
+          parenthesized: true,
+        };
       }
       default:
         error('Expected an expression.');
