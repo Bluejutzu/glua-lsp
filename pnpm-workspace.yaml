@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+
+# esbuild needs its postinstall to fetch the platform binary; pnpm 10 blocks
+# build scripts by default.
+onlyBuiltDependencies:
+  - esbuild

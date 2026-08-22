@@ -1,0 +1,432 @@
+{
+  "name": "glua-lsp",
+  "displayName": "GLua Language Server",
+  "description": "Language server for Garry's Mod Lua — AST-based IntelliSense, realm awareness, hook and net message analysis, cross-file diagnostics.",
+  "version": "0.1.0",
+  "publisher": "bluejutzu",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "glua",
+    "garrysmod",
+    "gmod",
+    "lua",
+    "lsp"
+  ],
+  "main": "./dist/client.js",
+  "activationEvents": [
+    "onLanguage:lua",
+    "onLanguage:glua",
+    "workspaceContains:**/lua/autorun/**",
+    "workspaceContains:**/addon.json",
+    "workspaceContains:**/gamemodes/**"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "glua",
+        "aliases": [
+          "GLua",
+          "Garry's Mod Lua"
+        ],
+        "extensions": [
+          ".glua"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./resources/glua-file.svg",
+          "dark": "./resources/glua-file.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "glua",
+        "scopeName": "source.glua",
+        "path": "./syntaxes/glua.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "glua.activateForFile",
+        "title": "GLua: Treat This File As GLua",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.deactivateForFile",
+        "title": "GLua: Treat This File As Plain Lua",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.restartServer",
+        "title": "GLua: Restart Language Server",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.showNetGraph",
+        "title": "GLua: Show Net Message Graph",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.reindexWorkspace",
+        "title": "GLua: Re-index Workspace",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.createFormatterConfig",
+        "title": "GLua: Create Formatter Config File (.gluafmtrc.json)",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.createLinterConfig",
+        "title": "GLua: Create Linter Config File (.glua.json)",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.openSettings",
+        "title": "GLua: Open Settings",
+        "category": "GLua"
+      }
+    ],
+    "configuration": {
+      "title": "GLua",
+      "properties": {
+        "glua.activation": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "markdownEnumDescriptions": [
+            "Take over `.lua` files only in workspaces that look like Garry's Mod addons or gamemodes.",
+            "Take over every `.lua` file. Use this if detection misses your layout.",
+            "Never take over `.lua` files. Only `.glua` files are handled."
+          ],
+          "markdownDescription": "Controls when `.lua` files are treated as GLua instead of plain Lua. `auto` keeps this extension out of the way of Love2D, Luau, Neovim and other Lua projects."
+        },
+        "glua.workspace.maxFiles": {
+          "type": "number",
+          "default": 6000,
+          "description": "Maximum number of Lua files to index in a workspace."
+        },
+        "glua.workspace.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/garrysmod/cache/**",
+            "**/garrysmod/download*/**"
+          ],
+          "description": "Glob patterns excluded from workspace indexing."
+        },
+        "glua.diagnostics.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable diagnostics."
+        },
+        "glua.diagnostics.undefinedGlobal": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "description": "Reading a global that is neither a known GMod API member nor assigned anywhere in the workspace."
+        },
+        "glua.diagnostics.realmViolation": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "markdownDescription": "Calling a serverside-only function from a clientside file, or vice versa. The function is nil in that realm, so the call fails at runtime."
+        },
+        "glua.diagnostics.unusedLocal": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "hint",
+          "description": "Locals that are declared but never read."
+        },
+        "glua.diagnostics.deprecated": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "description": "Use of API members the wiki marks as deprecated."
+        },
+        "glua.diagnostics.argumentCount": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "description": "Calling a known API function with too few or too many arguments."
+        },
+        "glua.diagnostics.argumentType": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "description": "Passing an argument whose inferred type cannot match the documented parameter type."
+        },
+        "glua.diagnostics.unknownHook": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "information",
+          "markdownDescription": "`hook.Add` with a name that is neither a documented hook nor called by `hook.Run`/`hook.Call` anywhere in the workspace. Catches typos like `\"PlayerSpawned\"`."
+        },
+        "glua.diagnostics.netMessage": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "markdownDescription": "`net.Start` on a message never passed to `util.AddNetworkString`, and `net.Receive` for a message never sent."
+        },
+        "glua.diagnostics.netReadWriteMismatch": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "markdownDescription": "The sequence of `net.Write*` calls in a `net.Start` block does not match the `net.Read*` calls in the matching `net.Receive`."
+        },
+        "glua.diagnostics.missingAddCSLuaFile": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "markdownDescription": "A clientside file that is never passed to `AddCSLuaFile`, so it will never reach clients."
+        },
+        "glua.diagnostics.globalWrite": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "off",
+          "description": "Writing to a global instead of declaring a local. Noisy by design; off unless you want it."
+        },
+        "glua.inlayHints.parameterNames": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show parameter names inline at call sites of known API functions."
+        },
+        "glua.inlayHints.realm": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the inferred realm at the top of each file."
+        },
+        "glua.completion.callSnippets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert parentheses and tab stops for parameters when completing a function."
+        },
+        "glua.completion.filterByRealm": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide API members that cannot exist in the current file's realm."
+        },
+        "glua.hover.wikiLinks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include a link to the Garry's Mod wiki in hover documentation."
+        },
+        "glua.format.enable": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable the GLua formatter. Select it per language with `editor.defaultFormatter`."
+        },
+        "glua.format.maxLineWidth": {
+          "type": "number",
+          "default": 120,
+          "description": "Column to wrap tables and argument lists at."
+        },
+        "glua.format.quoteStyle": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "double",
+            "single"
+          ],
+          "default": "preserve",
+          "description": "Preferred string quotes. Strings are only rewritten when it needs no extra escaping."
+        },
+        "glua.format.operatorStyle": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "lua"
+          ],
+          "default": "preserve",
+          "markdownEnumDescriptions": [
+            "Leave `!=`, `&&`, `||` and `!` as written.",
+            "Rewrite them to `~=`, `and`, `or` and `not`."
+          ],
+          "markdownDescription": "What to do with GLua's C-style operator aliases."
+        },
+        "glua.format.commentStyle": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "lua"
+          ],
+          "default": "preserve",
+          "markdownDescription": "Whether to rewrite `//` and `/* */` comments as `--` and `--[[ ]]`."
+        },
+        "glua.format.spaceInsideParens": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Write `func( a, b )` instead of `func(a, b)`. This is the style used across the Garry's Mod wiki."
+        },
+        "glua.format.keepSingleLineBlocks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Keep blocks the author wrote on one line on one line, e.g. `if not IsValid(ent) then return end`."
+        },
+        "glua.format.maxBlankLines": {
+          "type": "number",
+          "default": 2,
+          "description": "Consecutive blank lines to keep between statements."
+        },
+        "glua.format.semicolons": {
+          "type": "string",
+          "enum": [
+            "remove",
+            "preserve"
+          ],
+          "default": "remove",
+          "description": "Whether to keep optional trailing semicolons."
+        },
+        "glua.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace communication with the language server."
+        }
+      }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": [".gluafmtrc.json", ".gluafmtrc", "gluafmt.json"],
+        "url": "./schemas/gluafmtrc.schema.json"
+      },
+      {
+        "fileMatch": [".glua.json", "glua.json", ".gluarc.json"],
+        "url": "./schemas/glua.schema.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[glua]": {
+        "editor.defaultFormatter": "bluejutzu.glua-lsp"
+      }
+    },
+    "semanticTokenScopes": [
+      {
+        "language": "glua",
+        "scopes": {
+          "namespace": [
+            "entity.name.namespace.glua"
+          ],
+          "function.declaration": [
+            "entity.name.function.glua"
+          ]
+        }
+      }
+    ]
+  },
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "compile": "tsc",
+    "test": "pnpm run compile && node --test --test-reporter=./test/reporter.mjs test/*.test.mjs",
+    "test:plain": "pnpm run compile && node --test test/*.test.mjs",
+    "bench": "pnpm run compile && node --expose-gc test/bench-real.mjs",
+    "generate-api": "node tools/generate-api.mjs",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "node esbuild.mjs --production"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-uri": "^3.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2"
+  }
+}
