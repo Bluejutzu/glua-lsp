@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { API_DATA, OUT } from './fixtures.mjs';
+import { bold, c, heading, pad, symbols } from '../tools/palette.mjs';
 
 const { GmodApi } = await import(OUT('api/index.js'));
 const { Workspace } = await import(OUT('analyze/workspace.js'));
@@ -24,7 +25,12 @@ const workspace = new Workspace(api, { maxFiles: 20000, exclude: [] });
 const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 const rss = () => process.memoryUsage().rss;
 
-console.log(`Project: ${root}`);
+/** `  label   value` with the label muted and the number highlighted. */
+const row = (label, value, note = '') =>
+  console.log(`  ${pad(c.muted(label), 26)}${c.highlight(value)}${note ? ` ${c.faint(note)}` : ''}`);
+
+console.log(heading('GLua benchmark'));
+console.log(`  ${c.muted('project')}  ${c.text(root)}`);
 
 const files = workspace.scanFolder(root);
 let bytes = 0;
@@ -40,7 +46,10 @@ for (const file of files) {
     /* unreadable */
   }
 }
-console.log(`Found ${sources.size} files, ${lines.toLocaleString()} lines, ${mb(bytes)}\n`);
+console.log(
+  `  ${c.muted('found')}    ${c.highlight(sources.size.toLocaleString())} ${c.muted('files')}, ` +
+    `${c.highlight(lines.toLocaleString())} ${c.muted('lines')}, ${c.highlight(mb(bytes))}`,
+);
 
 /* ------------------------------------------------------------ cold index */
 
@@ -55,11 +64,11 @@ const indexMs = performance.now() - indexStart;
 for (let i = 0; i < 4 && global.gc; i++) global.gc();
 const afterRss = rss();
 
-console.log('Cold index');
-console.log(`  total     ${indexMs.toFixed(0)} ms`);
-console.log(`  per file  ${(indexMs / sources.size).toFixed(2)} ms`);
-console.log(`  throughput ${(lines / (indexMs / 1000) / 1000).toFixed(0)}k lines/sec`);
-console.log(`  memory    +${mb(afterRss - beforeRss)} rss, heap ${mb(process.memoryUsage().heapUsed)}\n`);
+console.log(heading('Cold index'));
+row('total', `${indexMs.toFixed(0)} ms`);
+row('per file', `${(indexMs / sources.size).toFixed(2)} ms`);
+row('throughput', `${(lines / (indexMs / 1000) / 1000).toFixed(0)}k`, 'lines/sec');
+row('retained heap', mb(process.memoryUsage().heapUsed), `(+${mb(afterRss - beforeRss)} rss)`);
 
 /* --------------------------------------------------------- cross-file index */
 
@@ -68,14 +77,18 @@ workspace.netRegistered();
 workspace.customHookNames();
 workspace.isKnownGlobalPath('does_not_exist');
 workspace.clientReachableFiles();
-console.log(`Cross-file index build: ${(performance.now() - queryStart).toFixed(1)} ms\n`);
+row('cross-file index', `${(performance.now() - queryStart).toFixed(1)} ms`);
 
 /* ------------------------------------------------ interactive edit cycle */
 
 const biggest = [...sources.entries()].sort((a, b) => b[1].length - a[1].length)[0];
 const [bigFile, bigText] = biggest;
 const bigLines = bigText.split('\n').length;
-console.log(`Largest file: ${path.basename(bigFile)} (${bigLines.toLocaleString()} lines, ${mb(bigText.length)})`);
+console.log(heading('Interactive latency'));
+console.log(
+  `  ${c.muted('largest file')} ${c.text(path.basename(bigFile))} ` +
+    `${c.faint(`(${bigLines.toLocaleString()} lines, ${mb(bigText.length)})`)}\n`,
+);
 
 const uri = pathToFileURL(bigFile).href;
 const timeIt = (label, iterations, fn) => {
@@ -83,7 +96,10 @@ const timeIt = (label, iterations, fn) => {
   const started = performance.now();
   for (let i = 0; i < iterations; i++) fn(i);
   const each = (performance.now() - started) / iterations;
-  console.log(`  ${label.padEnd(26)} ${each.toFixed(1)} ms`);
+  // Anything past a frame budget is worth noticing.
+  const value = `${each.toFixed(1)} ms`;
+  const coloured = each > 100 ? c.failure(value) : each > 50 ? c.warning(value) : c.highlight(value);
+  console.log(`  ${pad(c.muted(label), 26)}${coloured}`);
   return each;
 };
 
@@ -123,8 +139,9 @@ for (const file of workspace.all()) {
   refs += file.globalRefs.length;
   symbolCount += file.symbols.length;
 }
-console.log(`  global references   ${refs.toLocaleString()}`);
-console.log(`  symbol entries      ${symbolCount.toLocaleString()}`);
+console.log(heading('What the index found'));
+row('global references', refs.toLocaleString());
+row('symbol entries', symbolCount.toLocaleString());
 
 // Diagnostics need a syntax tree, so ask for the full analysis explicitly.
 const sample = [...workspace.uris()].slice(0, 200).map((uri) => workspace.full(uri));
@@ -140,27 +157,43 @@ for (const file of sample) {
   }
 }
 
-console.log('\nWhat the index found');
-console.log(`  global definitions  ${defs.toLocaleString()}`);
-console.log(`  hook.Add sites      ${hooks.toLocaleString()}`);
-console.log(`  net messages        ${workspace.netRegistered().size} registered, ${workspace.netStarts().size} sent, ${workspace.netReceives().size} received`);
-console.log(`  parse errors        ${errors.toLocaleString()} (across ${workspace.size} files)`);
-console.log(`  diagnostics         ${diagnostics.toLocaleString()} in the first ${sample.length} files`);
+row('global definitions', defs.toLocaleString());
+row('hook.Add sites', hooks.toLocaleString());
+row(
+  'net messages',
+  `${workspace.netRegistered().size}`,
+  `registered · ${workspace.netStarts().size} sent · ${workspace.netReceives().size} received`,
+);
+console.log(
+  `  ${pad(c.muted('parse errors'), 26)}${
+    errors ? c.failure(errors.toLocaleString()) : c.success('0')
+  } ${c.faint(`across ${workspace.size} files`)}`,
+);
+row('diagnostics', diagnostics.toLocaleString(), `in the first ${sample.length} files`);
 
-console.log('\nDiagnostics by rule');
-for (const [code, count] of [...byCode].sort((a, b) => b[1] - a[1])) {
-  console.log(`  ${String(code).padEnd(22)} ${String(count).padStart(5)}`);
-  console.log(`      e.g. ${examples.get(code).slice(0, 150)}`);
+console.log(heading('Diagnostics by rule'));
+const ranked = [...byCode].sort((a, b) => b[1] - a[1]);
+const widest = Math.max(...ranked.map(([code]) => String(code).length), 10);
+for (const [code, count] of ranked) {
+  console.log(
+    `  ${pad(c.accent(String(code)), widest + 2)}${c.highlight(String(count).padStart(5))}`,
+  );
+  console.log(`  ${' '.repeat(widest + 2)}${c.faint(examples.get(code).slice(0, 140))}`);
 }
+console.log(`\n  ${c.faint(`${symbols.bullet} run with a different project path to compare`)}\n`);
+void bold;
 
 if (errors > 0) {
-  console.log('\nFiles with parse errors (first 10):');
+  console.log(heading('Files with parse errors'));
   let shown = 0;
   for (const file of workspace.all()) {
     if (!file.parseErrors.length || shown >= 10) continue;
     shown++;
     const first = file.parseErrors[0];
     const pos = file.lines.positionAt(first.start);
-    console.log(`  ${path.relative(root, file.fsPath)}:${pos.line + 1}:${pos.character + 1} — ${first.message}`);
+    console.log(
+      `  ${c.failure(symbols.fail)} ${c.text(path.relative(root, file.fsPath))}` +
+        `${c.faint(`:${pos.line + 1}:${pos.character + 1}`)} ${c.muted(first.message)}`,
+    );
   }
 }

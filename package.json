@@ -410,7 +410,8 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "compile": "tsc",
-    "test": "pnpm run compile && node --test test/*.test.mjs",
+    "test": "pnpm run compile && node --test --test-reporter=./test/reporter.mjs test/*.test.mjs",
+    "test:plain": "pnpm run compile && node --test test/*.test.mjs",
     "bench": "pnpm run compile && node --expose-gc test/bench-real.mjs",
     "generate-api": "node tools/generate-api.mjs",
     "vscode:prepublish": "node esbuild.mjs --production"
