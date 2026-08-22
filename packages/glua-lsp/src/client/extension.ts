@@ -103,6 +103,56 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       createConfigFile('.glua.json', linterConfigTemplate()),
     ),
 
+    // Code lenses hand us the locations; VS Code owns the peek UI.
+    vscode.commands.registerCommand(
+      'glua.showReferences',
+      (uri: string, position: { line: number; character: number }, locations: vscode.Location[]) => {
+        void vscode.commands.executeCommand(
+          'editor.action.showReferences',
+          vscode.Uri.parse(uri),
+          new vscode.Position(position.line, position.character),
+          locations.map(
+            (location) =>
+              new vscode.Location(
+                vscode.Uri.parse(String((location as unknown as { uri: string }).uri)),
+                new vscode.Range(
+                  location.range.start.line,
+                  location.range.start.character,
+                  location.range.end.line,
+                  location.range.end.character,
+                ),
+              ),
+          ),
+        );
+      },
+    ),
+
+    vscode.commands.registerCommand('glua.checkWorkspace', async () => {
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'GLua: checking the workspace' },
+        () => client!.sendRequest<{ files: number; problems: number }>('glua/checkWorkspace'),
+      );
+
+      if (!result.problems) {
+        vscode.window.showInformationMessage(
+          `GLua: no problems found across ${result.files} files.`,
+        );
+        return;
+      }
+      const choice = await vscode.window.showWarningMessage(
+        `GLua: ${result.problems} problems across ${result.files} files.`,
+        'Show',
+      );
+      if (choice === 'Show') {
+        await vscode.commands.executeCommand('workbench.actions.view.problems');
+      }
+    }),
+
+    vscode.commands.registerCommand('glua.clearWorkspaceDiagnostics', async () => {
+      await client!.sendRequest('glua/clearWorkspaceDiagnostics');
+      vscode.window.showInformationMessage('GLua: cleared problems for unopened files.');
+    }),
+
     vscode.commands.registerCommand('glua.showNetGraph', async () => {
       const markdown = await client!.sendRequest<string>('glua/netGraph');
       const document = await vscode.workspace.openTextDocument({

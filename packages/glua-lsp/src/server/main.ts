@@ -30,6 +30,7 @@ import { LEGEND, semanticTokens } from './features/semanticTokens.js';
 import { inlayHints } from './features/inlayHints.js';
 import { codeActions } from './features/codeActions.js';
 import { formatting, rangeFormatting } from './features/formatting.js';
+import { codeLenses } from './features/codeLens.js';
 import { detectEndOfLine } from '../format/printer.js';
 import { ConfigResolver } from '../config/index.js';
 import { buildNetGraph } from './features/netGraph.js';
@@ -74,6 +75,7 @@ connection.onInitialize((params): InitializeResult => {
       inlayHintProvider: true,
       documentFormattingProvider: true,
       documentRangeFormattingProvider: true,
+      codeLensProvider: { resolveProvider: false },
       semanticTokensProvider: {
         legend: LEGEND,
         full: true,
@@ -119,7 +121,56 @@ async function indexWorkspace(): Promise<number> {
 
   // Diagnostics for already-open documents now that cross-file facts exist.
   for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
+  if (settings.diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
   return indexed;
+}
+
+/**
+ * Reports every indexed file, not just the open ones.
+ *
+ * Without this you only learn a file is broken by opening it, which is the
+ * wrong way round for problems that span files — a handler whose sender was
+ * deleted lives in a file you have no reason to open.
+ */
+async function publishWorkspaceDiagnostics(): Promise<number> {
+  const started = Date.now();
+  let reported = 0;
+  let scanned = 0;
+
+  for (const uri of [...workspace.uris()]) {
+    if (documents.get(uri)) continue; // open documents publish on their own
+    const analysis = workspace.full(uri);
+    if (!analysis) continue;
+
+    try {
+      const found = diagnose(analysis, api, workspace, config.settingsFor(analysis.fsPath), {
+        extraGlobals: config.globalsFor(analysis.fsPath),
+      });
+      reported += found.length;
+      connection.sendDiagnostics({ uri, diagnostics: found });
+    } catch (error) {
+      connection.console.error(`GLua: diagnostics failed for ${uri}: ${String(error)}`);
+    }
+
+    // Release the tree again and yield, so a big workspace neither blocks the
+    // server nor holds every syntax tree in memory at once.
+    workspace.releaseAst(uri);
+    if (++scanned % 25 === 0) await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  connection.console.log(
+    `GLua: workspace scan reported ${reported} problem${reported === 1 ? '' : 's'} ` +
+      `across ${scanned} files in ${Date.now() - started}ms.`,
+  );
+  return reported;
+}
+
+/** Clears reported problems for files that are not open. */
+function clearWorkspaceDiagnostics(): void {
+  for (const uri of workspace.uris()) {
+    if (documents.get(uri)) continue;
+    connection.sendDiagnostics({ uri, diagnostics: [] });
+  }
 }
 
 async function refreshSettings(): Promise<void> {
@@ -155,8 +206,12 @@ async function reloadProjectConfig(): Promise<void> {
 }
 
 connection.onDidChangeConfiguration(async () => {
+  const wasWorkspaceScope = settings.diagnostics.scope === 'workspace';
   await refreshSettings();
   for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
+
+  if (settings.diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
+  else if (wasWorkspaceScope) clearWorkspaceDiagnostics();
 });
 
 /* --------------------------------------------------------------- analysis */
@@ -372,6 +427,13 @@ connection.onDocumentRangeFormatting(
   }),
 );
 
+connection.onCodeLens(
+  guarded('codeLens', [], (params) => {
+    const analysis = analysisFor(params.textDocument.uri);
+    return analysis ? codeLenses(analysis, workspace) : [];
+  }),
+);
+
 connection.languages.inlayHint.on(
   guarded('inlayHint', [], (params) => {
     const analysis = analysisFor(params.textDocument.uri);
@@ -391,6 +453,16 @@ connection.languages.semanticTokens.on(
 connection.onRequest('glua/netGraph', () => buildNetGraph(workspace));
 
 connection.onRequest('glua/reindex', async () => ({ indexed: await indexWorkspace() }));
+
+connection.onRequest('glua/checkWorkspace', async () => ({
+  files: workspace.size,
+  problems: await publishWorkspaceDiagnostics(),
+}));
+
+connection.onRequest('glua/clearWorkspaceDiagnostics', () => {
+  clearWorkspaceDiagnostics();
+  return { cleared: true };
+});
 
 connection.onRequest('glua/status', () => ({
   files: workspace.size,

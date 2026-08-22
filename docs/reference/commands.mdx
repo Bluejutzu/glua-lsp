@@ -14,6 +14,23 @@ GLua Language Server adds several commands to the VS Code Command Palette. Use t
 | `GLua: Create Formatter Config File` | Writes a `.gluafmtrc.json` file into the workspace root using your current formatter settings as the baseline. |
 | `GLua: Re-index Workspace` | Forces a full rescan of the workspace. Reach for this after large disk changes (for example, switching Git branches or bulk file moves) when the incremental watcher may have missed events. |
 | `GLua: Open Settings` | Opens the GLua Language Server settings page in the VS Code Settings UI. |
+| `GLua: Check Whole Workspace` | Reports problems in every indexed file, not just the ones you have open. Set `glua.diagnostics.scope` to `workspace` to do this automatically after indexing. |
+| `GLua: Clear Workspace Problems` | Clears reported problems for files that are not open. |
+| `GLua: Restart Language Server` | Restarts the server process. |
+| `GLua: Treat This File As GLua` | Forces GLua analysis for the current file. |
+| `GLua: Treat This File As Plain Lua` | Hands the current file back to your other Lua extension. |
+
+## Code lens
+
+Counts appear above the things whose other half lives in another file — a
+`net.Receive` shows how many senders it has, a `net.Start` how many handlers, a
+custom `hook.Add` how many call sites, and a global function how many
+references. Clicking one opens the peek view.
+
+## Outside the editor
+
+Everything the linter and formatter do is also available from the
+[command line](/reference/cli), which is how you run them in CI.
 
 <Tip>
   Open any command quickly from the Command Palette with **Ctrl\+Shift\+P** (Windows/Linux) or **Cmd\+Shift\+P** (macOS), then type the command name.
