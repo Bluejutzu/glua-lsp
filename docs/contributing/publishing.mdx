@@ -1,0 +1,150 @@
+---
+title: "Publishing"
+description: "Cut a release, and set up publishing to the VS Code Marketplace and Open VSX."
+icon: "upload"
+sidebarTitle: "Publishing"
+---
+
+Every release goes to GitHub Releases with the `.vsix` attached. Marketplace and
+Open VSX publishing are layered on top and are opt-in — the workflow skips them
+cleanly when their tokens are not configured.
+
+## Cutting a release
+
+```bash
+pnpm run release minor      # or patch, major, or an explicit 0.2.0
+git push origin main --follow-tags
+```
+
+`release` bumps `packages/glua-lsp/package.json`, commits, and creates an
+annotated `v<version>` tag. Pushing the tag runs the release workflow:
+typecheck, test, build, package, GitHub release, then publish.
+
+<Note>
+  The workflow refuses to build when the tag and the manifest version disagree.
+  That mismatch produces a release whose filename and contents contradict each
+  other, and you only find out after the tag is public. The script exists so you
+  cannot hit it by hand.
+</Note>
+
+A tag containing a hyphen (`v0.2.0-beta.1`) is published as a GitHub prerelease
+and is **not** pushed to either marketplace.
+
+## VS Code Marketplace
+
+<Steps>
+  <Step title="Create an Azure DevOps organisation">
+    Sign in at [dev.azure.com](https://dev.azure.com) with a Microsoft account.
+    The organisation itself is only a container for the token; its name does not
+    appear anywhere public.
+  </Step>
+
+  <Step title="Create a Personal Access Token">
+    In Azure DevOps: **User settings → Personal access tokens → New Token**.
+
+    - **Organization**: `All accessible organizations` — this matters, a
+      single-org token will not work
+    - **Scopes**: `Custom defined` → **Marketplace → Manage**
+    - **Expiration**: as long as you are comfortable with; you will need to
+      rotate it
+
+    Copy the token now. It is not shown again.
+  </Step>
+
+  <Step title="Create the publisher">
+    Go to the [Marketplace publisher page](https://marketplace.visualstudio.com/manage)
+    and create a publisher. The **ID** is what goes in `package.json`, and it is
+    public and permanent — renaming later means a new extension page and losing
+    your installs.
+
+    The manifest currently says:
+
+    ```json packages/glua-lsp/package.json
+    {
+      "publisher": "bluejutzu"
+    }
+    ```
+
+    Change it if you want a different ID, and make sure it matches the one you
+    registered.
+  </Step>
+
+  <Step title="Add the token to GitHub">
+    In the repository: **Settings → Secrets and variables → Actions → New
+    repository secret**, named `VSCE_PAT`.
+  </Step>
+</Steps>
+
+Tag a release and the workflow publishes automatically. To do it by hand:
+
+```bash
+pnpm run build
+pnpm run package
+pnpm --filter glua-lsp exec vsce publish --no-dependencies --packagePath glua-lsp-0.1.0.vsix
+```
+
+## Open VSX
+
+Cursor, VSCodium and Windsurf do not use the Microsoft marketplace, so this is a
+separate registry with its own namespace.
+
+<Steps>
+  <Step title="Sign in and create a token">
+    Sign in to [open-vsx.org](https://open-vsx.org) with GitHub, then
+    **Settings → Access Tokens → Generate New Token**.
+  </Step>
+
+  <Step title="Sign the publisher agreement">
+    Open VSX requires the Eclipse Foundation Publisher Agreement before your
+    first publish. There is a prompt in the UI; it is a one-off.
+  </Step>
+
+  <Step title="Claim the namespace">
+    ```bash
+    npx ovsx create-namespace bluejutzu --pat <token>
+    ```
+  </Step>
+
+  <Step title="Add the token to GitHub">
+    Add it as a repository secret named `OVSX_PAT`.
+  </Step>
+</Steps>
+
+## Before the first publish
+
+<Warning>
+  **The repository is private.** The Marketplace listing links to the
+  `repository` field in the manifest, so that link will 404 for everyone who is
+  not a collaborator. The same applies to the issues link and to every
+  `github.com` link in the README.
+
+  Either make the repository public before publishing, or remove `repository`
+  and `bugs` from `packages/glua-lsp/package.json` and drop the GitHub links
+  from its README.
+</Warning>
+
+A checklist for the rest:
+
+- **Publisher ID** matches what you registered
+- **Icon** is present at `packages/glua-lsp/resources/icon.png`. Regenerate with
+  `pnpm run generate-icon` after changing the palette
+- **README** in `packages/glua-lsp/` is what the listing shows, not the one at
+  the repository root
+- **LICENSE** is in the package, not just at the root
+- `pnpm run package` reports no warnings
+
+## What gets shipped
+
+`.vscodeignore` keeps source, tests and tooling out. The published package is
+around 920 KB, most of which is the bundled Garry's Mod API dataset. Check
+before publishing:
+
+```bash
+pnpm --filter glua-lsp package:ls
+```
+
+## Rotating a token
+
+Both tokens expire. When one does, the publish step fails but the GitHub release
+still succeeds — generate a new token, update the secret, and re-run the failed
+job rather than cutting another release.

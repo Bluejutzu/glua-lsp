@@ -17,9 +17,16 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#2B2118",
+    "theme": "dark"
+  },
   "categories": [
     "Programming Languages",
-    "Linters"
+    "Linters",
+    "Formatters",
+    "Snippets"
   ],
   "keywords": [
     "glua",

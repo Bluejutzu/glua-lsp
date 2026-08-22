@@ -58,6 +58,19 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Internals",
+            "pages": ["contributing/architecture", "contributing/development"]
+          },
+          {
+            "group": "Maintaining",
+            "pages": ["contributing/publishing"]
+          }
+        ]
       }
     ]
   },
