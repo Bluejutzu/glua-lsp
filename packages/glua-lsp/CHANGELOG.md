@@ -4,6 +4,14 @@ Notable changes to the GLua Language Server extension. Release notes on each
 [GitHub release](https://github.com/Bluejutzu/glua-lsp/releases) list every
 commit; this file covers what actually changed for you.
 
+## Unreleased
+
+### Changed
+
+- `pnpm run release` now rolls the `Unreleased` section into the new version
+  and opens a fresh one, so a shipped release is never still described as
+  unreleased.
+
 ## 0.2.1
 
 ### Fixed
