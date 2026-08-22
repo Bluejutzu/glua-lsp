@@ -33,7 +33,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     documentSelector: [{ scheme: 'file', language: 'glua' }],
     synchronize: {
       configurationSection: 'glua',
-      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{lua,glua}'),
+      fileEvents: [
+        vscode.workspace.createFileSystemWatcher('**/*.{lua,glua}'),
+        // Reload when the project's committed rules change.
+        vscode.workspace.createFileSystemWatcher(
+          '**/{.glua.json,glua.json,.gluarc.json,.gluafmtrc.json,.gluafmtrc,gluafmt.json,.editorconfig,.prettierrc,.prettierrc.json}',
+        ),
+      ],
     },
     outputChannelName: 'GLua Language Server',
   };
@@ -85,6 +91,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showInformationMessage(`GLua: indexed ${result.indexed} files.`);
     }),
 
+    vscode.commands.registerCommand('glua.openSettings', () =>
+      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:bluejutzu.glua-lsp'),
+    ),
+
+    vscode.commands.registerCommand('glua.createFormatterConfig', () =>
+      createConfigFile('.gluafmtrc.json', formatterConfigTemplate()),
+    ),
+
+    vscode.commands.registerCommand('glua.createLinterConfig', () =>
+      createConfigFile('.glua.json', linterConfigTemplate()),
+    ),
+
     vscode.commands.registerCommand('glua.showNetGraph', async () => {
       const markdown = await client!.sendRequest<string>('glua/netGraph');
       const document = await vscode.workspace.openTextDocument({
@@ -103,6 +121,93 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export async function deactivate(): Promise<void> {
   await client?.stop();
   client = undefined;
+}
+
+/* ----------------------------------------------------------- config files */
+
+/**
+ * Writes a config file seeded from the settings currently in the UI, so the
+ * settings editor and the committed file are two views of the same thing rather
+ * than two places to keep in sync by hand.
+ */
+async function createConfigFile(name: string, contents: string): Promise<void> {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    vscode.window.showErrorMessage('GLua: open a folder first.');
+    return;
+  }
+
+  const target = vscode.Uri.joinPath(folder.uri, name);
+  try {
+    await vscode.workspace.fs.stat(target);
+    const choice = await vscode.window.showWarningMessage(
+      `${name} already exists. Overwrite it?`,
+      { modal: true },
+      'Overwrite',
+    );
+    if (choice !== 'Overwrite') {
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(target));
+      return;
+    }
+  } catch {
+    /* does not exist yet, which is the normal case */
+  }
+
+  await vscode.workspace.fs.writeFile(target, Buffer.from(contents, 'utf8'));
+  await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(target));
+}
+
+function formatterConfigTemplate(): string {
+  const config = vscode.workspace.getConfiguration('glua.format');
+  const editor = vscode.workspace.getConfiguration('editor', { languageId: 'glua' });
+
+  return `${JSON.stringify(
+    {
+      $schema: './node_modules/glua-lsp/schemas/gluafmtrc.schema.json',
+      useTabs: !editor.get<boolean>('insertSpaces', true),
+      indentSize: editor.get<number>('tabSize', 4),
+      maxLineWidth: config.get('maxLineWidth', 120),
+      quoteStyle: config.get('quoteStyle', 'preserve'),
+      operatorStyle: config.get('operatorStyle', 'preserve'),
+      commentStyle: config.get('commentStyle', 'preserve'),
+      spaceInsideParens: config.get('spaceInsideParens', false),
+      keepSingleLineBlocks: config.get('keepSingleLineBlocks', true),
+      maxBlankLines: config.get('maxBlankLines', 2),
+      semicolons: config.get('semicolons', 'remove'),
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+function linterConfigTemplate(): string {
+  const config = vscode.workspace.getConfiguration('glua.diagnostics');
+  const rules = [
+    'undefinedGlobal', 'realmViolation', 'unusedLocal', 'deprecated',
+    'argumentCount', 'argumentType', 'unknownHook', 'netMessage',
+    'netReadWriteMismatch', 'missingAddCSLuaFile', 'globalWrite',
+  ];
+
+  const diagnostics: Record<string, string> = {};
+  for (const rule of rules) diagnostics[rule] = config.get(rule, 'warning');
+
+  return `${JSON.stringify(
+    {
+      $schema: './node_modules/glua-lsp/schemas/glua.schema.json',
+      // Globals from addons outside this workspace, so they are not reported
+      // as undefined. For example: ["ULib", "ulx", "pac"]
+      globals: [],
+      diagnostics,
+      overrides: [
+        {
+          files: ['lua/vendor/**', 'lua/thirdparty/**'],
+          diagnostics: { undefinedGlobal: 'off', unusedLocal: 'off' },
+        },
+      ],
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 /* ------------------------------------------------------------- activation */

@@ -1,49 +1,20 @@
-import type { FormattingOptions, Range, TextEdit } from 'vscode-languageserver';
+import type { Range, TextEdit } from 'vscode-languageserver';
 import { parse } from '../../parser/parser.js';
-import { detectEndOfLine, formatDocument } from '../../format/printer.js';
+import { formatDocument } from '../../format/printer.js';
 import type { FormatOptions } from '../../format/options.js';
 import type { FileAnalysis } from '../../analyze/binder.js';
-import type { Settings } from '../settings.js';
-
-/**
- * Editor-supplied indentation wins over our own settings — the user's tab or
- * space choice for the document already says what they want.
- */
-function resolveOptions(
-  editor: FormattingOptions,
-  settings: Settings,
-  text: string,
-): FormatOptions {
-  return {
-    useTabs: !editor.insertSpaces,
-    indentSize: editor.tabSize || 4,
-    maxLineWidth: settings.format.maxLineWidth,
-    quoteStyle: settings.format.quoteStyle,
-    operatorStyle: settings.format.operatorStyle,
-    commentStyle: settings.format.commentStyle,
-    spaceInsideParens: settings.format.spaceInsideParens,
-    keepSingleLineBlocks: settings.format.keepSingleLineBlocks,
-    maxBlankLines: settings.format.maxBlankLines,
-    semicolons: settings.format.semicolons,
-    endOfLine: detectEndOfLine(text),
-  };
-}
 
 export function formatting(
   analysis: FileAnalysis,
-  editorOptions: FormattingOptions,
-  settings: Settings,
+  options: FormatOptions,
+  enabled: boolean,
 ): TextEdit[] {
-  if (!settings.format.enable) return [];
+  if (!enabled) return [];
   // Never rewrite a file that does not parse.
   if (analysis.parseErrors.length) return [];
 
   const parsed = { chunk: analysis.chunk, comments: analysis.comments, errors: [], tokens: [] };
-  const formatted = formatDocument(
-    analysis.text,
-    parsed,
-    resolveOptions(editorOptions, settings, analysis.text),
-  );
+  const formatted = formatDocument(analysis.text, parsed, options);
   if (formatted === null || formatted === analysis.text) return [];
 
   return [{ range: analysis.lines.rangeAt(0, analysis.text.length), newText: formatted }];
@@ -58,10 +29,10 @@ export function formatting(
 export function rangeFormatting(
   analysis: FileAnalysis,
   range: Range,
-  editorOptions: FormattingOptions,
-  settings: Settings,
+  options: FormatOptions,
+  enabled: boolean,
 ): TextEdit[] {
-  if (!settings.format.enable) return [];
+  if (!enabled) return [];
   if (analysis.parseErrors.length) return [];
 
   const from = analysis.lines.offsetAt(range.start);
@@ -78,7 +49,6 @@ export function rangeFormatting(
   const parsed = parse(slice);
   if (parsed.errors.length) return [];
 
-  const options = resolveOptions(editorOptions, settings, analysis.text);
   const formatted = formatDocument(slice, parsed, options);
   if (formatted === null) return [];
 

@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GLua project configuration",
+  "description": "Project-wide rules for the GLua language server. Committed to the repository, so they apply to everyone working on it.",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "severity": {
+      "enum": ["error", "warning", "information", "hint", "off"],
+      "description": "Severity to report at, or 'off' to disable the rule."
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enable": { "type": "boolean", "description": "Turn all diagnostics on or off." },
+        "undefinedGlobal": {
+          "$ref": "#/definitions/severity",
+          "description": "Reading a global that is neither a known GMod API member nor assigned anywhere in the workspace. Declare externals under 'globals' instead of turning this off."
+        },
+        "realmViolation": {
+          "$ref": "#/definitions/severity",
+          "description": "Calling a serverside-only function from a clientside file, or vice versa."
+        },
+        "unusedLocal": { "$ref": "#/definitions/severity", "description": "Locals declared but never read." },
+        "deprecated": { "$ref": "#/definitions/severity", "description": "Use of API members the wiki marks deprecated." },
+        "argumentCount": { "$ref": "#/definitions/severity", "description": "Wrong number of arguments for a documented function." },
+        "argumentType": { "$ref": "#/definitions/severity", "description": "Argument whose inferred type cannot match the documented parameter." },
+        "unknownHook": { "$ref": "#/definitions/severity", "description": "hook.Add with a name that is neither documented nor fired in this workspace." },
+        "netMessage": { "$ref": "#/definitions/severity", "description": "Unregistered, unsent or unhandled net messages." },
+        "netReadWriteMismatch": { "$ref": "#/definitions/severity", "description": "net.Write sequence not matching the net.Read sequence in the handler." },
+        "missingAddCSLuaFile": { "$ref": "#/definitions/severity", "description": "Clientside file that is included but never sent with AddCSLuaFile." },
+        "globalWrite": { "$ref": "#/definitions/severity", "description": "Writing to a global instead of declaring a local." }
+      }
+    }
+  },
+  "properties": {
+    "$schema": { "type": "string", "description": "URL of the JSON schema for this file." },
+    "diagnostics": {
+      "$ref": "#/definitions/diagnostics",
+      "description": "Per-rule severities. Rules can also be suppressed inline with '-- glua-ignore <rule>'."
+    },
+    "globals": {
+      "type": "array",
+      "description": "Globals provided by addons outside this workspace, e.g. [\"ULib\", \"ulx\", \"pac\"]. Declaring them stops undefined-global firing on every use.",
+      "items": { "type": "string" }
+    },
+    "format": {
+      "type": "object",
+      "description": "Formatting options. A .gluafmtrc.json file, if present, wins over this.",
+      "additionalProperties": true
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxFiles": { "type": "integer", "minimum": 1, "description": "Maximum Lua files to index." },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Directory names to skip while indexing."
+        }
+      }
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "callSnippets": { "type": "boolean" },
+        "filterByRealm": { "type": "boolean" }
+      }
+    },
+    "inlayHints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parameterNames": { "type": "boolean" },
+        "realm": { "type": "boolean" }
+      }
+    },
+    "hover": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "wikiLinks": { "type": "boolean" } }
+    },
+    "overrides": {
+      "type": "array",
+      "description": "Per-path rule overrides, applied in order; later entries win.",
+      "items": {
+        "type": "object",
+        "required": ["files"],
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "Glob patterns relative to this file's directory, e.g. lua/vendor/**."
+          },
+          "diagnostics": { "$ref": "#/definitions/diagnostics" },
+          "globals": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Extra globals for matching files only."
+          }
+        }
+      }
+    }
+  }
+}

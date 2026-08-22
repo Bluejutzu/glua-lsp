@@ -4,6 +4,7 @@ import {
   ProposedFeatures,
   TextDocumentSyncKind,
   TextDocuments,
+  type FormattingOptions,
   type InitializeResult,
 } from 'vscode-languageserver/node.js';
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -29,6 +30,8 @@ import { LEGEND, semanticTokens } from './features/semanticTokens.js';
 import { inlayHints } from './features/inlayHints.js';
 import { codeActions } from './features/codeActions.js';
 import { formatting, rangeFormatting } from './features/formatting.js';
+import { detectEndOfLine } from '../format/printer.js';
+import { ConfigResolver } from '../config/index.js';
 import { buildNetGraph } from './features/netGraph.js';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -37,6 +40,7 @@ const documents = new TextDocuments(TextDocument);
 let settings: Settings = DEFAULT_SETTINGS;
 let api: GmodApi;
 let workspace: Workspace;
+let config = new ConfigResolver(DEFAULT_SETTINGS);
 let hasConfigurationCapability = false;
 
 /** Debounce timers per document, so typing does not trigger a diagnostic storm. */
@@ -123,10 +127,31 @@ async function refreshSettings(): Promise<void> {
     const raw = await connection.workspace.getConfiguration('glua');
     settings = mergeSettings(raw);
   }
+  config.setEditorSettings(settings);
+  await reloadProjectConfig();
   workspace.setOptions({
     maxFiles: settings.workspace.maxFiles,
     exclude: settings.workspace.exclude,
   });
+}
+
+/** Picks up `.glua.json`, `.gluafmtrc.json`, `.editorconfig` and `.prettierrc`. */
+async function reloadProjectConfig(): Promise<void> {
+  const folders = (await connection.workspace.getWorkspaceFolders()) ?? [];
+  const roots = folders.map((folder) => URI.parse(folder.uri).fsPath);
+  const loaded = config.reload(roots);
+
+  for (const error of config.errors) {
+    connection.window.showWarningMessage(`GLua: ${error}`);
+  }
+  if (loaded) {
+    const used = [
+      ...config.files,
+      ...(loaded.editorConfig ? ['.editorconfig'] : []),
+      ...(loaded.prettier ? ['.prettierrc'] : []),
+    ];
+    if (used.length) connection.console.log(`GLua: config from ${used.join(', ')}`);
+  }
 }
 
 connection.onDidChangeConfiguration(async () => {
@@ -167,7 +192,9 @@ function publishDiagnostics(uri: string): void {
   try {
     connection.sendDiagnostics({
       uri,
-      diagnostics: diagnose(analysis, api, workspace, settings),
+      diagnostics: diagnose(analysis, api, workspace, config.settingsFor(analysis.fsPath), {
+        extraGlobals: config.globalsFor(analysis.fsPath),
+      }),
     });
   } catch (error) {
     connection.console.error(`GLua: diagnostics failed for ${uri}: ${String(error)}`);
@@ -195,14 +222,27 @@ documents.onDidClose((event) => {
   connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
 });
 
-connection.onDidChangeWatchedFiles((event) => {
+const CONFIG_FILE = /[/\\](\.glua\.json|glua\.json|\.gluarc\.json|\.gluafmtrc(\.json)?|gluafmt\.json|\.editorconfig|\.prettierrc(\.json)?)$/;
+
+connection.onDidChangeWatchedFiles(async (event) => {
+  let configChanged = false;
+
   for (const change of event.changes) {
+    if (CONFIG_FILE.test(change.uri)) {
+      configChanged = true;
+      continue;
+    }
     if (documents.get(change.uri)) continue; // the editor is the source of truth
     if (change.type === 3 /* Deleted */) {
       workspace.remove(change.uri);
     } else {
       workspace.loadFromDisk(URI.parse(change.uri).fsPath);
     }
+  }
+
+  if (configChanged) {
+    await reloadProjectConfig();
+    for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
   }
 });
 
@@ -300,17 +340,35 @@ connection.onCodeAction(
   }),
 );
 
+/** Resolves formatting options for a document through the config precedence. */
+function formatOptionsFor(analysis: FileAnalysis, editor: FormattingOptions) {
+  return config.formatOptionsFor(
+    analysis.fsPath,
+    { useTabs: !editor.insertSpaces, indentSize: editor.tabSize || 4 },
+    detectEndOfLine(analysis.text),
+  );
+}
+
 connection.onDocumentFormatting(
   guarded('formatting', [], (params) => {
     const analysis = analysisFor(params.textDocument.uri);
-    return analysis ? formatting(analysis, params.options, settings) : [];
+    if (!analysis) return [];
+    const enabled = config.settingsFor(analysis.fsPath).format.enable;
+    return formatting(analysis, formatOptionsFor(analysis, params.options), enabled);
   }),
 );
 
 connection.onDocumentRangeFormatting(
   guarded('rangeFormatting', [], (params) => {
     const analysis = analysisFor(params.textDocument.uri);
-    return analysis ? rangeFormatting(analysis, params.range, params.options, settings) : [];
+    if (!analysis) return [];
+    const enabled = config.settingsFor(analysis.fsPath).format.enable;
+    return rangeFormatting(
+      analysis,
+      params.range,
+      formatOptionsFor(analysis, params.options),
+      enabled,
+    );
   }),
 );
 

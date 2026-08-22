@@ -77,6 +77,21 @@
         "command": "glua.reindexWorkspace",
         "title": "GLua: Re-index Workspace",
         "category": "GLua"
+      },
+      {
+        "command": "glua.createFormatterConfig",
+        "title": "GLua: Create Formatter Config File (.gluafmtrc.json)",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.createLinterConfig",
+        "title": "GLua: Create Linter Config File (.glua.json)",
+        "category": "GLua"
+      },
+      {
+        "command": "glua.openSettings",
+        "title": "GLua: Open Settings",
+        "category": "GLua"
       }
     ],
     "configuration": {
@@ -355,6 +370,16 @@
         }
       }
     },
+    "jsonValidation": [
+      {
+        "fileMatch": [".gluafmtrc.json", ".gluafmtrc", "gluafmt.json"],
+        "url": "./schemas/gluafmtrc.schema.json"
+      },
+      {
+        "fileMatch": [".glua.json", "glua.json", ".gluarc.json"],
+        "url": "./schemas/glua.schema.json"
+      }
+    ],
     "configurationDefaults": {
       "[glua]": {
         "editor.defaultFormatter": "bluejutzu.glua-lsp"

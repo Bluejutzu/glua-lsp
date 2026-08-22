@@ -8,6 +8,7 @@ import { GmodApi } from '../../api/index.js';
 import type { ApiFunction, ApiParam } from '../../api/types.js';
 import type { FileAnalysis, Span } from '../../analyze/binder.js';
 import { realmAt } from '../../analyze/realm.js';
+import { Suppressions } from '../../analyze/suppressions.js';
 import { isAssignable, fromApiType, typeToString } from '../../analyze/types.js';
 import type { Workspace } from '../../analyze/workspace.js';
 import { realmLabel } from '../render.js';
@@ -48,14 +49,22 @@ export const enum Code {
   CompoundAssignment = 'compound-assignment',
 }
 
+export interface DiagnoseContext {
+  /** Globals declared in the project config, e.g. an addon this depends on. */
+  extraGlobals?: Set<string>;
+}
+
 export function diagnose(
   analysis: FileAnalysis,
   api: GmodApi,
   workspace: Workspace,
   settings: Settings,
+  context: DiagnoseContext = {},
 ): Diagnostic[] {
   const out: Diagnostic[] = [];
   if (!settings.diagnostics.enable) return out;
+
+  const suppressions = new Suppressions(analysis.comments, analysis.lines, analysis.text);
 
   const push = (
     span: Span,
@@ -65,8 +74,10 @@ export function diagnose(
     extra: Partial<Diagnostic> = {},
   ) => {
     if (severity === null) return;
+    const range = analysis.lines.rangeAt(span.start, span.end);
+    if (suppressions.isSuppressed(code, range.start.line)) return;
     out.push({
-      range: analysis.lines.rangeAt(span.start, span.end),
+      range,
       message,
       severity,
       code,
@@ -99,6 +110,7 @@ export function diagnose(
       if (ref.path !== ref.root) continue; // only flag unknown roots, not fields
       if (api.isKnownGlobal(ref.root)) continue;
       if (workspace.isKnownGlobalPath(ref.root)) continue;
+      if (context.extraGlobals?.has(ref.root)) continue;
       // `if someAddon and someAddon.Thing then` is how you depend on an
       // optional addon; do not punish it.
       if (analysis.guardedGlobals.has(ref.root)) continue;
