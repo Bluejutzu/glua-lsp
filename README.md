@@ -11,6 +11,7 @@ your own workspace. Nothing is fetched at runtime.
 [Documentation](https://glua.bluejutzu.dev) ·
 [Marketplace](https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp) ·
 [Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp) ·
+[npm](https://www.npmjs.com/package/glua-cli) ·
 [Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest)
 
 ## Install
@@ -247,6 +248,25 @@ ends up fighting over Love2D, Luau and Neovim workspaces, so it only adopts a
 file when the workspace actually looks like GMod — a `lua/` tree, `addon.json`, a
 `gamemodes/` directory, or GMod-only API use in the file itself. `glua.activation`
 switches that to `always` or `never`, and the status bar item toggles it per file.
+
+## On the command line
+
+The same parser, analyser and formatter run outside the editor as
+[`glua-cli`](https://www.npmjs.com/package/glua-cli), so a finding in CI is the
+finding you saw while writing it. It bundles everything, including the wiki
+dataset, and pulls in no dependencies of its own.
+
+```bash
+pnpm add -D glua-cli
+```
+
+```bash
+glua lint lua/ --format github
+glua fmt lua/ --check
+```
+
+`--format github` emits workflow annotations, so findings land on the diff of a
+pull request. [Full reference](https://glua.bluejutzu.dev/reference/cli).
 
 ## Configuration
 
