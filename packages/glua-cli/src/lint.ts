@@ -4,6 +4,7 @@ import { DiagnosticSeverity, type Diagnostic } from 'vscode-languageserver-types
 import { diagnose } from '@glua/server/features/diagnostics.js';
 import { bold, c, heading, pad, plain, symbols } from './palette.js';
 import { loadProject, uriOf } from './project.js';
+import { createProgress } from './progress.js';
 
 export type LintFormat = 'pretty' | 'json' | 'github' | 'compact';
 
@@ -12,6 +13,7 @@ export interface LintOptions {
   maxWarnings: number;
   quiet: boolean;
   root?: string;
+  progress?: boolean;
 }
 
 interface Finding {
@@ -58,12 +60,18 @@ export interface LintResult {
 }
 
 export function lint(targets: string[], options: LintOptions): LintResult {
-  const { api, workspace, config, files, root } = loadProject(targets, { root: options.root });
+  const progress = createProgress(options.progress ?? false);
+
+  const { api, workspace, config, files, root } = loadProject(targets, {
+    root: options.root,
+    onIndex: (done, total, file) => progress.update(done, total, `indexing ${path.basename(file)}`),
+  });
 
   const findings: Finding[] = [];
-  for (const file of files) {
+  files.forEach((file, i) => {
+    progress.update(i + 1, files.length, `linting ${path.relative(root, file).replace(/\\/g, '/')}`);
     const analysis = workspace.full(uriOf(file));
-    if (!analysis) continue;
+    if (!analysis) return;
     const diagnostics = diagnose(
       analysis,
       api,
@@ -73,7 +81,8 @@ export function lint(targets: string[], options: LintOptions): LintResult {
     );
     for (const diagnostic of diagnostics) findings.push({ file, diagnostic });
     workspace.releaseAst(analysis.uri);
-  }
+  });
+  progress.done();
 
   const visible = options.quiet
     ? findings.filter((f) => f.diagnostic.severity === DiagnosticSeverity.Error)

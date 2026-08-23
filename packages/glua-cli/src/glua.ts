@@ -11,6 +11,8 @@ import { Command, Option } from 'commander';
 import { format } from './format.js';
 import { lint, type LintFormat } from './lint.js';
 import { bold, c, heading, setColourEnabled, symbols } from './palette.js';
+import { supportsProgress } from './progress.js';
+import { checkForUpdate, renderUpdateNotice, type UpdateNotice } from './update-check.js';
 
 declare const __GLUA_VERSION__: string | undefined;
 
@@ -19,17 +21,30 @@ const VERSION = typeof __GLUA_VERSION__ === 'string' ? __GLUA_VERSION__ : '0.0.0
 
 const program = new Command();
 
+// Kicked off in `preAction` so the registry request overlaps with whatever
+// the command itself is doing, and awaited in `postAction` so it never
+// delays a result that is already known.
+let updateCheck: Promise<UpdateNotice | null> = Promise.resolve(null);
+
 program
   .name('glua')
   .description("Lint and format Garry's Mod Lua.")
   .version(VERSION, '-v, --version')
   .option('--no-color', 'disable coloured output (or set NO_COLOR; FORCE_COLOR=1 forces it on)')
+  .option('--no-update-check', 'skip the npm registry check for a newer glua-cli')
   .hook('preAction', (command) => {
     // `--no-color` gives commander a `color` option that defaults to true, so
     // the value alone cannot tell us whether the user actually passed it.
     if (command.getOptionValueSource('color') === 'cli') {
       setColourEnabled(command.opts<{ color: boolean }>().color);
     }
+    if (command.opts<{ updateCheck: boolean }>().updateCheck) {
+      updateCheck = checkForUpdate(VERSION);
+    }
+  })
+  .hook('postAction', async () => {
+    const notice = await updateCheck;
+    if (notice) process.stderr.write(renderUpdateNotice(notice));
   });
 
 /* ------------------------------------------------------------------ lint */
@@ -51,10 +66,17 @@ program
     -1,
   )
   .option('-q, --quiet', 'only report errors', false)
+  .option('--no-progress', 'do not print progress while linting')
   .action(
     (
       paths: string[],
-      options: { format: LintFormat; maxWarnings: number; quiet: boolean; root?: string },
+      options: {
+        format: LintFormat;
+        maxWarnings: number;
+        quiet: boolean;
+        root?: string;
+        progress: boolean;
+      },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
       if (options.format === 'github' || options.format === 'json') setColourEnabled(false);
@@ -63,6 +85,7 @@ program
         format: options.format,
         maxWarnings: options.maxWarnings,
         quiet: options.quiet,
+        progress: options.progress && supportsProgress(),
         ...(options.root ? { root: options.root } : {}),
       });
 
@@ -88,22 +111,26 @@ program
   .option('-w, --write', 'rewrite files in place', false)
   .option('-c, --check', 'exit non-zero if anything would change, and write nothing', false)
   .option('--root <dir>', 'project root for config files and relative paths')
-  .action((paths: string[], options: { write: boolean; check: boolean; root?: string }) => {
-    if (options.write && options.check) {
-      program.error('--write and --check cannot be used together.');
-    }
-    // Neither flag given: report what would change without touching anything.
-    const result = format(paths, {
-      write: options.write,
-      check: options.check,
-      ...(options.root ? { root: options.root } : {}),
-    });
+  .option('--no-progress', 'do not print progress while formatting')
+  .action(
+    (paths: string[], options: { write: boolean; check: boolean; root?: string; progress: boolean }) => {
+      if (options.write && options.check) {
+        program.error('--write and --check cannot be used together.');
+      }
+      // Neither flag given: report what would change without touching anything.
+      const result = format(paths, {
+        write: options.write,
+        check: options.check,
+        progress: options.progress && supportsProgress(),
+        ...(options.root ? { root: options.root } : {}),
+      });
 
-    if (result.output.trim()) process.stdout.write(`${result.output}\n`);
+      if (result.output.trim()) process.stdout.write(`${result.output}\n`);
 
-    if (!options.write && result.changed.length) process.exitCode = 1;
-    if (result.skipped.length) process.exitCode = 1;
-  });
+      if (!options.write && result.changed.length) process.exitCode = 1;
+      if (result.skipped.length) process.exitCode = 1;
+    },
+  );
 
 /* ----------------------------------------------------------------- extra */
 
