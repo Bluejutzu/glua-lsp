@@ -23,6 +23,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.map",
     "README.md",
     "LICENSE"
   ],
@@ -33,16 +34,16 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run build && node --test --test-reporter=../glua-lsp/test/reporter.mjs test/*.test.mjs"
+    "test": "pnpm run build && node --test --test-reporter=../glua-lsp/test/reporter.mjs test/*.test.mjs",
+    "prepublishOnly": "node esbuild.mjs --production"
   },
-  "dependencies": {
-    "commander": "^13.1.0",
-    "vscode-languageserver-types": "^3.18.0",
-    "vscode-uri": "^3.1.0"
-  },
+  "//": "Nothing is listed as a dependency because esbuild bundles all of it into dist/glua.js — installing this pulls nothing else in.",
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "commander": "^13.1.0",
     "esbuild": "^0.25.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vscode-languageserver-types": "^3.18.0",
+    "vscode-uri": "^3.1.0"
   }
 }

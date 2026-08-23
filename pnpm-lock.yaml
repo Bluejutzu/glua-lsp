@@ -13,26 +13,25 @@ importers:
         version: 4.2.818(@base-ui/react@1.7.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.3))(react@19.2.3))(@types/node@24.13.3)(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.3))(typescript@7.0.2)
 
   packages/glua-cli:
-    dependencies:
-      commander:
-        specifier: ^13.1.0
-        version: 13.1.0
-      vscode-languageserver-types:
-        specifier: ^3.18.0
-        version: 3.18.0
-      vscode-uri:
-        specifier: ^3.1.0
-        version: 3.1.0
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
+      commander:
+        specifier: ^13.1.0
+        version: 13.1.0
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
+      vscode-languageserver-types:
+        specifier: ^3.18.0
+        version: 3.18.0
+      vscode-uri:
+        specifier: ^3.1.0
+        version: 3.1.0
 
   packages/glua-lsp:
     dependencies:

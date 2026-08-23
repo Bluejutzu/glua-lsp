@@ -11,8 +11,18 @@ requests, run a pre-commit hook, or format a whole addon in one go.
 
 ## Installing
 
+Published on npm as [`glua-cli`](https://www.npmjs.com/package/glua-cli). The
+analyser and the wiki dataset are bundled into it, so it pulls in no dependencies
+of its own.
+
 ```bash
 pnpm add -D glua-cli
+```
+
+To try it without adding it to a project:
+
+```bash
+npx glua-cli lint lua/
 ```
 
 Or build it from the repository:

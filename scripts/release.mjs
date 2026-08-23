@@ -19,6 +19,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = path.join(ROOT, 'packages', 'glua-lsp', 'package.json');
 const CHANGELOG = path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md');
 
+/**
+ * The CLI bundles the analyser straight from the extension's source, so any
+ * change to one is a change to the other. Versioning them apart would ship a
+ * `glua-cli` whose number says nothing about what is inside it.
+ */
+const CLI_MANIFEST = path.join(ROOT, 'packages', 'glua-cli', 'package.json');
+
 /** The heading a new release's notes accumulate under between releases. */
 const UNRELEASED = '## Unreleased';
 const PLACEHOLDER = '_Nothing yet._';
@@ -90,6 +97,7 @@ function rollChangelog(version) {
 /* ------------------------------------------------------------ next version */
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+const cliManifest = JSON.parse(fs.readFileSync(CLI_MANIFEST, 'utf8'));
 const current = manifest.version;
 
 function bump(version, kind) {
@@ -139,6 +147,10 @@ console.log(`  ${c.muted('version')}    ${c.text(current)} ${c.faint('→')} ${c
 console.log(`  ${c.muted('tag')}        ${c.highlight(tag)}`);
 console.log(`  ${c.muted('branch')}     ${c.text(branch)}`);
 console.log(`  ${c.muted('changelog')}  ${changelogColour(changelog.message)}`);
+console.log(
+  `  ${c.muted('glua-cli')}   ${c.text(cliManifest.version)} ${c.faint('→')} ${c.text(next)}` +
+    `${cliManifest.version === current ? '' : c.faint('  (was out of step)')}`,
+);
 
 if (dryRun) {
   console.log(`\n  ${c.warning('dry run')} ${c.faint('— nothing written')}\n`);
@@ -150,7 +162,10 @@ if (dryRun) {
 manifest.version = next;
 fs.writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
 
-const staged = [path.relative(ROOT, MANIFEST)];
+cliManifest.version = next;
+fs.writeFileSync(CLI_MANIFEST, `${JSON.stringify(cliManifest, null, 2)}\n`);
+
+const staged = [path.relative(ROOT, MANIFEST), path.relative(ROOT, CLI_MANIFEST)];
 if (changelog.contents) {
   fs.writeFileSync(CHANGELOG, changelog.contents);
   staged.push(path.relative(ROOT, CHANGELOG));

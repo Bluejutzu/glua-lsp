@@ -6,7 +6,12 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Changed
+
+- `glua-cli` is on npm, and the release workflow publishes it over OIDC rather
+  than a stored token. It declares no dependencies — everything is bundled —
+  and its version now moves in lockstep with the extension, since it carries
+  the same analyser.
 
 ## 0.2.3
 
