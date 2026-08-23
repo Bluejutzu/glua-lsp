@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.3.0
+
 ### Fixed
 
 - Iterating a method that returns a list gave no completions at all —
