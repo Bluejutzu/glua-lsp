@@ -113,8 +113,10 @@ export function loadProject(
   }
 
   const files = collectLuaFiles(targets, maxFiles);
-  for (const file of files) {
-    if (!workspace.get(uriOf(file))) workspace.loadFromDisk(file);
+  if (indexProject) {
+    for (const file of files) {
+      if (!workspace.get(uriOf(file))) workspace.loadFromDisk(file);
+    }
   }
 
   return { api, workspace, config, files, root };
