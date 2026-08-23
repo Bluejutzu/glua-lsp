@@ -625,6 +625,24 @@ test('accessors from an unrelated entity do not leak in', () => {
   assert.ok(!names.includes('GetAmmo'), 'the turret is a different entity');
 });
 
+test('array returns resolve on methods, not just library functions', () => {
+  // These are keyed on the wiki address because a method is written on the
+  // receiver — `ply:GetWeapons()`, never `Player:GetWeapons()`.
+  const cases = [
+    ['local ply = player.GetByID(1)\nfor _, w in ipairs(ply:GetWeapons()) do w:| end', 'Clip1'],
+    ['local ent = ents.GetAll()[1]\nfor _, c in ipairs(ent:GetChildren()) do c:| end', 'SetModel'],
+    ['for _, p in ipairs(player.GetAll()) do p:| end', 'Nick'],
+  ];
+
+  for (const [source, expected] of cases) {
+    const { text, offset } = withCursor(source);
+    const { workspace, analyses } = makeWorkspace({ 'lua/autorun/server/sv_arr.lua': text });
+    const analysis = analyses['lua/autorun/server/sv_arr.lua'];
+    const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+    assert.ok(names.includes(expected), `${source.split('\n').pop()} should offer ${expected}`);
+  }
+});
+
 /* --------------------------------------------------- scripted classes */
 
 test('a class name comes from the directory, or the file for a single-file class', () => {

@@ -12,7 +12,10 @@ import { format } from './format.js';
 import { lint, type LintFormat } from './lint.js';
 import { bold, c, heading, setColourEnabled, symbols } from './palette.js';
 
-const VERSION = '0.1.0';
+declare const __GLUA_VERSION__: string | undefined;
+
+// Substituted by esbuild from package.json, so it cannot drift from what ships.
+const VERSION = typeof __GLUA_VERSION__ === 'string' ? __GLUA_VERSION__ : '0.0.0-dev';
 
 const program = new Command();
 

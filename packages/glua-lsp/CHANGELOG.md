@@ -6,7 +6,14 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Fixed
+
+- Iterating a method that returns a list gave no completions at all —
+  `for _, w in ipairs(ply:GetWeapons())` left `w` untyped, as did
+  `Entity:GetChildren`, `Entity:GetMaterials` and `Panel:GetChildren`. The
+  library forms like `player.GetAll()` were unaffected.
+- `glua --version` reported `0.1.0` whatever version it was. Both the CLI and
+  the language server now take their version from the manifest at build time.
 
 ## 0.2.4
 

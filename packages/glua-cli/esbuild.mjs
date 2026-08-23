@@ -24,9 +24,13 @@ const copyApiData = {
   },
 };
 
+// Baked in rather than written out in a constant, which only ever goes stale.
+const { version } = JSON.parse(await fs.readFile('package.json', 'utf8'));
+
 const context = await esbuild.context({
   entryPoints: ['src/glua.ts'],
   outfile: 'dist/glua.js',
+  define: { __GLUA_VERSION__: JSON.stringify(version) },
   bundle: true,
   format: 'cjs',
   platform: 'node',

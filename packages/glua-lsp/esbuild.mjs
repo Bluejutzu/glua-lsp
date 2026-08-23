@@ -23,6 +23,9 @@ const copyApiData = {
   },
 };
 
+// Baked in rather than written out in a constant, which only ever goes stale.
+const { version } = JSON.parse(await fs.readFile('package.json', 'utf8'));
+
 const shared = {
   bundle: true,
   format: 'cjs',
@@ -31,6 +34,7 @@ const shared = {
   sourcemap: !production,
   minify: production,
   logLevel: 'info',
+  define: { __GLUA_VERSION__: JSON.stringify(version) },
 };
 
 const contexts = await Promise.all([

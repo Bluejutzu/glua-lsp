@@ -193,13 +193,10 @@ export interface AnalyseOptions {
 }
 
 /**
- * Library functions whose documented return type is just `table`, but which
- * always yield an array of a known class. Makes `for _, ply in ipairs(...)`
- * produce a real Player.
- */
-/**
  * Functions whose return type is decided by a class name in a string argument.
- * Keyed on the wiki address, which is the same however the call is written.
+ *
+ * Keyed on the wiki address rather than the written call, because a method is
+ * written on the receiver — `ply:Give(...)`, never `Player:Give(...)`.
  */
 const SCRIPTED_RETURNS: Record<string, { arg: number; array?: boolean }> = {
   'ents.Create': { arg: 0 },
@@ -210,6 +207,11 @@ const SCRIPTED_RETURNS: Record<string, { arg: number; array?: boolean }> = {
   'Player:Give': { arg: 0 },
 };
 
+/**
+ * Functions whose documented return type is just `table`, but which always
+ * yield an array of a known class. Makes `for _, ply in ipairs(...)` produce a
+ * real Player. Keyed on the wiki address, for the same reason as above.
+ */
 const ARRAY_RETURNS: Record<string, string> = {
   'player.GetAll': 'Player',
   'player.GetHumans': 'Player',
@@ -224,10 +226,10 @@ const ARRAY_RETURNS: Record<string, string> = {
   'ents.FindInCone': 'Entity',
   'ents.FindInSphere': 'Entity',
   'ents.FindAlongRay': 'Entity',
-  'Entity.GetChildren': 'Entity',
-  'Player.GetWeapons': 'Weapon',
-  'Entity.GetMaterials': 'string',
-  'Panel.GetChildren': 'Panel',
+  'Entity:GetChildren': 'Entity',
+  'Player:GetWeapons': 'Weapon',
+  'Entity:GetMaterials': 'string',
+  'Panel:GetChildren': 'Panel',
 };
 
 /**
@@ -504,8 +506,8 @@ export function analyseFile(
         return scriptedReturn.array ? tableType({ element: type }) : type;
       }
     }
-    if (path && ARRAY_RETURNS[path]) {
-      const element = ARRAY_RETURNS[path]!;
+    if (ARRAY_RETURNS[fn.address]) {
+      const element = ARRAY_RETURNS[fn.address]!;
       return tableType({ element: api.isClass(element) ? classType(element) : fromApiType(element, api) });
     }
 

@@ -33,6 +33,7 @@ import { formatting, rangeFormatting } from './features/formatting.js';
 import { codeLenses } from './features/codeLens.js';
 import { detectEndOfLine } from '../format/printer.js';
 import { ConfigResolver } from '../config/index.js';
+import { VERSION } from '../util/version.js';
 import { buildNetGraph } from './features/netGraph.js';
 
 const connection = createConnection(ProposedFeatures.all);
@@ -84,7 +85,7 @@ connection.onInitialize((params): InitializeResult => {
         workspaceFolders: { supported: true, changeNotifications: true },
       },
     },
-    serverInfo: { name: 'GLua Language Server', version: '0.1.0' },
+    serverInfo: { name: 'GLua Language Server', version: VERSION },
   };
 });
 
