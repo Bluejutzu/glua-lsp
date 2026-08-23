@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.2.3
+
 ### Added
 
 - **Entity and weapon class awareness.** `ents.Create("my_turret")` is typed as
