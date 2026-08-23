@@ -83,6 +83,30 @@ Declarations carry across the whole entity directory, so a `NetworkVar` in
 `shared.lua` completes in `init.lua` and `cl_init.lua` as well. Entities in other
 directories keep their accessors to themselves.
 
+## Your own entity and weapon classes
+
+Garry's Mod takes a scripted class name from where its files sit, so
+`lua/entities/my_turret/` defines the class `my_turret`. Spawning one gives you
+that class rather than a bare `Entity`:
+
+```lua
+local turret = ents.Create("my_turret")
+
+turret:Explode()   -- a method the entity defines on ENT
+turret:GetAmmo()   -- an accessor from its NetworkVar
+turret:SetModel()  -- and the whole Entity API underneath
+```
+
+This works the same for weapons in `lua/weapons/` and for the calls that take a
+class name: `ents.FindByClass` (as an array), `ents.CreateClientside`,
+`weapons.Get`, and `Player:Give`.
+
+The class name itself completes inside the string, and go-to-definition on it
+opens the class, preferring `shared.lua` where there is one.
+
+An engine class like `prop_physics` is left alone and stays a plain `Entity` —
+nothing in the workspace defines it, so there is nothing extra to offer.
+
 ## Typing your own functions
 
 You can add explicit types to your own functions with annotations, or let the server infer them from usage.

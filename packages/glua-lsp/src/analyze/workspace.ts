@@ -10,8 +10,18 @@ import {
   type Span,
 } from './binder.js';
 import type { Realm } from '../api/types.js';
+import { rankClassFile, scriptedClassOf, type ScriptedClass } from './entities.js';
 import { Scope } from './scope.js';
 import { tableType, UNKNOWN, type GType } from './types.js';
+
+/** A scripted class plus the files in this workspace that make it up. */
+export interface ScriptedClassEntry extends ScriptedClass {
+  /** Best file to open for the class, usually shared.lua. */
+  primaryUri: string;
+  uris: string[];
+  /** Shared directory, or the containing directory for a single-file class. */
+  dir: string;
+}
 
 export interface Located<T> {
   uri: string;
@@ -65,6 +75,7 @@ export class Workspace {
   private netStartNames: Map<string, Located<Span>[]> | null = null;
   private netReceiveNames: Map<string, Located<Span>[]> | null = null;
   private clientFiles: Set<string> | null = null;
+  private scriptedIndex: Map<string, ScriptedClassEntry> | null = null;
   private readonly accessorCache = new Map<string, Located<GeneratedAccessor>[]>();
   private duplicateCache: {
     hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
@@ -104,6 +115,7 @@ export class Workspace {
     this.netStartNames = null;
     this.netReceiveNames = null;
     this.clientFiles = null;
+    this.scriptedIndex = null;
     this.accessorCache.clear();
     this.duplicateCache = null;
   }
@@ -118,6 +130,7 @@ export class Workspace {
     const fsPath = URI.parse(uri).fsPath;
     const analysis = analyseFile(uri, fsPath, text, version, this.api, {
       externalGlobal: (p) => this.externalGlobal(p, uri),
+      scriptedClass: (name) => this.scriptedClass(name),
     });
     this.files.set(uri, retainAst ? analysis : releaseAst(analysis));
     this.invalidate();
@@ -318,6 +331,82 @@ export class Workspace {
     }
 
     this.accessorCache.set(dir, out);
+    return out;
+  }
+
+  /* ---------------------------------------------------- scripted classes */
+
+  private buildScriptedIndex(): void {
+    const out = new Map<string, ScriptedClassEntry>();
+
+    for (const file of this.files.values()) {
+      const scripted = scriptedClassOf(file.fsPath);
+      if (!scripted) continue;
+
+      const key = scripted.name.toLowerCase();
+      const existing = out.get(key);
+      if (!existing) {
+        out.set(key, {
+          ...scripted,
+          primaryUri: file.uri,
+          uris: [file.uri],
+          dir: path.dirname(file.fsPath).replace(/\\/g, '/').toLowerCase(),
+        });
+        continue;
+      }
+
+      existing.uris.push(file.uri);
+      // shared.lua describes the class; the realm halves only fill it in.
+      const best = this.files.get(existing.primaryUri);
+      if (best && rankClassFile(file.fsPath) < rankClassFile(best.fsPath)) {
+        existing.primaryUri = file.uri;
+      }
+    }
+
+    this.scriptedIndex = out;
+  }
+
+  /** Every entity, weapon and effect class defined in this workspace. */
+  scriptedClasses(): Map<string, ScriptedClassEntry> {
+    if (!this.scriptedIndex) this.buildScriptedIndex();
+    return this.scriptedIndex!;
+  }
+
+  scriptedClass(name: string): ScriptedClassEntry | undefined {
+    return this.scriptedClasses().get(name.toLowerCase());
+  }
+
+  /** Accessors declared anywhere in a scripted class, not just one of its files. */
+  accessorsForClass(name: string): Located<GeneratedAccessor>[] {
+    const entry = this.scriptedClass(name);
+    if (!entry) return [];
+    const out: Located<GeneratedAccessor>[] = [];
+    for (const uri of entry.uris) {
+      const file = this.files.get(uri);
+      if (!file) continue;
+      for (const accessor of file.accessors) out.push({ uri, value: accessor });
+    }
+    return out;
+  }
+
+  /**
+   * Methods and fields the class defines on its own table — `function
+   * ENT:Explode()` and friends. Keyed per class rather than globally, because
+   * every scripted entity in the workspace writes to the same `ENT` name.
+   */
+  classMembers(name: string): Located<GlobalDefinition>[] {
+    const entry = this.scriptedClass(name);
+    if (!entry) return [];
+
+    const out: Located<GlobalDefinition>[] = [];
+    for (const uri of entry.uris) {
+      const file = this.files.get(uri);
+      if (!file) continue;
+      for (const def of file.globalDefs) {
+        if (def.root !== entry.table || def.path === entry.table) continue;
+        out.push({ uri, value: def });
+      }
+    }
     return out;
   }
 

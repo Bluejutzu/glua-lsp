@@ -87,6 +87,26 @@ export function hover(analysis: FileAnalysis, position: Position, deps: HoverDep
       };
     }
 
+    case 'scriptedClass': {
+      const entry = workspace.scriptedClass(resolution.name);
+      if (!entry) return null;
+      const methods = workspace.classMembers(entry.name).length;
+      const accessors = workspace.accessorsForClass(entry.name).length;
+      const parts = [`${methods} method${methods === 1 ? '' : 's'}`];
+      if (accessors) parts.push(`${accessors} networked value${accessors === 1 ? '' : 's'}`);
+      return {
+        contents: markdown(
+          [
+            '```glua',
+            `${entry.name} -- scripted ${entry.kind} : ${entry.base}`,
+            '```',
+            `${parts.join(', ')} across ${entry.uris.length} file${entry.uris.length === 1 ? '' : 's'}.`,
+          ].join('\n'),
+        ),
+        range,
+      };
+    }
+
     case 'hookTable': {
       const hooks = api.getHooksFor(resolution.hookParent);
       const count = Object.keys(hooks).length;

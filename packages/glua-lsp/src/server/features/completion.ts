@@ -9,6 +9,7 @@ import {
 import { GmodApi, HOOK_TABLES } from '../../api/index.js';
 import type { ApiFunction, Realm } from '../../api/types.js';
 import type { FileAnalysis } from '../../analyze/binder.js';
+import { scriptedClassArg } from '../../analyze/entities.js';
 import { realmAt } from '../../analyze/realm.js';
 import { typeToString, type GType } from '../../analyze/types.js';
 import type { Workspace } from '../../analyze/workspace.js';
@@ -163,10 +164,35 @@ function memberCompletions(
       for (const fn of api.getClassMembers(base.name).values()) {
         addApiFunction(fn, CompletionItemKind.Method, Sort.ApiMember);
       }
+
+      // Methods the scripted class defines on its own ENT/SWEP table. Only
+      // reachable when we know which class this value is, since every entity
+      // in the workspace writes to the same `ENT`.
+      if (base.scripted) {
+        for (const { value } of workspace.classMembers(base.scripted)) {
+          const label = value.path.slice(value.path.search(/[.:]/) + 1);
+          if (!label || seen.has(label)) continue;
+          seen.add(label);
+          items.push({
+            label,
+            kind:
+              value.kind === 'function'
+                ? CompletionItemKind.Method
+                : CompletionItemKind.Field,
+            detail: value.params ? `(${value.params.join(', ')})` : value.kind,
+            documentation: value.doc ?? `Defined on \`${base.scripted}\`.`,
+            sortText: `${Sort.WorkspaceMember}${label}`,
+          });
+        }
+      }
+
       // Getters and setters Garry's Mod generates from NetworkVar and
       // AccessorFunc. They only exist at runtime, so nothing else knows them.
       if (isEntityLike(base.name, api)) {
-        for (const { value } of workspace.accessorsNear(analysis.fsPath)) {
+        const accessors = base.scripted
+          ? workspace.accessorsForClass(base.scripted)
+          : workspace.accessorsNear(analysis.fsPath);
+        for (const { value } of accessors) {
           for (const prefix of ['Get', 'Set'] as const) {
             const label = `${prefix}${value.name}`;
             if (seen.has(label)) continue;
@@ -413,6 +439,21 @@ function stringCompletions(
           ? other.slice(luaRoot + 5)
           : other.split('/').pop()!;
       push(relative, `${file.realm.file} · ${file.realm.kind}`, undefined, CompletionItemKind.File);
+    }
+    return items;
+  }
+
+  const classArg = scriptedClassArg(callPath);
+  if (classArg && argIndex === classArg.arg) {
+    for (const entry of workspace.scriptedClasses().values()) {
+      if (!classArg.kinds.includes(entry.kind)) continue;
+      const files = entry.uris.length;
+      push(
+        entry.name,
+        `${entry.kind} · ${files} file${files === 1 ? '' : 's'}`,
+        `Defined in this workspace.`,
+        CompletionItemKind.Class,
+      );
     }
     return items;
   }

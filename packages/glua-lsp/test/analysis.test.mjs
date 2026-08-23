@@ -5,6 +5,7 @@ import { API_DATA, OUT, file, uriOf } from './fixtures.mjs';
 const { GmodApi } = await import(OUT('api/index.js'));
 const { Workspace } = await import(OUT('analyze/workspace.js'));
 const { typeToString } = await import(OUT('analyze/types.js'));
+const { scriptedClassOf } = await import(OUT('analyze/entities.js'));
 const { completion } = await import(OUT('server/features/completion.js'));
 const { hover } = await import(OUT('server/features/hover.js'));
 const { signatureHelp } = await import(OUT('server/features/signature.js'));
@@ -622,6 +623,139 @@ test('accessors from an unrelated entity do not leak in', () => {
 
   const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
   assert.ok(!names.includes('GetAmmo'), 'the turret is a different entity');
+});
+
+/* --------------------------------------------------- scripted classes */
+
+test('a class name comes from the directory, or the file for a single-file class', () => {
+  assert.deepEqual(scriptedClassOf(file('lua', 'entities', 'my_turret', 'shared.lua')), {
+    name: 'my_turret', kind: 'entity', base: 'Entity', table: 'ENT',
+  });
+  assert.deepEqual(scriptedClassOf(file('lua', 'entities', 'my_turret.lua')), {
+    name: 'my_turret', kind: 'entity', base: 'Entity', table: 'ENT',
+  });
+  assert.equal(scriptedClassOf(file('lua', 'weapons', 'my_gun', 'shared.lua')).base, 'Weapon');
+  assert.equal(scriptedClassOf(file('lua', 'effects', 'sparks', 'init.lua')).kind, 'effect');
+  assert.equal(
+    scriptedClassOf(file('lua', 'weapons', 'gmod_tool', 'stools', 'welder.lua')),
+    null,
+    'toolgun tools all share the gmod_tool weapon',
+  );
+  assert.equal(scriptedClassOf(file('lua', 'autorun', 'sh_init.lua')), null);
+});
+
+test('ents.Create types the result as that entity, with its own methods', () => {
+  const { text, offset } = withCursor(`
+local turret = ents.Create("my_turret")
+turret:|
+`);
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua':
+      'function ENT:SetupDataTables()\n  self:NetworkVar("Int", 0, "Ammo")\nend\n' +
+      'function ENT:Explode(force)\nend\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('Explode'), 'methods the entity defines on ENT');
+  assert.ok(names.includes('GetAmmo'), 'accessors the entity generates');
+  assert.ok(names.includes('SetModel'), 'and the real Entity API underneath');
+});
+
+test('another entity\'s methods do not leak into an unrelated ents.Create', () => {
+  const { text, offset } = withCursor('local d = ents.Create("door")\nd:|\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua': 'function ENT:Explode()\nend\n',
+    'lua/entities/door/shared.lua': 'function ENT:Open()\nend\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('Open'));
+  assert.ok(!names.includes('Explode'), 'Explode belongs to my_turret');
+});
+
+test('ents.FindByClass yields an array of the scripted class', () => {
+  const { text, offset } = withCursor(`
+for _, turret in ipairs(ents.FindByClass("my_turret")) do
+  turret:|
+end
+`);
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua': 'function ENT:Explode()\nend\n',
+    'lua/autorun/server/sv_sweep.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_sweep.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('Explode'));
+});
+
+test('the class argument completes with workspace classes of the right kind', () => {
+  const { text, offset } = withCursor('local e = ents.Create("|")\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua': 'ENT.Base = "base_gmodentity"\n',
+    'lua/weapons/my_gun/shared.lua': 'SWEP.Base = "weapon_base"\n',
+    'lua/effects/sparks/init.lua': 'function EFFECT:Init()\nend\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('my_turret'));
+  assert.ok(names.includes('my_gun'), 'ents.Create takes weapons too');
+  assert.ok(!names.includes('sparks'), 'effects are not spawned with ents.Create');
+});
+
+test('go to definition on a class string opens the class, preferring shared.lua', () => {
+  const { text, offset } = withCursor('local e = ents.Create("my_|turret")\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/init.lua': 'AddCSLuaFile()\n',
+    'lua/entities/my_turret/shared.lua': 'ENT.Type = "anim"\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  const targets = definition(analysis, analysis.lines.positionAt(offset), api, workspace);
+  assert.equal(targets.length, 1);
+  assert.ok(targets[0].uri.endsWith('/my_turret/shared.lua'), targets[0].uri);
+});
+
+test('an unknown class string resolves to nothing rather than guessing', () => {
+  const { text, offset } = withCursor('local e = ents.Create("prop_phy|sics")\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua': 'ENT.Type = "anim"\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  assert.deepEqual(definition(analysis, analysis.lines.positionAt(offset), api, workspace), []);
+});
+
+test('an engine class keeps the documented Entity return type', () => {
+  const { text, offset } = withCursor('local ent = ents.Create("prop_physics")\ne|nt:Spawn()\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua': 'function ENT:Explode()\nend\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  const info = hover(analysis, analysis.lines.positionAt(offset), deps(workspace));
+  assert.match(info.contents.value, /local ent: Entity\b/, info.contents.value);
+});
+
+test('a scripted class shows both names, so the base API is still obvious', () => {
+  const { text, offset } = withCursor('local turret = ents.Create("my_turret")\nt|urret:Spawn()\n');
+  const { workspace, analyses } = makeWorkspace({
+    'lua/entities/my_turret/shared.lua': 'function ENT:Explode()\nend\n',
+    'lua/autorun/server/sv_spawn.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_spawn.lua'];
+
+  const info = hover(analysis, analysis.lines.positionAt(offset), deps(workspace));
+  assert.match(info.contents.value, /local turret: Entity \(my_turret\)/, info.contents.value);
 });
 
 /* ------------------------------------------------ duplicate registrations */

@@ -69,6 +69,15 @@ export function definition(
       return out;
     }
 
+    case 'scriptedClass': {
+      const entry = workspace.scriptedClass(resolution.name);
+      if (!entry) return [];
+      return [{
+        uri: entry.primaryUri,
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      }];
+    }
+
     case 'hookName': {
       const out: Location[] = [];
       for (const uri of workspace.uris()) {

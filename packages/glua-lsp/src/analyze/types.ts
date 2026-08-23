@@ -29,7 +29,16 @@ export type GType =
       element?: GType;
       node?: TableConstructor;
     }
-  | { kind: 'class'; name: string }
+  | {
+      kind: 'class';
+      name: string;
+      /**
+       * A scripted entity/weapon class from this workspace. `name` stays the
+       * wiki class it behaves as, so assignability is unaffected and only
+       * completion and hover need to know the difference.
+       */
+      scripted?: string;
+    }
   | { kind: 'union'; options: GType[] };
 
 export const UNKNOWN: GType = { kind: 'unknown' };
@@ -39,6 +48,11 @@ export const NUMBER: GType = { kind: 'number' };
 export const STRING: GType = { kind: 'string' };
 
 export const classType = (name: string): GType => ({ kind: 'class', name });
+export const scriptedType = (base: string, scripted: string): GType => ({
+  kind: 'class',
+  name: base,
+  scripted,
+});
 export const tableType = (init: Partial<Extract<GType, { kind: 'table' }>> = {}): GType => ({
   kind: 'table',
   ...init,
@@ -93,7 +107,7 @@ export function typeToString(type: GType): string {
       if (type.element) return `${typeToString(type.element)}[]`;
       return 'table';
     case 'class':
-      return type.name;
+      return type.scripted ? `${type.name} (${type.scripted})` : type.name;
     case 'union':
       return type.options.map(typeToString).join('|');
     default:

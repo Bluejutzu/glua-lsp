@@ -14,6 +14,7 @@ import type { ApiFunction, Realm } from '../api/types.js';
 import { LineIndex } from '../util/lines.js';
 import { Scope, type VarSymbol } from './scope.js';
 import { analyseRealm, realmAt, type RealmInfo } from './realm.js';
+import type { ScriptedClass } from './entities.js';
 import { parseLuaDoc, typeFromDoc, type LuaDoc } from './luadoc.js';
 import {
   BOOLEAN,
@@ -23,6 +24,7 @@ import {
   UNKNOWN,
   classType,
   fromApiType,
+  scriptedType,
   tableType,
   union,
   type GType,
@@ -183,6 +185,11 @@ export interface AnalyseOptions {
    * workspace index so single-file analysis stays usable on its own.
    */
   externalGlobal?: (path: string) => GType | undefined;
+  /**
+   * Looks up a scripted entity or weapon class the workspace defines, so
+   * `ents.Create("my_turret")` can carry that class rather than a bare Entity.
+   */
+  scriptedClass?: (name: string) => ScriptedClass | undefined;
 }
 
 /**
@@ -190,6 +197,19 @@ export interface AnalyseOptions {
  * always yield an array of a known class. Makes `for _, ply in ipairs(...)`
  * produce a real Player.
  */
+/**
+ * Functions whose return type is decided by a class name in a string argument.
+ * Keyed on the wiki address, which is the same however the call is written.
+ */
+const SCRIPTED_RETURNS: Record<string, { arg: number; array?: boolean }> = {
+  'ents.Create': { arg: 0 },
+  'ents.CreateClientside': { arg: 0 },
+  'ents.FindByClass': { arg: 0, array: true },
+  'ents.FindByClassAndParent': { arg: 0, array: true },
+  'Player:GetWeapon': { arg: 0 },
+  'Player:Give': { arg: 0 },
+};
+
 const ARRAY_RETURNS: Record<string, string> = {
   'player.GetAll': 'Player',
   'player.GetHumans': 'Player',
@@ -471,6 +491,18 @@ export function analyseFile(
     if (path === 'Panel.Add' || path === 'Panel:Add') {
       const literal = stringArg(args, 0);
       if (literal && api.isClass(literal.value)) return classType(literal.value);
+    }
+    // Scripted classes are named by a string too, but they live in the
+    // workspace rather than the wiki. Keyed on the wiki address because
+    // `ply:GetWeapon(...)` never spells out the class it is called on.
+    const scriptedReturn = SCRIPTED_RETURNS[fn.address];
+    if (scriptedReturn) {
+      const literal = stringArg(args, scriptedReturn.arg);
+      const scripted = literal ? options.scriptedClass?.(literal.value) : undefined;
+      if (scripted) {
+        const type = scriptedType(scripted.base, scripted.name);
+        return scriptedReturn.array ? tableType({ element: type }) : type;
+      }
     }
     if (path && ARRAY_RETURNS[path]) {
       const element = ARRAY_RETURNS[path]!;

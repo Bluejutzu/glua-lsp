@@ -1,5 +1,6 @@
 import { nodePathAt, type MemberExpression } from '../parser/ast.js';
 import { exprToPath, type FileAnalysis, type Span } from '../analyze/binder.js';
+import { scriptedClassArg } from '../analyze/entities.js';
 import type { VarSymbol } from '../analyze/scope.js';
 import { HOOK_TABLES, type GmodApi, type EnumLookup } from '../api/index.js';
 import type { ApiFunction } from '../api/types.js';
@@ -17,6 +18,7 @@ export type Resolution =
   | { kind: 'netMessage'; name: string; nameSpan: Span }
   | { kind: 'includePath'; path: string; nameSpan: Span }
   | { kind: 'panelClass'; name: string; nameSpan: Span }
+  | { kind: 'scriptedClass'; name: string; nameSpan: Span }
   | {
       kind: 'hookTable';
       name: string;
@@ -45,6 +47,13 @@ export function resolveAt(
     const call = enclosingCall(analysis, innermost.start);
     const callPath = call ? exprToPath(call.call.base) : null;
     const nameSpan = { start: innermost.start + 1, end: innermost.end - 1 };
+
+    // Whether the workspace actually has this class is the caller's problem —
+    // resolveAt has no index to check against.
+    const classArg = scriptedClassArg(callPath);
+    if (classArg && call?.argIndex === classArg.arg) {
+      return { kind: 'scriptedClass', name: innermost.value, nameSpan };
+    }
 
     if (call?.argIndex === 0) {
       switch (callPath) {

@@ -6,6 +6,15 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+### Added
+
+- **Entity and weapon class awareness.** `ents.Create("my_turret")` is typed as
+  that class, so its own `ENT` methods and generated accessors complete on the
+  result instead of only on `self`. Class names complete inside the string, and
+  go-to-definition on one opens the class. Also covers `ents.FindByClass`,
+  `ents.CreateClientside`, `weapons.Get` and `Player:Give`. Engine classes like
+  `prop_physics` stay a plain `Entity`.
+
 ### Changed
 
 - The extension is listed as **GLua for Garry's Mod**. The old name was too
