@@ -170,8 +170,13 @@ jobs:
 
       # Publishing is opt-in: without the token the step is skipped, so the
       # GitHub release still happens and nothing fails.
+      #
+      # It is also non-fatal. The GitHub release is already created by this
+      # point, so an expired PAT should leave you with a release to publish by
+      # hand, not a red workflow and a half-done tag. The summary says which.
       - name: Publish to the VS Code Marketplace
         id: marketplace
+        continue-on-error: true
         if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
@@ -209,7 +214,7 @@ jobs:
             echo "- size: ${{ steps.artifact.outputs.size }}"
             if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
               echo "- released as \`$GITHUB_REF_NAME\`"
-              echo "- Marketplace: ${{ steps.marketplace.outputs.published == 'true' && 'published' || 'skipped' }}"
+              echo "- Marketplace: ${{ steps.marketplace.outcome == 'failure' && '**failed** — publish it by hand' || (steps.marketplace.outputs.published == 'true' && 'published' || 'skipped') }}"
               echo "- Open VSX: ${{ steps.openvsx.outputs.published == 'true' && 'published' || 'skipped' }}"
             else
               echo "- dry run, attached as a workflow artifact only"

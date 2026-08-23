@@ -6,7 +6,14 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Changed
+
+- The extension is listed as **GLua for Garry's Mod**. The old name was too
+  close to other language servers already on the Marketplace. The extension id
+  is unchanged, so existing installs and settings keep working.
+- A failed Marketplace publish no longer fails the release workflow. The
+  GitHub release is already out by the time that step runs, so the job summary
+  reports the failure instead of leaving a half-finished release behind.
 
 ## 0.2.2
 
