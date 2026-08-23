@@ -5,11 +5,13 @@ import { parse } from '@glua/parser/parser.js';
 import { detectEndOfLine, formatDocument } from '@glua/format/printer.js';
 import { bold, c, heading, symbols } from './palette.js';
 import { loadProject } from './project.js';
+import { createProgress } from './progress.js';
 
 export interface FormatOptions {
   write: boolean;
   check: boolean;
   root?: string;
+  progress?: boolean;
 }
 
 export interface FormatResult {
@@ -20,13 +22,19 @@ export interface FormatResult {
 }
 
 export function format(targets: string[], options: FormatOptions): FormatResult {
-  const { config, files, root } = loadProject(targets, { root: options.root, indexProject: false });
+  const progress = createProgress(options.progress ?? false);
+
+  const { config, files, root } = loadProject(targets, {
+    root: options.root,
+    indexProject: false,
+  });
 
   const changed: string[] = [];
   const skipped: { file: string; reason: string }[] = [];
   let unchanged = 0;
 
-  for (const file of files) {
+  for (const [i, file] of files.entries()) {
+    progress.update(i + 1, files.length, `formatting ${path.relative(root, file).replace(/\\/g, '/')}`);
     let source: string;
     try {
       source = fs.readFileSync(file, 'utf8');
@@ -58,6 +66,7 @@ export function format(targets: string[], options: FormatOptions): FormatResult 
     changed.push(file);
     if (options.write) fs.writeFileSync(file, formatted);
   }
+  progress.done();
 
   return {
     changed,
