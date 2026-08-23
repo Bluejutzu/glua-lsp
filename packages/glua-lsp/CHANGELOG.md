@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.2.4
+
 ### Changed
 
 - `glua-cli` is on npm, and the release workflow publishes it over OIDC rather
