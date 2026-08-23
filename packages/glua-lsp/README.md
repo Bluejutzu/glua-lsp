@@ -4,7 +4,11 @@ Language support for Garry's Mod Lua: IntelliSense that follows your values,
 diagnostics that catch realm and net message bugs before you launch the game,
 and a formatter.
 
-**[Full documentation → glua.bluejutzu.dev](https://glua.bluejutzu.dev)**
+[Documentation](https://glua.bluejutzu.dev) ·
+[Installation](https://glua.bluejutzu.dev/installation) ·
+[Quick start](https://glua.bluejutzu.dev/quickstart) ·
+[Source](https://github.com/Bluejutzu/glua-lsp) ·
+[Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest)
 
 ---
 
@@ -24,6 +28,10 @@ before you run the game, and out-of-realm functions are hidden from completion.
 nothing normally connects them. Unregistered messages, messages never sent,
 handlers that never run, and **payload mismatches between the writes and the
 reads** are all reported across files.
+
+**Your own classes.** `ents.Create("my_turret")` is typed as that entity, so the
+methods it defines on `ENT` and the accessors its `NetworkVar`s generate complete
+on the result — not only on `self`.
 
 **Hook intelligence.** Name completion, typo detection with suggestions, and
 callback parameters typed from the hook's documented signature. `function ENT:`

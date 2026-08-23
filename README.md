@@ -1,28 +1,81 @@
 # GLua for Garry's Mod
 
-Language support for Garry's Mod Lua in VS Code: IntelliSense that follows your
-values, diagnostics that catch realm and net message bugs before you launch the
-game, and a formatter.
+Language support for Garry's Mod Lua in VS Code, Cursor and VSCodium.
+IntelliSense that follows your values, diagnostics that catch realm and net
+message bugs before you launch the game, and a formatter.
 
-Backed by 5,586 API entries from the Garry's Mod wiki — 331 globals, 1,257
-library functions, 2,376 class methods, 551 hooks, 1,069 panel methods, 100
-enums, 72 structures — plus an index of your own workspace.
+Backed by 5,586 API entries scraped from the Garry's Mod wiki, plus an index of
+your own workspace. Nothing is fetched at runtime.
 
-**Docs: [glua.bluejutzu.dev](https://glua.bluejutzu.dev)**
+[Install](#install) · [Quick start](#quick-start) ·
+[Documentation](https://glua.bluejutzu.dev) ·
+[Marketplace](https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp) ·
+[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp) ·
+[Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest)
 
-## Installing
-
-Not on the Marketplace — releases go to GitHub. Download
-`glua-lsp-<version>.vsix` from the
-[latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest), then:
+## Install
 
 ```bash
-code --install-extension glua-lsp-0.1.0.vsix
+code --install-extension bluejutzu.glua-lsp
+```
+
+```bash
+cursor --install-extension bluejutzu.glua-lsp
+```
+
+VSCodium, Gitpod, Theia and Windsurf pull from
+[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp), which carries the
+same build. For anything else, grab `glua-lsp-<version>.vsix` from the
+[latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest) and
+install the file directly:
+
+```bash
+code --install-extension glua-lsp-<version>.vsix
 ```
 
 Every push to `main` also attaches a build to its
 [CI run](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml), if you
 want a fix before it is tagged.
+
+Full instructions, including building from source:
+**[glua.bluejutzu.dev/installation](https://glua.bluejutzu.dev/installation)**
+
+## Quick start
+
+Open a `.lua` file inside a Garry's Mod addon. The status bar shows the realm it
+worked out — `GLua · Server` — and that is the whole setup.
+
+From there, completion follows your values rather than matching words:
+
+```lua
+local ply = player.GetByID(1)
+ply:Nick()                        -- Player, so Player and Entity methods
+
+local turret = ents.Create("my_turret")
+turret:GetAmmo()                  -- your entity's own NetworkVar accessor
+
+hook.Add("PlayerSay", "greet", function(sender, text)
+    sender:Kick("bye")            -- typed from the wiki's PlayerSay signature
+end)                              -- and flagged, because Kick is serverside only
+```
+
+Two things worth turning on straight away. Format on save, in `settings.json`:
+
+```json
+{
+  "[glua]": {
+    "editor.defaultFormatter": "bluejutzu.glua-lsp",
+    "editor.formatOnSave": true
+  }
+}
+```
+
+And a committed config, so your team shares one set of rules — run
+`GLua: Create Linter Config File` from the command palette to seed a `.glua.json`
+from whatever you already have set.
+
+A longer tour, with the net message and realm checks in context:
+**[glua.bluejutzu.dev/quickstart](https://glua.bluejutzu.dev/quickstart)**
 
 ## Features
 
@@ -87,6 +140,23 @@ end
 
 Ambiguous method sets fall back to the common base class; unrecognisable ones
 stay `any` rather than guessing. An explicit `---@param` always wins.
+
+### Your own entity and weapon classes
+
+A scripted class is named by where its files sit, so `lua/entities/my_turret/`
+defines `my_turret`. Spawning one gives you that class rather than a bare entity.
+
+```lua
+local turret = ents.Create("my_turret")
+
+turret:Explode()   -- a method the entity defines on ENT
+turret:GetAmmo()   -- an accessor from its NetworkVar
+turret:SetModel()  -- and the whole Entity API underneath
+```
+
+The class name completes inside the string, and go-to-definition on it opens the
+class. Same for weapons, `ents.FindByClass`, `weapons.Get` and `Player:Give`.
+Engine classes like `prop_physics` stay a plain `Entity`.
 
 ### Realm awareness
 
