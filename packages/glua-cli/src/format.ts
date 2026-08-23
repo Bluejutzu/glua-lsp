@@ -26,7 +26,7 @@ export function format(targets: string[], options: FormatOptions): FormatResult 
 
   const { config, files, root } = loadProject(targets, {
     root: options.root,
-    onIndex: (done, total, file) => progress.update(done, total, `indexing ${path.basename(file)}`),
+    indexProject: false,
   });
 
   const changed: string[] = [];
