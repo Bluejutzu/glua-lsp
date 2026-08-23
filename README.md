@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/glua-cli?label=npm%20glua-cli)](https://www.npmjs.com/package/glua-cli)
 [![CI](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml/badge.svg)](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml)
 
-Language support for Garry's Mod Lua in VS Code, Cursor and VSCodium.
+Unofficial language support for Garry's Mod Lua in VS Code, Cursor and VSCodium.
 IntelliSense that follows your values, diagnostics that catch realm and net
 message bugs before you launch the game, and a formatter.
 
