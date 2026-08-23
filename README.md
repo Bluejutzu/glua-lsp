@@ -1,5 +1,10 @@
 # GLua for Garry's Mod
 
+[![VS Marketplace](https://vsmarketplacebadges.dev/version-short/bluejutzu.glua-lsp.svg)](https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp)
+[![Open VSX](https://img.shields.io/open-vsx/v/bluejutzu/glua-lsp?label=open%20vsx)](https://open-vsx.org/extension/bluejutzu/glua-lsp)
+[![npm](https://img.shields.io/npm/v/glua-cli?label=npm%20glua-cli)](https://www.npmjs.com/package/glua-cli)
+[![CI](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml/badge.svg)](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml)
+
 Language support for Garry's Mod Lua in VS Code, Cursor and VSCodium.
 IntelliSense that follows your values, diagnostics that catch realm and net
 message bugs before you launch the game, and a formatter.
@@ -9,9 +14,6 @@ your own workspace. Nothing is fetched at runtime.
 
 [Install](#install) · [Quick start](#quick-start) ·
 [Documentation](https://glua.bluejutzu.dev) ·
-[Marketplace](https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp) ·
-[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp) ·
-[npm](https://www.npmjs.com/package/glua-cli) ·
 [Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest)
 
 ## Install
