@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes to the GLua Language Server extension. Release notes on each
+Notable changes to the GLua for Garry's Mod extension. Release notes on each
 [GitHub release](https://github.com/Bluejutzu/glua-lsp/releases) list every
 commit; this file covers what actually changed for you.
 

@@ -1,4 +1,4 @@
-# GLua Language Server
+# GLua for Garry's Mod
 
 Language support for Garry's Mod Lua: IntelliSense that follows your values,
 diagnostics that catch realm and net message bugs before you launch the game,

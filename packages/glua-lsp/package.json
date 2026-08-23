@@ -1,6 +1,6 @@
 {
   "name": "glua-lsp",
-  "displayName": "GLua Language Server",
+  "displayName": "GLua for Garry's Mod",
   "description": "Language server for Garry's Mod Lua — AST-based IntelliSense, realm awareness, hook and net message analysis, cross-file diagnostics.",
   "version": "0.2.2",
   "publisher": "bluejutzu",
