@@ -9,7 +9,7 @@ MyAddon.MaxTurrets = 8
 ---@param ply Player the player attempting to place one
 ---@return boolean
 function MyAddon.CanPlace(ply)
-	-- Annotated, so `ply:` completes Player methods anywhere in the body.
+	-- The @param above is what makes `ply:` complete Player methods below.
 	if not IsValid(ply) then return false end
 	return ply:IsAdmin() or ply:GetNWBool("myaddon.trusted", false)
 end
