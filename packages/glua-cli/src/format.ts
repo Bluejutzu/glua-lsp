@@ -20,7 +20,7 @@ export interface FormatResult {
 }
 
 export function format(targets: string[], options: FormatOptions): FormatResult {
-  const { config, files, root } = loadProject(targets, { root: options.root });
+  const { config, files, root } = loadProject(targets, { root: options.root, indexProject: false });
 
   const changed: string[] = [];
   const skipped: { file: string; reason: string }[] = [];

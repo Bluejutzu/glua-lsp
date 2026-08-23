@@ -92,11 +92,12 @@ export interface LoadedProject {
  */
 export function loadProject(
   targets: string[],
-  options: { maxFiles?: number; root?: string } = {},
+  options: { maxFiles?: number; root?: string; indexProject?: boolean } = {},
 ): LoadedProject {
   const api = loadApi();
   const maxFiles = options.maxFiles ?? 20000;
   const root = path.resolve(options.root ?? process.cwd());
+  const indexProject = options.indexProject ?? true;
 
   const config = new ConfigResolver(DEFAULT_SETTINGS);
   config.reload([root]);
@@ -104,9 +105,12 @@ export function loadProject(
   const workspace = new Workspace(api, { maxFiles, exclude: [] });
 
   // Index the project root so cross-file facts are complete, then make sure
-  // every explicitly named target is in there too.
-  const indexed = collectLuaFiles([root], maxFiles);
-  for (const file of indexed) workspace.loadFromDisk(file);
+  // every explicitly named target is in there too. Callers that only care
+  // about the target files (e.g. formatting) can skip this.
+  if (indexProject) {
+    const indexed = collectLuaFiles([root], maxFiles);
+    for (const file of indexed) workspace.loadFromDisk(file);
+  }
 
   const files = collectLuaFiles(targets, maxFiles);
   for (const file of files) {
