@@ -12,30 +12,36 @@ export interface InstallInfo {
   command: string;
 }
 
-interface NearestPackageJson {
+interface PackageJsonInfo {
   dir: string;
   json: { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; packageManager?: string };
 }
 
-function findNearestPackageJson(startDir: string): NearestPackageJson | null {
+/**
+ * Every `package.json` from `startDir` up to the filesystem root, nearest
+ * first — a monorepo commonly declares `glua-cli` (and the lockfile) at the
+ * workspace root, not in the leaf package a subcommand happens to run from.
+ */
+function ancestorPackageJsons(startDir: string): PackageJsonInfo[] {
+  const found: PackageJsonInfo[] = [];
   let dir = startDir;
   for (;;) {
     const file = path.join(dir, 'package.json');
     if (fs.existsSync(file)) {
       try {
-        return { dir, json: JSON.parse(fs.readFileSync(file, 'utf8')) };
+        found.push({ dir, json: JSON.parse(fs.readFileSync(file, 'utf8')) });
       } catch {
-        return null;
+        // Unreadable manifest; keep climbing rather than giving up entirely.
       }
     }
     const parent = path.dirname(dir);
-    if (parent === dir) return null;
+    if (parent === dir) return found;
     dir = parent;
   }
 }
 
 /** The `packageManager` field (corepack) wins when present; lockfiles are the fallback. */
-function managerFromProject(dir: string, json: NearestPackageJson['json']): PackageManager | null {
+function managerFromProject(dir: string, json: PackageJsonInfo['json']): PackageManager | null {
   const name = json.packageManager?.split('@')[0];
   if (name === 'npm' || name === 'pnpm' || name === 'yarn' || name === 'bun') return name;
 
@@ -75,15 +81,18 @@ function installCommand(manager: PackageManager, scope: 'workspace' | 'global', 
 }
 
 export function detectInstall(cwd: string = process.cwd()): InstallInfo {
-  const found = findNearestPackageJson(cwd);
-  const dep = found?.json.dependencies?.['glua-cli'];
-  const devDep = found?.json.devDependencies?.['glua-cli'];
+  const ancestors = ancestorPackageJsons(cwd);
 
-  if (found && (dep || devDep)) {
-    const manager = managerFromProject(found.dir, found.json) ?? 'npm';
-    return { scope: 'workspace', manager, command: installCommand(manager, 'workspace', Boolean(devDep)) };
+  const declaring = ancestors.find(
+    (p) => p.json.dependencies?.['glua-cli'] || p.json.devDependencies?.['glua-cli'],
+  );
+  if (declaring) {
+    const dev = Boolean(declaring.json.devDependencies?.['glua-cli']);
+    const manager = managerFromProject(declaring.dir, declaring.json) ?? 'npm';
+    return { scope: 'workspace', manager, command: installCommand(manager, 'workspace', dev) };
   }
 
-  const manager = (found && managerFromProject(found.dir, found.json)) || managerFromInstallPath();
+  const nearest = ancestors[0];
+  const manager = (nearest && managerFromProject(nearest.dir, nearest.json)) || managerFromInstallPath();
   return { scope: 'global', manager, command: installCommand(manager, 'global', false) };
 }

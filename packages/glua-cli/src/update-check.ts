@@ -12,7 +12,10 @@ import { detectInstall } from './detect-install.js';
 import { c, symbols } from './palette.js';
 
 const REGISTRY_URL = 'https://registry.npmjs.org/glua-cli/latest';
-const CACHE_FILE = path.join(os.tmpdir(), 'glua-cli-update-check.json');
+// Under the home directory rather than the shared temp directory, so another
+// account on the same machine can't plant a file here for us to trust.
+const CACHE_DIR = path.join(os.homedir(), '.glua-cli');
+const CACHE_FILE = path.join(CACHE_DIR, 'update-check.json');
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 1000;
 
@@ -21,9 +24,16 @@ interface Cache {
   latest: string;
 }
 
+function isValidCache(value: unknown): value is Cache {
+  if (typeof value !== 'object' || value === null) return false;
+  const cache = value as Record<string, unknown>;
+  return typeof cache.checkedAt === 'number' && /^\d+\.\d+\.\d+/.test(String(cache.latest));
+}
+
 function readCache(): Cache | null {
   try {
-    return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    const parsed: unknown = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    return isValidCache(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -31,6 +41,7 @@ function readCache(): Cache | null {
 
 function writeCache(cache: Cache): void {
   try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
     fs.writeFileSync(CACHE_FILE, JSON.stringify(cache));
   } catch {
     // Best effort; a missing cache just means checking again next run.
