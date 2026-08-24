@@ -3,7 +3,16 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: &non-code
+      # docs/**.mdx is intentionally not ignored: test/docs.test.mjs validates
+      # those files against the schemas, settings manifest, and diagnostic
+      # codes, so doc-only changes still need CI to catch a broken example.
+      - '**/*.md'
+      - LICENSE
+      - NOTICE
+      - .vscode/**
   pull_request:
+    paths-ignore: *non-code
   workflow_dispatch:
 
 concurrency:
