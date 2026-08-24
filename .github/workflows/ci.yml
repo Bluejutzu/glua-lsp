@@ -3,7 +3,15 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: &non-code
+      - 'docs/**'
+      - '**/*.md'
+      - '**/*.mdx'
+      - LICENSE
+      - NOTICE
+      - .vscode/**
   pull_request:
+    paths-ignore: *non-code
   workflow_dispatch:
 
 concurrency:
