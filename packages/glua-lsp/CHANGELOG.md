@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.4.0
+
 ### Added
 
 - **Project report.** `glua doctor`, or `GLua: Project Report` in the editor,

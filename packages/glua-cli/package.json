@@ -1,6 +1,6 @@
 {
   "name": "glua-cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Lint and format Garry's Mod Lua from the command line, using the same analysis as the GLua language server.",
   "license": "MIT",
   "homepage": "https://glua.bluejutzu.dev",
