@@ -238,6 +238,45 @@ test('lint --fix-dry-run changes nothing on disk', { skip: !built }, () => {
   assert.equal(fs.readFileSync(path.join(root, 'lua/autorun/sh_b.lua'), 'utf8'), before);
 });
 
+/* ---------------------------------------------------------------- doctor */
+
+test('doctor reports on the project named, not the working directory', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/server/sv_a.lua': 'util.AddNetworkString("m")\nnet.Start("m")\nnet.Send(ply)\n',
+    'lua/entities/turret/shared.lua': 'function ENT:Boom()\nend\n',
+  });
+
+  const result = run(['doctor', root, '--format', 'json', '--no-progress']);
+  assert.equal(result.code, 0);
+
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.files, 2, 'the two files in the addon, not this repo');
+  assert.equal(report.entities.total, 1);
+  assert.equal(report.net.registered, 1);
+  assert.deepEqual(report.net.unhandled, ['m'], 'nothing receives it');
+});
+
+test('doctor writes html to a file', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_a.lua': 'print(1)\n' });
+  const out = path.join(root, 'report.html');
+
+  const result = run(['doctor', root, '--format', 'html', '--out', out]);
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /wrote/);
+
+  const html = fs.readFileSync(out, 'utf8');
+  assert.match(html, /<title>/);
+  assert.match(html, /findings/);
+  assert.doesNotMatch(html, /<script/, 'the page runs nothing');
+});
+
+test('doctor can fail a build on too many findings', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_a.lua': 'net.Start("never_registered")\n' });
+
+  assert.equal(run(['doctor', root, '--no-progress']).code, 0, 'no limit, no failure');
+  assert.equal(run(['doctor', root, '--max-findings', '0', '--no-progress']).code, 1);
+});
+
 /* ----------------------------------------------------------------- rules */
 
 test('rules lists codes alongside their settings keys', { skip: !built }, () => {

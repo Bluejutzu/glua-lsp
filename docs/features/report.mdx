@@ -1,0 +1,114 @@
+---
+title: "Project Report"
+description: "A whole-project health report from the same analysis the editor uses — net message health, hook collisions, unknown globals and the files worth looking at."
+icon: "clipboard-list"
+sidebarTitle: "Project Report"
+---
+
+Every other feature answers "what is wrong with this line". None of them answer
+"what shape is this codebase in", and a Problems panel with four thousand
+entries in it does not either.
+
+```bash
+glua doctor
+```
+
+```
+  p-city   932 files · 236,345 lines
+
+Layout
+──────────────────
+  realms       246 client  ·  194 server  ·  492 shared
+  classes      46 effects  ·  89 entities  ·  202 weapons
+
+Health
+──────────────────
+  net messages ! 32   13 with no handler, 19 nothing sends
+  hook clashes ! 13   same event and identifier, overlapping realms
+  timer clashes ! 3   same name, one silently replaces the other
+  unknown names ! 197 globals defined nowhere we can see
+  findings     2,714  1793 unused-local, 350 undefined-global
+```
+
+Nothing here is new analysis. Every number comes from an index that already
+existed to answer some per-line question; the report just asks a different one.
+
+## In the editor
+
+**GLua: Project Report** from the command palette opens the same thing as a
+page, with the tables laid out side by side.
+
+## As a file
+
+```bash
+glua doctor --format html --out report.html
+```
+
+A single self-contained file with no scripts and no external requests, so it can
+be committed, attached to a pull request, or opened by someone who does not have
+the extension. It follows the reader's light or dark preference.
+
+## In CI
+
+```bash
+glua doctor --format json
+```
+
+The same data as a structure, for a dashboard or a threshold of your own. To
+fail a build outright:
+
+```bash
+glua doctor --max-findings 0
+```
+
+| Flag | Description |
+| --- | --- |
+| `-f, --format <format>` | `pretty` (default), `json`, `html` |
+| `-o, --out <file>` | Write to a file instead of stdout |
+| `--top <n>` | How many entries to list per section (default 8) |
+| `--max-findings <n>` | Exit non-zero above this many findings |
+| `--root <dir>` | Project root for config files and relative paths |
+| `--game-path <dir>` | A Garry's Mod directory, for the asset counts (or `GLUA_GAME_PATH`) |
+
+## What it looks at
+
+<CardGroup cols={2}>
+  <Card title="Net messages" icon="tower-broadcast">
+    Registered, sent and handled counts, plus the three ways they fail to line
+    up — unregistered, no handler, nothing sends.
+  </Card>
+
+  <Card title="Collisions" icon="triangle-exclamation">
+    `hook.Add` pairs sharing an event and identifier, and `timer.Create` calls
+    sharing a name, where the realms actually overlap.
+  </Card>
+
+  <Card title="Unknown globals" icon="circle-question">
+    Ranked by how often each is used. A name near the top is usually a
+    [framework you have not pointed at](/configuration/frameworks) rather than a
+    typo.
+  </Card>
+
+  <Card title="Files to look at" icon="file-lines">
+    Ranked by findings, then size. Where to start, rather than an alphabetical
+    wall.
+  </Card>
+</CardGroup>
+
+<Note>
+  The report reads every indexed file, so it costs about what a workspace-wide
+  lint does. Syntax trees are released as it goes, so memory stays flat on a
+  large project, and in the editor it yields between batches so nothing else
+  waits on it.
+</Note>
+
+## Frameworks are not counted
+
+If you have pointed at a [framework's source](/configuration/frameworks), its
+files are indexed but excluded from every total here. A hook only ULib fires, an
+entity only DarkRP ships, or two of a dependency's own registrations clashing
+with each other are not this project's, and putting them in a report about your
+codebase would only be noise.
+
+Relationships that cross the line still resolve: a net message you send and a
+dependency handles counts as handled.

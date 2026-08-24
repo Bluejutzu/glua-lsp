@@ -13,6 +13,7 @@ GLua adds several commands to the VS Code Command Palette. Use them to inspect y
 | `GLua: Create Linter Config File` | Writes a `.glua.json` file into the workspace root using your current settings as the baseline. Edit the file afterward to tune rule severity. |
 | `GLua: Create Formatter Config File` | Writes a `.gluafmtrc.json` file into the workspace root using your current formatter settings as the baseline. |
 | `GLua: Re-index Workspace` | Forces a full rescan of the workspace. Reach for this after large disk changes (for example, switching Git branches or bulk file moves) when the incremental watcher may have missed events. |
+| `GLua: Project Report` | Opens a [whole-project health report](/features/report) — net message health, collisions, unknown globals, and the files worth looking at. |
 | `GLua: Open Settings` | Opens the GLua settings page in the VS Code Settings UI. |
 | `GLua: Check Whole Workspace` | Reports problems in every indexed file, not just the ones you have open. Set `glua.diagnostics.scope` to `workspace` to do this automatically after indexing. |
 | `GLua: Clear Workspace Problems` | Clears reported problems for files that are not open. |

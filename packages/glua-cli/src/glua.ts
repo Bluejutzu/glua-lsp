@@ -8,6 +8,7 @@
 
 import { Command, Option } from 'commander';
 
+import type { DoctorFormat } from './doctor.js';
 import { format } from './format.js';
 import { lint, type LintFormat } from './lint.js';
 import { bold, c, heading, setColourEnabled, symbols } from './palette.js';
@@ -146,6 +147,66 @@ program
 
       if (!options.write && result.changed.length) process.exitCode = 1;
       if (result.skipped.length) process.exitCode = 1;
+    },
+  );
+
+/* ---------------------------------------------------------------- doctor */
+
+program
+  .command('doctor')
+  .description('Report on the whole project rather than one file at a time')
+  .argument('[paths...]', 'the project to look at', ['.'])
+  .addOption(
+    new Option('-f, --format <format>', 'output format').choices(['pretty', 'json', 'html']).default('pretty'),
+  )
+  .option('-o, --out <file>', 'write to a file instead of stdout')
+  .option('--root <dir>', 'project root for config files and relative paths')
+  .option('--game-path <dir>', 'a Garry\'s Mod directory, so base game content counts as existing')
+  .option('--top <n>', 'how many entries to list per section', (v) => Number.parseInt(v, 10), 8)
+  .option('--max-findings <n>', 'exit non-zero above this many findings', (v) => Number.parseInt(v, 10), -1)
+  .option('--no-progress', 'do not print progress')
+  .action(
+    async (
+      paths: string[],
+      options: {
+        format: DoctorFormat;
+        out?: string;
+        root?: string;
+        gamePath?: string;
+        top: number;
+        maxFindings: number;
+        progress: boolean;
+      },
+    ) => {
+      if (options.format !== 'pretty' || options.out) setColourEnabled(false);
+
+      const { doctor } = await import('./doctor.js');
+      const result = await doctor(paths, {
+        format: options.format,
+        top: options.top,
+        progress: options.progress && !options.out && supportsProgress(),
+        ...(options.root ? { root: options.root } : {}),
+        ...(options.gamePath ? { gamePath: options.gamePath } : {}),
+      });
+
+      if (options.out) {
+        const { writeFileSync } = await import('node:fs');
+        writeFileSync(options.out, result.output);
+        process.stdout.write(
+          `${c.success(symbols.pass)} wrote ${bold(options.out)} ${c.faint(
+            `(${result.report.files} files, ${result.report.diagnostics.total} findings)`,
+          )}\n`,
+        );
+      } else {
+        process.stdout.write(`${result.output}\n`);
+      }
+
+      if (options.maxFindings >= 0 && result.report.diagnostics.total > options.maxFindings) {
+        process.stderr.write(
+          `${c.failure(symbols.error)} ${result.report.diagnostics.total} findings exceeds the limit of ${options.maxFindings}.\n`,
+        );
+        process.exitCode = 1;
+      }
     },
   );
 

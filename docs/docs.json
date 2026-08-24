@@ -28,7 +28,8 @@
               "features/realms",
               "features/net-messages",
               "features/hooks",
-              "features/assets"
+              "features/assets",
+              "features/report"
             ]
           },
           {

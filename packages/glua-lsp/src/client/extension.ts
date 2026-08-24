@@ -153,6 +153,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showInformationMessage('GLua: cleared problems for unopened files.');
     }),
 
+    vscode.commands.registerCommand('glua.showReport', async () => {
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: 'GLua: building the project report' },
+        () => client!.sendRequest<{ html: string; name: string }>('glua/report'),
+      );
+
+      const panel = vscode.window.createWebviewPanel(
+        'gluaReport',
+        `GLua: ${result.name}`,
+        vscode.ViewColumn.Active,
+        { enableScripts: false, retainContextWhenHidden: true },
+      );
+      // The page is generated here and loads nothing, so lock it to that.
+      panel.webview.html =
+        `<!DOCTYPE html><html><head><meta charset="utf-8">` +
+        `<meta http-equiv="Content-Security-Policy" ` +
+        `content="default-src 'none'; style-src 'unsafe-inline';">` +
+        `${result.html}</html>`;
+    }),
+
     vscode.commands.registerCommand('glua.showNetGraph', async () => {
       const markdown = await client!.sendRequest<string>('glua/netGraph');
       const document = await vscode.workspace.openTextDocument({
