@@ -374,6 +374,30 @@ function identifierCompletions(
 
 /* --------------------------------------------------------- string args */
 
+/**
+ * Paths worth offering for what has been typed.
+ *
+ * A prefix match comes first, since these are directory paths and that is how
+ * people narrow them; a loose match follows so typing the file name alone still
+ * finds something. Only then is the list cut.
+ */
+function matchPaths(paths: string[], prefix: string, limit: number): string[] {
+  if (!prefix) return paths.slice(0, limit);
+
+  const needle = prefix.toLowerCase();
+  const starts: string[] = [];
+  const contains: string[] = [];
+
+  for (const entry of paths) {
+    const value = entry.toLowerCase();
+    if (value.startsWith(needle)) starts.push(entry);
+    else if (value.includes(needle)) contains.push(entry);
+    if (starts.length >= limit) break;
+  }
+
+  return [...starts, ...contains].slice(0, limit);
+}
+
 function stringCompletions(
   analysis: FileAnalysis,
   context: Extract<CompletionContext, { kind: 'string' }>,
@@ -446,10 +470,10 @@ function stringCompletions(
 
   const asset = assetArgOf(null, callPath);
   if (asset && argIndex === asset.arg) {
-    const paths = workspace.assets().entries(asset.kind);
-    // A full game directory holds tens of thousands; the client filters as the
-    // prefix grows, so hand it a bounded slice rather than all of them.
-    for (const entry of paths.slice(0, 2000)) {
+    // A game directory holds tens of thousands of these, far more than is worth
+    // sending. Narrow by what has been typed *before* cutting the list, or the
+    // same arbitrary slice comes back however much more you type.
+    for (const entry of matchPaths(workspace.assets().entries(asset.kind), context.prefix, 500)) {
       push(entry, asset.kind, undefined, CompletionItemKind.File);
     }
     return items;

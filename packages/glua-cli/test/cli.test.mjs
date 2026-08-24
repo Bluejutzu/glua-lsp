@@ -229,6 +229,42 @@ test('lint --fix applies the unambiguous fixes and leaves the rest', { skip: !bu
   assert.match(result.stdout, /fixed 2/);
 });
 
+test('lint --fix still fails when something unfixable is left', { skip: !built }, () => {
+  // Fixing must not turn a failing build green: the parse error survives, so
+  // the command has to keep saying so.
+  const root = addon({ 'lua/autorun/sh_broken.lua': 'local n = 0\nn += 1\nlocal x = \n' });
+
+  const result = run(['lint', root, '--fix', '--no-progress']);
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(
+    fs.readFileSync(path.join(root, 'lua/autorun/sh_broken.lua'), 'utf8'),
+    /n = n \+ 1/,
+    'the fixable part is still applied',
+  );
+});
+
+test('lint --fix exits 0 when only warnings are left, unless capped', { skip: !built }, () => {
+  // UnknownThing is a warning that no fix can settle; the += is fixed.
+  const root = addon({ 'lua/autorun/sh_warn.lua': 'local n = 0\nn += 1\nUnknownThing(n)\n' });
+
+  assert.equal(run(['lint', root, '--fix', '--no-progress']).code, 0, 'warnings alone do not fail');
+  assert.equal(run(['lint', root, '--fix', '--no-progress', '--max-warnings', '0']).code, 1);
+});
+
+test('lint --fix does not write a fix twice', { skip: !built }, () => {
+  // Two unregistered sends of the same message each ask for the same insertion
+  // at the top of the file.
+  const root = addon({
+    'lua/autorun/server/sv_dup.lua':
+      'net.Start("msg")\nnet.Send(ply)\nnet.Start("msg")\nnet.Send(ply)\n',
+  });
+
+  run(['lint', root, '--fix', '--no-progress']);
+  const after = fs.readFileSync(path.join(root, 'lua/autorun/server/sv_dup.lua'), 'utf8');
+  const added = [...after.matchAll(/util\.AddNetworkString\("msg"\)/g)];
+  assert.equal(added.length, 1, `wrote it ${added.length} times:\n${after}`);
+});
+
 test('lint --fix-dry-run changes nothing on disk', { skip: !built }, () => {
   const before = 'local n = 0\nn += 1\nprint(n)\n';
   const root = addon({ 'lua/autorun/sh_b.lua': before });

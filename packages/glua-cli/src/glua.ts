@@ -93,8 +93,17 @@ program
           ...(options.root ? { root: options.root } : {}),
         });
         if (result.output.trim()) process.stdout.write(`${result.output}\n`);
-        // Anything a fix could not settle is still a reason to fail a build.
-        if (result.remaining > 0 && options.maxWarnings === 0) process.exitCode = 1;
+
+        // Fixing must not turn a failing build green. These are the same
+        // semantics the plain lint branch below uses.
+        if (result.remainingErrors > 0) {
+          process.exitCode = 1;
+        } else if (options.maxWarnings >= 0 && result.remainingWarnings > options.maxWarnings) {
+          process.stderr.write(
+            `${c.failure(symbols.error)} ${result.remainingWarnings} warnings exceeds the limit of ${options.maxWarnings}.\n`,
+          );
+          process.exitCode = 1;
+        }
         return;
       }
 

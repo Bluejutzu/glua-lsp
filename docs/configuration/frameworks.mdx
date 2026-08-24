@@ -42,8 +42,13 @@ ULib.tsayError(ply, "no")
 --   ^ completes, with the parameter names from ULib's own source
 ```
 
-Nothing in a library is ever reported on. It is not yours to fix, and a
-framework you have merely installed should not fill your Problems panel.
+Nothing in a library is ever reported on — including when you open one of its
+files to read it. It is not yours to fix, and a framework you have merely
+installed should not fill your Problems panel.
+
+Changing the list takes effect immediately. Adding a path indexes it, and
+removing one drops its files, so its globals stop resolving rather than
+lingering until the next restart.
 
 ## Why source, rather than a bundled list
 

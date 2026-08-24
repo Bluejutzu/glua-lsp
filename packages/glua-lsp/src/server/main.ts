@@ -143,6 +143,34 @@ function resolveLibraryPath(library: string, folders: { uri: string }[]): string
   return base ? path.resolve(base, library) : path.resolve(library);
 }
 
+/** Library roots from editor settings and the project config combined. */
+function configuredLibraries(): string[] {
+  return [
+    ...new Set([...settings.workspace.libraries, ...config.projectSettings().workspace.libraries]),
+  ].sort();
+}
+
+/** What was indexed last time, so a change to the list can be noticed. */
+let indexedLibraries: string[] = [];
+
+/**
+ * Re-indexes when the library list changes.
+ *
+ * Adding a framework mid-session should not need a restart, and removing one
+ * has to drop its files — otherwise its globals keep resolving after you have
+ * said they are not there.
+ */
+async function reindexedForLibraryChange(): Promise<boolean> {
+  const wanted = configuredLibraries();
+  if (wanted.join('\0') === indexedLibraries.join('\0')) return false;
+
+  connection.console.log(
+    `GLua: library list changed (${indexedLibraries.length} → ${wanted.length}), re-indexing.`,
+  );
+  await indexWorkspace();
+  return true;
+}
+
 async function indexWorkspace(): Promise<number> {
   const folders = (await connection.workspace.getWorkspaceFolders()) ?? [];
   const started = Date.now();
@@ -150,11 +178,9 @@ async function indexWorkspace(): Promise<number> {
 
   // Frameworks first, so the project's own files see what they define on the
   // very first pass rather than only after a re-analysis.
-  const libraries = new Set([
-    ...settings.workspace.libraries,
-    ...config.projectSettings().workspace.libraries,
-  ]);
-  for (const library of libraries) {
+  workspace.clearLibraries();
+  indexedLibraries = configuredLibraries();
+  for (const library of indexedLibraries) {
     const count = workspace.indexLibrary(resolveLibraryPath(library, folders));
     if (count) connection.console.log(`GLua: indexed ${count} files from library ${library}.`);
     else connection.console.warn(`GLua: library path '${library}' has no Lua files.`);
@@ -265,8 +291,12 @@ async function reloadProjectConfig(): Promise<void> {
 connection.onDidChangeConfiguration(async () => {
   const wasWorkspaceScope = settings.diagnostics.scope === 'workspace';
   await refreshSettings();
-  for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
 
+  // Reindexing republishes everything itself, so do not do it twice.
+  const reindexed = await reindexedForLibraryChange();
+  if (reindexed) return;
+
+  for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
   if (settings.diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
   else if (wasWorkspaceScope) clearWorkspaceDiagnostics();
 });
@@ -299,6 +329,13 @@ function scheduleDiagnostics(uri: string, delay = 250): void {
 }
 
 function publishDiagnostics(uri: string): void {
+  // Opening a framework file must not fill the panel with its problems. The
+  // promise is that library code is never reported on, wherever you found it.
+  if (workspace.isLibrary(uri)) {
+    connection.sendDiagnostics({ uri, diagnostics: [] });
+    return;
+  }
+
   const analysis = analysisFor(uri);
   if (!analysis) return;
   try {
@@ -354,6 +391,9 @@ connection.onDidChangeWatchedFiles(async (event) => {
 
   if (configChanged) {
     await reloadProjectConfig();
+    // Editing workspace.libraries in .glua.json takes effect here, rather than
+    // waiting for a restart.
+    if (await reindexedForLibraryChange()) return;
     for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
   }
 });
