@@ -1,0 +1,7 @@
+/* On wide viewports the page shell (#body-content) is centered with
+   max-w-8xl, which pushes the sidebar in from the left edge instead of
+   letting it sit closer to the navbar's own edge-to-edge width. */
+#body-content {
+  max-width: none;
+  margin-left: 0;
+}
