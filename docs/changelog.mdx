@@ -1,16 +1,15 @@
-# Changelog
+---
+title: "Changelog"
+description: "Notable changes to GLua for Garry's Mod, release by release."
+icon: "clock"
+sidebarTitle: "Changelog"
+---
 
-Notable changes to the GLua for Garry's Mod extension. Release notes on each
-[GitHub release](https://github.com/Bluejutzu/glua-lsp/releases) list every
-commit; this file covers what actually changed for you.
+Each GitHub release lists every commit. This page covers what actually
+changed for you — see the [full history on GitHub](https://github.com/Bluejutzu/glua-lsp/releases).
 
-## Unreleased
-
-_Nothing yet._
-
-## 0.3.0
-
-### Fixed
+<Update label="0.3.0 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.3.0">View release on GitHub ↗</a>}>
+**Fixed**
 
 - Iterating a method that returns a list gave no completions at all —
   `for _, w in ipairs(ply:GetWeapons())` left `w` untyped, as did
@@ -18,17 +17,17 @@ _Nothing yet._
   library forms like `player.GetAll()` were unaffected.
 - `glua --version` reported `0.1.0` whatever version it was. Both the CLI and
   the language server now take their version from the manifest at build time.
+</Update>
 
-## 0.2.4
-
-### Changed
+<Update label="0.2.4" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.2.4">View release on GitHub ↗</a>}>
+**Changed**
 
 - `glua-cli` is now published on npm, with the formatter and linter available
   directly in the terminal.
+</Update>
 
-## 0.2.3
-
-### Added
+<Update label="0.2.3" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.2.3">View release on GitHub ↗</a>}>
+**Added**
 
 - **Entity and weapon class awareness.** `ents.Create("my_turret")` is typed as
   that class, so its own `ENT` methods and generated accessors complete on the
@@ -37,7 +36,7 @@ _Nothing yet._
   `ents.CreateClientside`, `weapons.Get` and `Player:Give`. Engine classes like
   `prop_physics` stay a plain `Entity`.
 
-### Changed
+**Changed**
 
 - The extension is listed as **GLua for Garry's Mod**. The old name was too
   close to other language servers already on the Marketplace. The extension id
@@ -45,31 +44,31 @@ _Nothing yet._
 - A failed Marketplace publish no longer fails the release workflow. The
   GitHub release is already out by the time that step runs, so the job summary
   reports the failure instead of leaving a half-finished release behind.
+</Update>
 
-## 0.2.2
-
-### Changed
+<Update label="0.2.2" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.2.2">View release on GitHub ↗</a>}>
+**Changed**
 
 - `pnpm run release` now rolls the `Unreleased` section into the new version
   and opens a fresh one, so a shipped release is never still described as
   unreleased.
+</Update>
 
-## 0.2.1
-
-### Fixed
+<Update label="0.2.1" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.2.1">View release on GitHub ↗</a>}>
+**Fixed**
 
 - CI ran the tests before the build, so the CLI's tests failed on a clean
   checkout. Both workflows now build first.
 - The light-mode code block theme was set to a dark Catppuccin variant.
 
-### Changed
+**Changed**
 
 - Release notes list each change as `subject by @author in #PR`, and open with
   an install command for every supported editor.
+</Update>
 
-## 0.2.0
-
-### Added
+<Update label="0.2.0" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.2.0">View release on GitHub ↗</a>}>
+**Added**
 
 - **Formatter.** Reprints from the syntax tree. Refuses to touch a file that
   does not parse, never drops a comment, and leaves idiomatic one-liners like
@@ -97,7 +96,7 @@ _Nothing yet._
 - **A command line interface**, published separately as `glua-cli`, for running
   the same linter and formatter in CI.
 
-### Fixed
+**Fixed**
 
 - Parentheses are recorded rather than discarded, so reprinting cannot change
   `(a + b) * c` into `a + b * c`.
@@ -108,9 +107,9 @@ _Nothing yet._
   `surface.SetDrawColor(color)`) are both recognised.
 - Argument checks are skipped for the Lua standard library, whose documented
   signatures are not precise enough to check against.
+</Update>
 
-## 0.1.0
-
+<Update label="0.1.0" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.1.0">View release on GitHub ↗</a>}>
 First release.
 
 - IntelliSense driven by an error-tolerant parser and a type model, so
@@ -120,3 +119,4 @@ First release.
 - Net message analysis across files, including payload mismatches
 - Hook name completion, typo detection, and typed callback parameters
 - Cross-file go-to-definition, find references and rename
+</Update>

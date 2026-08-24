@@ -41,6 +41,10 @@
               "configuration/config-files",
               "configuration/suppressions"
             ]
+          },
+          {
+            "group": "Changelog",
+            "pages": ["changelog"]
           }
         ]
       },
