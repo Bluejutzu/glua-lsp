@@ -71,7 +71,7 @@ export function lint(targets: string[], options: LintOptions): LintResult {
   files.forEach((file, i) => {
     progress.update(i + 1, files.length, `linting ${path.relative(root, file).replace(/\\/g, '/')}`);
     const analysis = workspace.full(uriOf(file));
-    if (!analysis) return;
+    if (!analysis || workspace.isLibrary(analysis.uri)) return;
     const diagnostics = diagnose(
       analysis,
       api,

@@ -114,6 +114,12 @@ export function loadProject(
   // about the target files (e.g. formatting) can skip this.
   const files = collectLuaFiles(targets, maxFiles);
   if (indexProject) {
+    // Frameworks first: their globals are what stop the project's own files
+    // reading as full of undefined names.
+    for (const library of config.projectSettings().workspace.libraries) {
+      workspace.indexLibrary(path.resolve(config.root ?? root, library));
+    }
+
     const indexed = collectLuaFiles([root], maxFiles);
     indexed.forEach((file, i) => {
       workspace.loadFromDisk(file);

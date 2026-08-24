@@ -8,6 +8,12 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **Framework support.** `glua.workspace.libraries` (or `workspace.libraries` in
+  `.glua.json`) points at the source of frameworks your project uses but does
+  not contain — ULib, DarkRP, Wiremod. They are indexed for what they define, so
+  their globals resolve with real signatures instead of reading as undefined,
+  and nothing in them is ever reported on. On a real gamemode this cleared every
+  `ULib` finding.
 - **`glua init`**, which writes `.glua.json` and `.gluafmtrc.json` from the
   defaults. Previously those could only be created from the VS Code command
   palette, so anyone adopting the CLI in CI had to write them by hand.

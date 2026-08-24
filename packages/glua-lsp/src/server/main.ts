@@ -7,6 +7,7 @@ import {
   type FormattingOptions,
   type InitializeResult,
 } from 'vscode-languageserver/node.js';
+import path from 'node:path';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 
@@ -132,10 +133,33 @@ connection.onInitialized(async () => {
  * Indexes every Lua file in the workspace, yielding to the event loop between
  * batches so requests from the editor are still answered while it runs.
  */
+/**
+ * A library path may be relative, since a framework usually sits beside the
+ * project. Relative to the config file if there is one, else the workspace.
+ */
+function resolveLibraryPath(library: string, folders: { uri: string }[]): string {
+  if (path.isAbsolute(library)) return library;
+  const base = config.root ?? (folders[0] ? URI.parse(folders[0].uri).fsPath : undefined);
+  return base ? path.resolve(base, library) : path.resolve(library);
+}
+
 async function indexWorkspace(): Promise<number> {
   const folders = (await connection.workspace.getWorkspaceFolders()) ?? [];
   const started = Date.now();
   let indexed = 0;
+
+  // Frameworks first, so the project's own files see what they define on the
+  // very first pass rather than only after a re-analysis.
+  const libraries = new Set([
+    ...settings.workspace.libraries,
+    ...config.projectSettings().workspace.libraries,
+  ]);
+  for (const library of libraries) {
+    const count = workspace.indexLibrary(resolveLibraryPath(library, folders));
+    if (count) connection.console.log(`GLua: indexed ${count} files from library ${library}.`);
+    else connection.console.warn(`GLua: library path '${library}' has no Lua files.`);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 
   for (const folder of folders) {
     const files = workspace.scanFolder(URI.parse(folder.uri).fsPath);
@@ -170,6 +194,7 @@ async function publishWorkspaceDiagnostics(): Promise<number> {
 
   for (const uri of [...workspace.uris()]) {
     if (documents.get(uri)) continue; // open documents publish on their own
+    if (workspace.isLibrary(uri)) continue; // somebody else's code
     const analysis = workspace.full(uri);
     if (!analysis) continue;
 

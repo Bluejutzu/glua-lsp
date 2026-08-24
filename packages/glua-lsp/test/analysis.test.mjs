@@ -648,6 +648,87 @@ test('array returns resolve on methods, not just library functions', () => {
   }
 });
 
+/* ---------------------------------------------------------- libraries */
+
+/** A framework checkout living outside the project, the way ULib does. */
+function makeLibrary(files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'glua-lib-'));
+  for (const [relative, contents] of Object.entries(files)) {
+    const full = path.join(root, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, contents);
+  }
+  return root;
+}
+
+test('a framework outside the project stops reading as undefined', () => {
+  const library = makeLibrary({
+    'lua/ulib/shared.lua': 'ULib = ULib or {}\nfunction ULib.tsayError(ply, msg) end\n',
+  });
+
+  const source = 'local ply = player.GetByID(1)\nULib.tsayError(ply, "no")\n';
+  const before = new Workspace(api, { maxFiles: 50, exclude: [] });
+  const withoutLibrary = before.analyse(uriOf('lua', 'autorun', 'sv_a.lua'), source, 1);
+  assert.ok(
+    diagnose(withoutLibrary, api, before, DEFAULT_SETTINGS).some((d) => d.code === 'undefined-global'),
+    'ULib is not a GMod global, so on its own it is undefined',
+  );
+
+  const after = new Workspace(api, { maxFiles: 50, exclude: [] });
+  assert.equal(after.indexLibrary(library), 1);
+  const withLibrary = after.analyse(uriOf('lua', 'autorun', 'sv_a.lua'), source, 1);
+  assert.equal(
+    diagnose(withLibrary, api, after, DEFAULT_SETTINGS).filter((d) => d.code === 'undefined-global').length,
+    0,
+  );
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
+test('a library gains real signatures, not just a silenced name', () => {
+  const library = makeLibrary({
+    'lua/ulib/shared.lua': 'ULib = ULib or {}\nfunction ULib.getUsers(target, ply) end\n',
+  });
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+
+  const { text, offset } = withCursor('ULib.|\n');
+  const analysis = workspace.analyse(uriOf('lua', 'autorun', 'sv_b.lua'), text, 1);
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('getUsers'), 'the function is completed, not merely tolerated');
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
+test('library files are never reported on themselves', () => {
+  const library = makeLibrary({
+    // Wrong on purpose: it is not ours to fix.
+    'lua/ulib/bad.lua': 'local unused = 1\nnet.Start("never_registered")\n',
+  });
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+
+  const uris = [...workspace.uris()];
+  assert.equal(uris.length, 1);
+  assert.ok(workspace.isLibrary(uris[0]), 'so callers know to skip it');
+  assert.equal(workspace.libraryCount, 1);
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
+test('library content does not join the asset index', () => {
+  const library = makeLibrary({
+    'lua/ulib/shared.lua': 'ULib = {}\n',
+    'materials/ulib/icon.png': '',
+  });
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+
+  assert.ok(!workspace.assets().has('material', 'ulib/icon'), 'a dependency ships its own content');
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
 /* ------------------------------------------------------------- assets */
 
 const withAssetCheck = (severity) => ({

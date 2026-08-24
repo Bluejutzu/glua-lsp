@@ -13,6 +13,12 @@ export interface Settings {
      * come from the base game, and guessing would be all false positives.
      */
     gamePath: string;
+    /**
+     * Source trees for frameworks this project uses but does not contain.
+     * Indexed for what they define so their globals resolve, and never
+     * reported on, since none of it is yours to fix.
+     */
+    libraries: string[];
   };
   diagnostics: {
     enable: boolean;
@@ -68,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
     maxFiles: 6000,
     exclude: [],
     gamePath: '',
+    libraries: [],
   },
   diagnostics: {
     enable: true,

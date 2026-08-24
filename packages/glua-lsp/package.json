@@ -156,6 +156,14 @@
           ],
           "description": "Glob patterns excluded from workspace indexing."
         },
+        "glua.workspace.libraries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Source trees for frameworks this project uses but does not contain — ULib, DarkRP, Wiremod. Each is indexed for what it defines, so its globals stop reading as undefined and its functions gain real signatures, and none of it is ever reported on.\n\nPaths may be absolute or relative to the workspace, e.g. `../ulib` or `C:/servers/mine/garrysmod/addons/ulib`.\n\nThis reads the framework's own source rather than a bundled list of names, so it is exact and cannot fall out of date."
+        },
         "glua.workspace.gamePath": {
           "type": "string",
           "default": "",

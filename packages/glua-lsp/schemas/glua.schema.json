@@ -71,6 +71,11 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Directory names to skip while indexing."
+        },
+        "libraries": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Source trees for frameworks this project uses but does not contain (ULib, DarkRP, Wiremod). Indexed for what they define and never reported on. Absolute, or relative to this file."
         }
       }
     },

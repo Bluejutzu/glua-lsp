@@ -35,6 +35,11 @@ export interface WorkspaceOptions {
   exclude: string[];
   /** A Garry's Mod directory, so base game content counts as existing. */
   gamePath?: string;
+  /**
+   * Source trees for frameworks this project depends on but does not contain —
+   * ULib, DarkRP, Wiremod. Indexed for what they define, never reported on.
+   */
+  libraries?: string[];
 }
 
 const DEFAULT_EXCLUDE = [
@@ -84,6 +89,8 @@ export class Workspace {
   private hookSignatures: Map<string, CustomHookSignature | null> | null = null;
   private assetIndex: AssetIndex | null = null;
   private folders: string[] = [];
+  /** Files that came from a library root, so nothing reports on them. */
+  private readonly libraryUris = new Set<string>();
   private readonly accessorCache = new Map<string, Located<GeneratedAccessor>[]>();
   private duplicateCache: {
     hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
@@ -547,8 +554,10 @@ export class Workspace {
   /* ------------------------------------------------------------ scanning */
 
   /** Recursively finds .lua files under a folder, honouring the exclude list. */
-  scanFolder(folderFsPath: string): string[] {
-    if (!this.folders.includes(folderFsPath)) {
+  scanFolder(folderFsPath: string, isProjectFolder = true): string[] {
+    // A library's content is not this addon's, so it stays out of the asset
+    // index as well as out of diagnostics.
+    if (isProjectFolder && !this.folders.includes(folderFsPath)) {
       this.folders.push(folderFsPath);
       this.assetIndex = null;
     }
@@ -588,6 +597,36 @@ export class Workspace {
     } catch {
       return undefined;
     }
+  }
+
+  /* ---------------------------------------------------------- libraries */
+
+  /**
+   * Indexes a framework this project depends on but does not ship.
+   *
+   * ULib, DarkRP and Wiremod live on the server rather than in the addon repo,
+   * so every global they define reads as undefined. Indexing their source is
+   * exact and stays current by itself, which a hand-written list of names would
+   * not — but nothing in there is yours, so it is never reported on.
+   */
+  indexLibrary(rootFsPath: string): number {
+    let indexed = 0;
+    for (const file of this.scanFolder(rootFsPath, false)) {
+      const analysis = this.loadFromDisk(file);
+      if (!analysis) continue;
+      this.libraryUris.add(analysis.uri);
+      indexed++;
+    }
+    return indexed;
+  }
+
+  /** Came from a library root, so it is somebody else's code. */
+  isLibrary(uri: string): boolean {
+    return this.libraryUris.has(uri);
+  }
+
+  get libraryCount(): number {
+    return this.libraryUris.size;
   }
 }
 
