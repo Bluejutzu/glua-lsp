@@ -36,6 +36,8 @@ import { detectEndOfLine } from '../format/printer.js';
 import { ConfigResolver } from '../config/index.js';
 import { VERSION } from '../util/version.js';
 import { buildNetGraph } from './features/netGraph.js';
+import { buildReport } from './features/report.js';
+import { renderHtml } from './features/reportHtml.js';
 
 /**
  * An editor launches this with a transport flag. Anything else is a person
@@ -508,6 +510,26 @@ connection.languages.semanticTokens.on(
 /* ---------------------------------------------------------- custom requests */
 
 connection.onRequest('glua/netGraph', () => buildNetGraph(workspace));
+
+connection.onRequest('glua/report', () => {
+  const report = buildReport(api, workspace, {
+    settingsFor: (fsPath) => config.settingsFor(fsPath),
+    globalsFor: (fsPath) => config.globalsFor(fsPath),
+    top: 10,
+  });
+  const folder = workspaceName();
+  return { html: renderHtml(report, folder), name: folder, report };
+});
+
+/** Best label for the project, for a report title. */
+function workspaceName(): string {
+  for (const uri of workspace.uris()) {
+    const root = URI.parse(uri).fsPath.replace(/\\/g, '/');
+    const lua = root.toLowerCase().lastIndexOf('/lua/');
+    if (lua > 0) return path.basename(root.slice(0, lua));
+  }
+  return 'Project';
+}
 
 connection.onRequest('glua/reindex', async () => ({ indexed: await indexWorkspace() }));
 

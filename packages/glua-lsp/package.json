@@ -90,6 +90,11 @@
         "category": "GLua"
       },
       {
+        "command": "glua.showReport",
+        "title": "GLua: Project Report",
+        "category": "GLua"
+      },
+      {
         "command": "glua.reindexWorkspace",
         "title": "GLua: Re-index Workspace",
         "category": "GLua"

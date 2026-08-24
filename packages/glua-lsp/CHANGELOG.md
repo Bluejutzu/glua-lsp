@@ -8,6 +8,13 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **Project report.** `glua doctor`, or `GLua: Project Report` in the editor,
+  answers what shape a codebase is in rather than what is wrong with one line:
+  net message health, hook and timer collisions, unknown globals ranked by use,
+  the largest scripted classes, and the files worth looking at first. Also
+  `--format html` for a self-contained file to attach to a pull request, and
+  `--format json` with `--max-findings` for CI. Nothing here is new analysis —
+  it reads the indexes the editor already builds.
 - **Framework support.** `glua.workspace.libraries` (or `workspace.libraries` in
   `.glua.json`) points at the source of frameworks your project uses but does
   not contain — ULib, DarkRP, Wiremod. They are indexed for what they define, so

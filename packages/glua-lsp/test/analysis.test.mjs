@@ -11,6 +11,8 @@ const { typeToString } = await import(OUT('analyze/types.js'));
 const { scriptedClassOf } = await import(OUT('analyze/entities.js'));
 const { AssetIndex } = await import(OUT('analyze/assets.js'));
 const { readVpkDirectory } = await import(OUT('analyze/vpk.js'));
+const { buildReport } = await import(OUT('server/features/report.js'));
+const { renderHtml } = await import(OUT('server/features/reportHtml.js'));
 const { completion } = await import(OUT('server/features/completion.js'));
 const { hover } = await import(OUT('server/features/hover.js'));
 const { signatureHelp } = await import(OUT('server/features/signature.js'));
@@ -646,6 +648,84 @@ test('array returns resolve on methods, not just library functions', () => {
     const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
     assert.ok(names.includes(expected), `${source.split('\n').pop()} should offer ${expected}`);
   }
+});
+
+/* --------------------------------------------------------------- report */
+
+test('the report counts what is actually there', () => {
+  const { workspace } = makeWorkspace({
+    'lua/autorun/server/sv_net.lua':
+      'util.AddNetworkString("used")\nnet.Start("used")\nnet.Send(ply)\nnet.Start("orphan")\nnet.Send(ply)\n',
+    'lua/autorun/client/cl_net.lua': 'net.Receive("used", function() end)\n',
+    'lua/entities/my_turret/shared.lua': 'function ENT:Explode()\nend\n',
+  });
+
+  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS, top: 5 });
+
+  assert.equal(report.files, 3);
+  assert.ok(report.lines > 5);
+  assert.equal(report.realms.server, 1);
+  assert.equal(report.realms.client, 1);
+
+  assert.equal(report.net.registered, 1);
+  assert.deepEqual(report.net.unhandled, ['orphan'], 'sent with nothing listening');
+  assert.deepEqual(report.net.unregistered, ['orphan']);
+
+  assert.equal(report.entities.total, 1);
+  assert.equal(report.entities.byKind.entity, 1);
+  assert.ok(report.diagnostics.byCode.some((r) => r.name === 'net-unregistered'));
+});
+
+test('a collision keeps its event and identifier apart', () => {
+  // The index joins them with a NUL because hook names contain spaces of their
+  // own, so a report that printed the raw key would run them together.
+  const { workspace } = makeWorkspace({
+    'lua/autorun/sh_a.lua': 'hook.Add("Org Clear", "RemovePoison2", function() end)\n',
+    'lua/autorun/sh_b.lua': 'hook.Add("Org Clear", "RemovePoison2", function() end)\n',
+  });
+
+  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+
+  assert.equal(report.hooks.collisions.length, 1);
+  assert.deepEqual(report.hooks.collisions[0], {
+    event: 'Org Clear',
+    identifier: 'RemovePoison2',
+    count: 2,
+  });
+  for (const clash of report.hooks.collisions) {
+    assert.ok(!clash.event.includes('\0') && !clash.identifier.includes('\0'));
+  }
+});
+
+test('library files are counted separately and never reported on', () => {
+  const library = makeLibrary({ 'lua/ulib/shared.lua': 'ULib = {}\nlocal unused = 1\n' });
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+  workspace.analyse(uriOf('lua', 'autorun', 'sh_mine.lua'), 'print(1)\n', 1);
+
+  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+
+  assert.equal(report.files, 1, 'only what this project wrote');
+  assert.equal(report.libraryFiles, 1);
+  assert.ok(
+    !report.worstFiles.some((f) => f.file.includes('ulib')),
+    "a dependency's own problems are not ours",
+  );
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
+test('the html report escapes what it prints', () => {
+  const { workspace } = makeWorkspace({
+    'lua/autorun/sh_x.lua': 'hook.Run("<img src=x>", 1)\n',
+  });
+  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+  report.undefinedGlobals.push({ name: '<script>alert(1)</script>', count: 1 });
+
+  const html = renderHtml(report, '<b>proj</b>');
+  assert.ok(!html.includes('<script>alert(1)</script>'));
+  assert.ok(html.includes('&lt;script&gt;'));
+  assert.ok(html.includes('&lt;b&gt;proj'));
 });
 
 /* ---------------------------------------------------------- libraries */
