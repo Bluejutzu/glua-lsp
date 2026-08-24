@@ -97,6 +97,8 @@ export function loadProject(
     root?: string;
     indexProject?: boolean;
     onIndex?: (done: number, total: number, file: string) => void;
+    /** A Garry's Mod directory, so base game content counts as existing. */
+    gamePath?: string;
   } = {},
 ): LoadedProject {
   const api = loadApi();
@@ -107,7 +109,21 @@ export function loadProject(
   const config = new ConfigResolver(DEFAULT_SETTINGS);
   config.reload([root]);
 
-  const workspace = new Workspace(api, { maxFiles, exclude: [] });
+  const projectSettings = config.projectSettings();
+  // An install path belongs to a machine, not a repository, so the flag and the
+  // environment come before anything committed.
+  const gamePath =
+    options.gamePath || process.env.GLUA_GAME_PATH || projectSettings.workspace.gamePath;
+
+  const workspace = new Workspace(api, {
+    maxFiles,
+    exclude: [],
+    ...(gamePath ? { gamePath } : {}),
+  });
+  // Files are loaded directly here rather than through scanFolder, so the
+  // asset roots have to be set explicitly or nothing finds this addon's
+  // materials, models or sounds.
+  workspace.setFolders([root]);
 
   // Index the project root so cross-file facts are complete, then make sure
   // every explicitly named target is in there too. Callers that only care
@@ -116,7 +132,7 @@ export function loadProject(
   if (indexProject) {
     // Frameworks first: their globals are what stop the project's own files
     // reading as full of undefined names.
-    for (const library of config.projectSettings().workspace.libraries) {
+    for (const library of projectSettings.workspace.libraries) {
       workspace.indexLibrary(path.resolve(config.root ?? root, library));
     }
 

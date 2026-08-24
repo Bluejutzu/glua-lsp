@@ -96,16 +96,24 @@ export interface ReportOptions {
   onProgress?: (done: number, total: number) => void;
   /** How many entries to keep in each "worst of" list. */
   top?: number;
+  /** 0 never yields, for a caller that owns its thread. */
+  yieldEvery?: number;
 }
 
 const REALMS: Realm[] = ['client', 'server', 'shared', 'menu'];
 
-export function buildReport(
+/**
+ * @param yieldEvery Files to process between handing the event loop back. The
+ * server shares a thread with everything else it answers, so a report over a
+ * large workspace must not hold it for the whole scan.
+ */
+export async function buildReport(
   api: GmodApi,
   workspace: Workspace,
   options: ReportOptions,
-): ProjectReport {
+): Promise<ProjectReport> {
   const top = options.top ?? 10;
+  const yieldEvery = options.yieldEvery ?? 25;
 
   const realms = Object.fromEntries(REALMS.map((r) => [r, 0])) as Record<Realm, number>;
   const byCode = new Map<string, number>();
@@ -119,12 +127,15 @@ export function buildReport(
   let ownFiles = 0;
 
   const uris = [...workspace.uris()];
-  uris.forEach((uri, index) => {
+  for (const [index, uri] of uris.entries()) {
     options.onProgress?.(index + 1, uris.length);
-    if (workspace.isLibrary(uri)) return;
+    if (yieldEvery > 0 && index > 0 && index % yieldEvery === 0) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    if (workspace.isLibrary(uri)) continue;
 
     const analysis = workspace.full(uri);
-    if (!analysis) return;
+    if (!analysis) continue;
     ownFiles++;
 
     const fileLines = analysis.lines.lineCount;
@@ -165,7 +176,7 @@ export function buildReport(
 
     // The whole point is to look at everything, so nothing may be retained.
     workspace.releaseAst(uri);
-  });
+  }
 
   return {
     files: ownFiles,
@@ -174,7 +185,7 @@ export function buildReport(
     realms,
     net: netHealth(workspace),
     hooks: hookHealth(api, workspace),
-    timers: { collisions: collisionsOf(workspace.duplicateRegistrations().timers) },
+    timers: { collisions: collisionsOf(workspace.duplicateRegistrations().timers, workspace) },
     entities: entityHealth(workspace, top),
     assets: {
       references: assetReferences,
@@ -192,29 +203,53 @@ export function buildReport(
   };
 }
 
+/* --------------------------------------------------------------- filters */
+
+/**
+ * Names this project itself contributes to.
+ *
+ * The cross-file indexes cover libraries too, on purpose — a message your code
+ * sends and ULib handles has to resolve. But a report describes *your* project,
+ * so a net message or hook living entirely inside a dependency is not yours to
+ * count.
+ */
+function ownNames<T>(
+  index: Map<string, { uri: string; value: T }[]>,
+  workspace: Workspace,
+): Set<string> {
+  const out = new Set<string>();
+  for (const [name, sites] of index) {
+    if (sites.some((site) => !workspace.isLibrary(site.uri))) out.add(name);
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------- net */
 
 function netHealth(workspace: Workspace): ProjectReport['net'] {
-  const registered = workspace.netRegistered();
-  const starts = workspace.netStarts();
-  const receives = workspace.netReceives();
+  const registered = ownNames(workspace.netRegistered(), workspace);
+  const starts = ownNames(workspace.netStarts(), workspace);
+  // A handler is a real handler wherever it lives: if a dependency listens for
+  // a message you send, that message is handled.
+  const anyReceives = workspace.netReceives();
+  const anyRegisters = workspace.netRegistered();
 
   const unhandled: string[] = [];
   const unsent: string[] = [];
   const unregistered: string[] = [];
 
-  for (const name of starts.keys()) {
-    if (!receives.has(name)) unhandled.push(name);
-    if (!registered.has(name)) unregistered.push(name);
+  for (const name of starts) {
+    if (!anyReceives.has(name)) unhandled.push(name);
+    if (!anyRegisters.has(name)) unregistered.push(name);
   }
-  for (const name of receives.keys()) {
-    if (!starts.has(name)) unsent.push(name);
+  for (const name of ownNames(anyReceives, workspace)) {
+    if (!workspace.netStarts().has(name)) unsent.push(name);
   }
 
   return {
     registered: registered.size,
     senders: starts.size,
-    handlers: receives.size,
+    handlers: ownNames(anyReceives, workspace).size,
     unhandled: unhandled.sort(),
     unsent: unsent.sort(),
     unregistered: unregistered.sort(),
@@ -227,7 +262,7 @@ function hookHealth(api: GmodApi, workspace: Workspace): ProjectReport['hooks'] 
   let custom = 0;
   let typed = 0;
 
-  for (const name of workspace.customHookNames().keys()) {
+  for (const name of ownNames(workspace.customHookNames(), workspace)) {
     if (api.getGlobalHook(name)) continue;
     custom++;
     const signature = workspace.customHookSignature(name);
@@ -237,7 +272,7 @@ function hookHealth(api: GmodApi, workspace: Workspace): ProjectReport['hooks'] 
   return {
     custom,
     typed,
-    collisions: collisionsOf(workspace.duplicateRegistrations().hooks).map((clash) => {
+    collisions: collisionsOf(workspace.duplicateRegistrations().hooks, workspace).map((clash) => {
       const at = clash.name.indexOf(KEY_SEPARATOR);
       return {
         event: at === -1 ? clash.name : clash.name.slice(0, at),
@@ -248,7 +283,10 @@ function hookHealth(api: GmodApi, workspace: Workspace): ProjectReport['hooks'] 
   };
 }
 
-function collisionsOf(map: Map<string, { value: { realm: Realm } }[]>): Counted[] {
+function collisionsOf(
+  map: Map<string, { uri: string; value: { realm: Realm } }[]>,
+  workspace: Workspace,
+): Counted[] {
   const out: Counted[] = [];
   for (const [name, sites] of map) {
     // Two registrations in realms that never both run are not a clash.
@@ -261,7 +299,11 @@ function collisionsOf(map: Map<string, { value: { realm: Realm } }[]>): Counted[
             other.value.realm === site.value.realm),
       ),
     );
-    if (overlapping.length > 1) out.push({ name, count: overlapping.length });
+    // A clash entirely inside a dependency is that dependency's problem, and
+    // nothing you could do about it belongs in your report.
+    if (overlapping.length > 1 && overlapping.some((site) => !workspace.isLibrary(site.uri))) {
+      out.push({ name, count: overlapping.length });
+    }
   }
   return out.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
@@ -274,6 +316,8 @@ function entityHealth(workspace: Workspace, top: number): ProjectReport['entitie
   const sized: ProjectReport['entities']['largest'] = [];
 
   for (const entry of classes.values()) {
+    // A dependency's own entities are not this project's classes.
+    if (entry.uris.every((uri) => workspace.isLibrary(uri))) continue;
     byKind.set(entry.kind, (byKind.get(entry.kind) ?? 0) + 1);
     sized.push({
       name: entry.name,
@@ -285,7 +329,7 @@ function entityHealth(workspace: Workspace, top: number): ProjectReport['entitie
   }
 
   return {
-    total: classes.size,
+    total: sized.length,
     byKind: Object.fromEntries(byKind),
     largest: sized.sort((a, b) => b.members - a.members).slice(0, top),
   };

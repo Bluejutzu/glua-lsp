@@ -511,19 +511,26 @@ connection.languages.semanticTokens.on(
 
 connection.onRequest('glua/netGraph', () => buildNetGraph(workspace));
 
-connection.onRequest('glua/report', () => {
-  const report = buildReport(api, workspace, {
+connection.onRequest('glua/report', async () => {
+  const report = await buildReport(api, workspace, {
     settingsFor: (fsPath) => config.settingsFor(fsPath),
     globalsFor: (fsPath) => config.globalsFor(fsPath),
     top: 10,
   });
-  const folder = workspaceName();
+  const folder = await workspaceName();
   return { html: renderHtml(report, folder), name: folder, report };
 });
 
 /** Best label for the project, for a report title. */
-function workspaceName(): string {
+async function workspaceName(): Promise<string> {
+  // The client knows the answer; ask it before guessing from a path.
+  const folders = (await connection.workspace.getWorkspaceFolders()) ?? [];
+  const first = folders[0];
+  if (first) return path.basename(URI.parse(first.uri).fsPath);
+
   for (const uri of workspace.uris()) {
+    // Libraries are indexed first, so without this the title becomes `ulib`.
+    if (workspace.isLibrary(uri)) continue;
     const root = URI.parse(uri).fsPath.replace(/\\/g, '/');
     const lua = root.toLowerCase().lastIndexOf('/lua/');
     if (lua > 0) return path.basename(root.slice(0, lua));

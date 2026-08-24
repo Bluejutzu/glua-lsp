@@ -652,7 +652,7 @@ test('array returns resolve on methods, not just library functions', () => {
 
 /* --------------------------------------------------------------- report */
 
-test('the report counts what is actually there', () => {
+test('the report counts what is actually there', async () => {
   const { workspace } = makeWorkspace({
     'lua/autorun/server/sv_net.lua':
       'util.AddNetworkString("used")\nnet.Start("used")\nnet.Send(ply)\nnet.Start("orphan")\nnet.Send(ply)\n',
@@ -660,7 +660,7 @@ test('the report counts what is actually there', () => {
     'lua/entities/my_turret/shared.lua': 'function ENT:Explode()\nend\n',
   });
 
-  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS, top: 5 });
+  const report = await buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS, top: 5 });
 
   assert.equal(report.files, 3);
   assert.ok(report.lines > 5);
@@ -676,7 +676,7 @@ test('the report counts what is actually there', () => {
   assert.ok(report.diagnostics.byCode.some((r) => r.name === 'net-unregistered'));
 });
 
-test('a collision keeps its event and identifier apart', () => {
+test('a collision keeps its event and identifier apart', async () => {
   // The index joins them with a NUL because hook names contain spaces of their
   // own, so a report that printed the raw key would run them together.
   const { workspace } = makeWorkspace({
@@ -684,7 +684,7 @@ test('a collision keeps its event and identifier apart', () => {
     'lua/autorun/sh_b.lua': 'hook.Add("Org Clear", "RemovePoison2", function() end)\n',
   });
 
-  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+  const report = await buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
 
   assert.equal(report.hooks.collisions.length, 1);
   assert.deepEqual(report.hooks.collisions[0], {
@@ -697,13 +697,13 @@ test('a collision keeps its event and identifier apart', () => {
   }
 });
 
-test('library files are counted separately and never reported on', () => {
+test('library files are counted separately and never reported on', async () => {
   const library = makeLibrary({ 'lua/ulib/shared.lua': 'ULib = {}\nlocal unused = 1\n' });
   const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
   workspace.indexLibrary(library);
   workspace.analyse(uriOf('lua', 'autorun', 'sh_mine.lua'), 'print(1)\n', 1);
 
-  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+  const report = await buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
 
   assert.equal(report.files, 1, 'only what this project wrote');
   assert.equal(report.libraryFiles, 1);
@@ -715,11 +715,41 @@ test('library files are counted separately and never reported on', () => {
   fs.rmSync(library, { recursive: true, force: true });
 });
 
-test('the html report escapes what it prints', () => {
+test('a dependency does not contribute to the project totals', async () => {
+  // The cross-file indexes cover libraries on purpose, so a message you send
+  // and ULib handles still resolves. But a hook, timer or entity living wholly
+  // inside a dependency is not something this project has, and a clash between
+  // two of its own registrations is not this project's clash.
+  const library = makeLibrary({
+    'lua/ulib/a.lua':
+      'hook.Add("Think", "ulib.tick", function() end)\n' +
+      'timer.Create("ulib.timer", 1, 0, function() end)\n' +
+      'hook.Run("ULib.Custom", 1)\n',
+    'lua/ulib/b.lua':
+      'hook.Add("Think", "ulib.tick", function() end)\n' +
+      'timer.Create("ulib.timer", 1, 0, function() end)\n',
+    'lua/entities/ulib_marker/shared.lua': 'function ENT:Ping()\nend\n',
+  });
+
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+  workspace.analyse(uriOf('lua', 'autorun', 'sh_mine.lua'), 'print(1)\n', 1);
+
+  const report = await buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+
+  assert.deepEqual(report.hooks.collisions, [], "the dependency's own clash is its own");
+  assert.deepEqual(report.timers.collisions, []);
+  assert.equal(report.hooks.custom, 0, 'a hook only ULib fires is not ours');
+  assert.equal(report.entities.total, 0, 'nor is an entity only ULib ships');
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
+test('the html report escapes what it prints', async () => {
   const { workspace } = makeWorkspace({
     'lua/autorun/sh_x.lua': 'hook.Run("<img src=x>", 1)\n',
   });
-  const report = buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
+  const report = await buildReport(api, workspace, { settingsFor: () => DEFAULT_SETTINGS });
   report.undefinedGlobals.push({ name: '<script>alert(1)</script>', count: 1 });
 
   const html = renderHtml(report, '<b>proj</b>');

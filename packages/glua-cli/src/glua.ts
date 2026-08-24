@@ -161,6 +161,7 @@ program
   )
   .option('-o, --out <file>', 'write to a file instead of stdout')
   .option('--root <dir>', 'project root for config files and relative paths')
+  .option('--game-path <dir>', 'a Garry\'s Mod directory, so base game content counts as existing')
   .option('--top <n>', 'how many entries to list per section', (v) => Number.parseInt(v, 10), 8)
   .option('--max-findings <n>', 'exit non-zero above this many findings', (v) => Number.parseInt(v, 10), -1)
   .option('--no-progress', 'do not print progress')
@@ -171,6 +172,7 @@ program
         format: DoctorFormat;
         out?: string;
         root?: string;
+        gamePath?: string;
         top: number;
         maxFindings: number;
         progress: boolean;
@@ -179,11 +181,12 @@ program
       if (options.format !== 'pretty' || options.out) setColourEnabled(false);
 
       const { doctor } = await import('./doctor.js');
-      const result = doctor(paths, {
+      const result = await doctor(paths, {
         format: options.format,
         top: options.top,
         progress: options.progress && !options.out && supportsProgress(),
         ...(options.root ? { root: options.root } : {}),
+        ...(options.gamePath ? { gamePath: options.gamePath } : {}),
       });
 
       if (options.out) {

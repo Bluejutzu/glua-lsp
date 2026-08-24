@@ -68,6 +68,7 @@ glua doctor --max-findings 0
 | `--top <n>` | How many entries to list per section (default 8) |
 | `--max-findings <n>` | Exit non-zero above this many findings |
 | `--root <dir>` | Project root for config files and relative paths |
+| `--game-path <dir>` | A Garry's Mod directory, for the asset counts (or `GLUA_GAME_PATH`) |
 
 ## What it looks at
 
@@ -97,5 +98,17 @@ glua doctor --max-findings 0
 <Note>
   The report reads every indexed file, so it costs about what a workspace-wide
   lint does. Syntax trees are released as it goes, so memory stays flat on a
-  large project.
+  large project, and in the editor it yields between batches so nothing else
+  waits on it.
 </Note>
+
+## Frameworks are not counted
+
+If you have pointed at a [framework's source](/configuration/frameworks), its
+files are indexed but excluded from every total here. A hook only ULib fires, an
+entity only DarkRP ships, or two of a dependency's own registrations clashing
+with each other are not this project's, and putting them in a report about your
+codebase would only be noise.
+
+Relationships that cross the line still resolve: a net message you send and a
+dependency handles counts as handled.

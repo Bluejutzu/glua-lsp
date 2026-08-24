@@ -12,6 +12,7 @@ export type DoctorFormat = 'pretty' | 'json' | 'html';
 export interface DoctorOptions {
   format: DoctorFormat;
   root?: string;
+  gamePath?: string;
   progress?: boolean;
   top?: number;
 }
@@ -21,7 +22,7 @@ export interface DoctorResult {
   output: string;
 }
 
-export function doctor(targets: string[], options: DoctorOptions): DoctorResult {
+export async function doctor(targets: string[], options: DoctorOptions): Promise<DoctorResult> {
   const progress = createProgress(options.progress ?? false);
 
   // A report is about the project named on the command line, not about
@@ -30,14 +31,17 @@ export function doctor(targets: string[], options: DoctorOptions): DoctorResult 
 
   const { api, workspace, config, root: resolved } = loadProject(targets, {
     root,
+    ...(options.gamePath ? { gamePath: options.gamePath } : {}),
     onIndex: (done, total, file) => progress.update(done, total, `indexing ${path.basename(file)}`),
   });
 
-  const report = buildReport(api, workspace, {
+  // Nothing else is waiting on this process, so keep the scan uninterrupted.
+  const report = await buildReport(api, workspace, {
     settingsFor: (fsPath) => config.settingsFor(fsPath),
     globalsFor: (fsPath) => config.globalsFor(fsPath),
     onProgress: (done, total) => progress.update(done, total, 'reading the project'),
     top: options.top ?? 8,
+    yieldEvery: 0,
   });
 
   progress.done();
