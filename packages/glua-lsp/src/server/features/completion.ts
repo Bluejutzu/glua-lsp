@@ -9,6 +9,7 @@ import {
 import { GmodApi, HOOK_TABLES } from '../../api/index.js';
 import type { ApiFunction, Realm } from '../../api/types.js';
 import type { FileAnalysis } from '../../analyze/binder.js';
+import { assetArgOf } from '../../analyze/assets.js';
 import { scriptedClassArg } from '../../analyze/entities.js';
 import { realmAt } from '../../analyze/realm.js';
 import { typeToString, type GType } from '../../analyze/types.js';
@@ -439,6 +440,17 @@ function stringCompletions(
           ? other.slice(luaRoot + 5)
           : other.split('/').pop()!;
       push(relative, `${file.realm.file} · ${file.realm.kind}`, undefined, CompletionItemKind.File);
+    }
+    return items;
+  }
+
+  const asset = assetArgOf(null, callPath);
+  if (asset && argIndex === asset.arg) {
+    const paths = workspace.assets().entries(asset.kind);
+    // A full game directory holds tens of thousands; the client filters as the
+    // prefix grows, so hand it a bounded slice rather than all of them.
+    for (const entry of paths.slice(0, 2000)) {
+      push(entry, asset.kind, undefined, CompletionItemKind.File);
     }
     return items;
   }

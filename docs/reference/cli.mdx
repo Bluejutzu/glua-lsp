@@ -35,6 +35,28 @@ pnpm run build
 node packages/glua-cli/dist/glua.js --help
 ```
 
+## `glua init`
+
+Writes `.glua.json` and `.gluafmtrc.json`, seeded from the defaults the server
+already uses — so a fresh config describes what you have rather than changing
+anything the moment it lands.
+
+```bash
+glua init
+```
+
+```bash
+glua init --lint-only          # just .glua.json
+glua init --format-only        # just .gluafmtrc.json
+glua init --root path/to/addon
+```
+
+An existing config is left alone and the command exits non-zero, so it is safe
+to run twice. Pass `--force` to replace one deliberately.
+
+Both files carry a `$schema` pointing at the copies shipped inside the package,
+so an editor completes and validates them offline.
+
 ## `glua lint`
 
 ```bash
@@ -49,8 +71,41 @@ glua lint . --quiet --max-warnings 0
 | `--root <dir>` | Project root for config files and relative paths |
 | `--max-warnings <n>` | Exit non-zero above this many warnings |
 | `-q, --quiet` | Only report errors |
+| `--fix` | Apply the fixes that have one sensible outcome |
+| `--fix-dry-run` | Show what `--fix` would change, writing nothing |
 
 Exits `1` when there are errors, or when `--max-warnings` is exceeded. Otherwise `0`.
+
+### Fixing
+
+`--fix` applies only the quick fixes with a single correct outcome, then reports
+whatever is left:
+
+```bash
+glua lint lua/ --fix
+```
+
+```
+lua/autorun/server/sv_net.lua
+  ✓ Add util.AddNetworkString("my_message")
+  ✓ Rewrite as 'count = count + ...'
+
+  fixed 2 in 1 file, of 40 checked
+  2 left, which need a look — run `glua lint` to see them
+```
+
+What it will fix: a missing `util.AddNetworkString`, a missing `AddCSLuaFile`
+above an include, and a C-style compound assignment.
+
+<Note>
+  It deliberately will not add a `net.Receive` stub, rename an unused local,
+  wrap a call in a realm guard, or correct a hook name from a spelling
+  suggestion. Each of those either guesses, changes control flow, or leaves a
+  body for you to write — none of which should happen unattended.
+</Note>
+
+Fixes run in passes, since resolving one can reveal another, capped at five so a
+pair that undo each other cannot spin.
 
 <Note>
   The whole project gets indexed even when you lint a single file. Cross-file rules — an unhandled net message, a duplicate hook identifier, a missing `AddCSLuaFile` — are only correct once the index has seen everything.

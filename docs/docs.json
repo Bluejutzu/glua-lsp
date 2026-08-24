@@ -27,7 +27,8 @@
               "features/typing-your-code",
               "features/realms",
               "features/net-messages",
-              "features/hooks"
+              "features/hooks",
+              "features/assets"
             ]
           },
           {
@@ -39,6 +40,7 @@
             "pages": [
               "configuration/overview",
               "configuration/config-files",
+              "configuration/frameworks",
               "configuration/suppressions"
             ]
           },
@@ -58,6 +60,7 @@
               "reference/annotations",
               "reference/commands",
               "reference/cli",
+              "reference/editors",
               "reference/performance"
             ]
           }

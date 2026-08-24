@@ -49,6 +49,7 @@ export const enum Code {
   CompoundAssignment = 'compound-assignment',
   DuplicateHookIdentifier = 'duplicate-hook-identifier',
   DuplicateTimerName = 'duplicate-timer-name',
+  MissingAsset = 'missing-asset',
 }
 
 export interface DiagnoseContext {
@@ -321,8 +322,10 @@ export function diagnose(
       }
     }
 
-    if (documented && callback?.type === 'FunctionExpression' && !callback.isVararg) {
-      const declared = callback.params.length;
+    if (callback?.type !== 'FunctionExpression' || callback.isVararg) return;
+    const declared = callback.params.length;
+
+    if (documented) {
       const available = documented.params.length;
       if (declared > available) {
         push(
@@ -333,6 +336,60 @@ export function diagnose(
           Code.ArgumentCount,
         );
       }
+      return;
+    }
+
+    // A hook of your own: every hook.Run for it is the documentation.
+    const custom = workspace.customHookSignature(nameArg.value);
+    if (!custom || declared <= custom.maxArity) return;
+
+    // Call sites that disagree with each other are a weaker claim, so say what
+    // was actually seen rather than asserting one arity.
+    const spread = custom.minArity === custom.maxArity;
+    push(
+      { start: callback.params[custom.maxArity]!.start, end: callback.params[declared - 1]!.end },
+      `Nothing passes this many arguments to '${nameArg.value}'. ` +
+        (spread
+          ? `Its ${custom.sites} call site${custom.sites === 1 ? '' : 's'} pass ${custom.maxArity}, ` +
+            `but this callback declares ${declared}.`
+          : `Its ${custom.sites} call sites pass between ${custom.minArity} and ${custom.maxArity}, ` +
+            `but this callback declares ${declared}.`),
+      severityOf(d.argumentCount),
+      Code.ArgumentCount,
+    );
+  }
+
+  /* ----------------------------------------------------------- assets */
+
+  // Only ever runs with a game directory configured. Workspace content alone
+  // cannot tell a typo from a base-game path, and every finding would be wrong.
+  if (d.missingAsset !== 'off' && analysis.assets.length && workspace.assets().canValidate) {
+    const assets = workspace.assets();
+    const label: Record<string, string> = {
+      material: 'Material',
+      model: 'Model',
+      sound: 'Sound',
+    };
+
+    for (const asset of analysis.assets) {
+      // A path built at runtime is not something we can check.
+      if (/[%{}]|\.\./.test(asset.path)) continue;
+      if (assets.has(asset.kind, asset.path)) continue;
+
+      push(
+        { start: asset.span.start + 1, end: asset.span.end - 1 },
+        `${label[asset.kind]} '${asset.path}' was not found in the workspace or the game ` +
+          `directory. It will load as ${
+            asset.kind === 'material'
+              ? 'the missing-texture checkerboard'
+              : asset.kind === 'model'
+                ? 'the error model'
+                : 'silence'
+          } rather than raising an error.`,
+        severityOf(d.missingAsset),
+        Code.MissingAsset,
+        { data: { kind: asset.kind, path: asset.path } },
+      );
     }
   }
 

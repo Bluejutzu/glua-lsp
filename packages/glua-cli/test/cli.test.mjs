@@ -178,6 +178,66 @@ test('--write and --check together is an error', { skip: !built }, () => {
   assert.equal(run(['fmt', root, '--write', '--check']).code, 1);
 });
 
+/* ------------------------------------------------------------------ init */
+
+test('init writes both configs, and the schema it points at exists', { skip: !built }, () => {
+  const root = addon({});
+  const result = run(['init', '--root', root]);
+
+  assert.equal(result.code, 0);
+  const linter = JSON.parse(fs.readFileSync(path.join(root, '.glua.json'), 'utf8'));
+  const formatter = JSON.parse(fs.readFileSync(path.join(root, '.gluafmtrc.json'), 'utf8'));
+
+  assert.equal(linter.diagnostics.unusedLocal, 'hint');
+  assert.ok(!('scope' in linter.diagnostics), 'scope is about your editor, not the team');
+  assert.ok(!('enable' in linter.diagnostics));
+  assert.equal(formatter.maxLineWidth, 120);
+
+  // The $schema path is relative to a consumer's project, so check the file it
+  // names is actually one we ship.
+  for (const config of [linter, formatter]) {
+    const shipped = path.join(ROOT, config.$schema.replace('./node_modules/glua-cli/', ''));
+    assert.ok(fs.existsSync(shipped), `${config.$schema} is not shipped`);
+  }
+});
+
+test('init refuses to clobber an existing config unless forced', { skip: !built }, () => {
+  const root = addon({ '.glua.json': '{"globals":["ULib"]}\n' });
+
+  const refused = run(['init', '--lint-only', '--root', root]);
+  assert.equal(refused.code, 1);
+  assert.match(refused.stdout, /already exists/);
+  assert.match(fs.readFileSync(path.join(root, '.glua.json'), 'utf8'), /ULib/);
+
+  assert.equal(run(['init', '--lint-only', '--root', root, '--force']).code, 0);
+  assert.ok(!fs.readFileSync(path.join(root, '.glua.json'), 'utf8').includes('ULib'));
+});
+
+/* ------------------------------------------------------------------- fix */
+
+test('lint --fix applies the unambiguous fixes and leaves the rest', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/server/sv_a.lua': 'net.Start("msg")\nnet.Send(ply)\n\nlocal n = 0\nn += 1\nprint(n)\n',
+  });
+
+  const result = run(['lint', root, '--fix', '--no-progress']);
+  const after = fs.readFileSync(path.join(root, 'lua/autorun/server/sv_a.lua'), 'utf8');
+
+  assert.match(after, /util\.AddNetworkString\("msg"\)/, 'added the registration');
+  assert.match(after, /n = n \+ 1/, 'rewrote the compound assignment');
+  assert.doesNotMatch(after, /net\.Receive/, 'a handler stub is not an unambiguous fix');
+  assert.match(result.stdout, /fixed 2/);
+});
+
+test('lint --fix-dry-run changes nothing on disk', { skip: !built }, () => {
+  const before = 'local n = 0\nn += 1\nprint(n)\n';
+  const root = addon({ 'lua/autorun/sh_b.lua': before });
+
+  const result = run(['lint', root, '--fix-dry-run', '--no-progress']);
+  assert.match(result.stdout, /would fix 1/);
+  assert.equal(fs.readFileSync(path.join(root, 'lua/autorun/sh_b.lua'), 'utf8'), before);
+});
+
 /* ----------------------------------------------------------------- rules */
 
 test('rules lists codes alongside their settings keys', { skip: !built }, () => {

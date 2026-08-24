@@ -156,6 +156,19 @@
           ],
           "description": "Glob patterns excluded from workspace indexing."
         },
+        "glua.workspace.libraries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Source trees for frameworks this project uses but does not contain — ULib, DarkRP, Wiremod. Each is indexed for what it defines, so its globals stop reading as undefined and its functions gain real signatures, and none of it is ever reported on.\n\nPaths may be absolute or relative to the workspace, e.g. `../ulib` or `C:/servers/mine/garrysmod/addons/ulib`.\n\nThis reads the framework's own source rather than a bundled list of names, so it is exact and cannot fall out of date."
+        },
+        "glua.workspace.gamePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a Garry's Mod directory, e.g. `C:/Program Files (x86)/Steam/steamapps/common/GarrysMod`. Asset paths complete from your own `materials/`, `models/` and `sound/` folders without this, but are only reported as missing when it is set — a material can come from the base game, and guessing without it would be wrong far more often than right."
+        },
         "glua.diagnostics.enable": {
           "type": "boolean",
           "default": true,
@@ -232,6 +245,18 @@
           ],
           "default": "warning",
           "description": "Passing an argument whose inferred type cannot match the documented parameter type."
+        },
+        "glua.diagnostics.missingAsset": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "off",
+          "markdownDescription": "A material, model or sound path that does not exist. Missing content never raises a Lua error — it renders as the checkerboard, the error model, or silence.\n\nRequires `#glua.workspace.gamePath#`, and **off by default on purpose**: only turn it on if every asset you reference ships in this repository. Content mounted from the Workshop or a separate content pack is invisible from here, so on a typical server most findings would be wrong."
         },
         "glua.diagnostics.unknownHook": {
           "type": "string",

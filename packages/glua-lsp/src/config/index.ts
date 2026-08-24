@@ -356,6 +356,31 @@ export class ConfigResolver {
     return path.relative(this.sources.root, fsPath).replace(/\\/g, '/');
   }
 
+  /**
+   * Settings for the project as a whole, before any per-path override.
+   *
+   * Overrides answer "how should this file be treated"; things like the library
+   * list are decided once for the whole index and have no file to ask about.
+   */
+  projectSettings(): Settings {
+    const config = this.sources?.lint?.value;
+    if (!config) return this.base;
+    return mergeSettings({
+      ...this.base,
+      diagnostics: { ...this.base.diagnostics, ...defined(config.diagnostics) },
+      format: { ...this.base.format, ...defined(config.format) },
+      workspace: { ...this.base.workspace, ...defined(config.workspace) },
+      completion: { ...this.base.completion, ...defined(config.completion) },
+      inlayHints: { ...this.base.inlayHints, ...defined(config.inlayHints) },
+      hover: { ...this.base.hover, ...defined(config.hover) },
+    });
+  }
+
+  /** Directory the project config was found in, for resolving relative paths. */
+  get root(): string | undefined {
+    return this.sources?.root;
+  }
+
   /** Linter and feature settings for one file. */
   settingsFor(fsPath: string): Settings {
     const cached = this.settingsCache.get(fsPath);

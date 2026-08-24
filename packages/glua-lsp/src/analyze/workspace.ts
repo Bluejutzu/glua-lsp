@@ -4,12 +4,14 @@ import { URI } from 'vscode-uri';
 import type { GmodApi } from '../api/index.js';
 import {
   analyseFile,
+  type CustomHookSignature,
   type FileAnalysis,
   type GeneratedAccessor,
   type GlobalDefinition,
   type Span,
 } from './binder.js';
 import type { Realm } from '../api/types.js';
+import { AssetIndex } from './assets.js';
 import { rankClassFile, scriptedClassOf, type ScriptedClass } from './entities.js';
 import { Scope } from './scope.js';
 import { tableType, UNKNOWN, type GType } from './types.js';
@@ -31,6 +33,13 @@ export interface Located<T> {
 export interface WorkspaceOptions {
   maxFiles: number;
   exclude: string[];
+  /** A Garry's Mod directory, so base game content counts as existing. */
+  gamePath?: string;
+  /**
+   * Source trees for frameworks this project depends on but does not contain —
+   * ULib, DarkRP, Wiremod. Indexed for what they define, never reported on.
+   */
+  libraries?: string[];
 }
 
 const DEFAULT_EXCLUDE = [
@@ -76,6 +85,12 @@ export class Workspace {
   private netReceiveNames: Map<string, Located<Span>[]> | null = null;
   private clientFiles: Set<string> | null = null;
   private scriptedIndex: Map<string, ScriptedClassEntry> | null = null;
+  /** null marks a name we looked up and found no fires for. */
+  private hookSignatures: Map<string, CustomHookSignature | null> | null = null;
+  private assetIndex: AssetIndex | null = null;
+  private folders: string[] = [];
+  /** Files that came from a library root, so nothing reports on them. */
+  private readonly libraryUris = new Set<string>();
   private readonly accessorCache = new Map<string, Located<GeneratedAccessor>[]>();
   private duplicateCache: {
     hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
@@ -88,7 +103,25 @@ export class Workspace {
   ) {}
 
   setOptions(options: WorkspaceOptions): void {
+    const changed = options.gamePath !== this.options.gamePath;
     this.options = options;
+    if (changed) this.assetIndex = null;
+  }
+
+  /** Folders scanned for `.lua`, which is also where an addon keeps its content. */
+  setFolders(folders: string[]): void {
+    this.folders = folders;
+    this.assetIndex = null;
+  }
+
+  /**
+   * Materials, models and sounds reachable from the workspace and, if one is
+   * configured, the game directory. Built on first use — a full GMod install is
+   * tens of thousands of files, and most sessions never ask.
+   */
+  assets(): AssetIndex {
+    this.assetIndex ??= new AssetIndex(this.folders, this.options.gamePath);
+    return this.assetIndex;
   }
 
   get size(): number {
@@ -116,6 +149,7 @@ export class Workspace {
     this.netReceiveNames = null;
     this.clientFiles = null;
     this.scriptedIndex = null;
+    this.hookSignatures = null;
     this.accessorCache.clear();
     this.duplicateCache = null;
   }
@@ -131,6 +165,7 @@ export class Workspace {
     const analysis = analyseFile(uri, fsPath, text, version, this.api, {
       externalGlobal: (p) => this.externalGlobal(p, uri),
       scriptedClass: (name) => this.scriptedClass(name),
+      customHook: (name) => this.customHookSignature(name),
     });
     this.files.set(uri, retainAst ? analysis : releaseAst(analysis));
     this.invalidate();
@@ -252,6 +287,51 @@ export class Workspace {
   customHookNames(): Map<string, Located<Span>[]> {
     if (!this.hookRunNames) this.buildHookIndex();
     return this.hookRunNames!;
+  }
+
+  /**
+   * The signature of a hook the workspace fires itself.
+   *
+   * A hook of your own is documented nowhere, so its call sites are the only
+   * description of it there is. Where they disagree about a position, that
+   * position falls back to `any` rather than picking a side.
+   */
+  customHookSignature(name: string): CustomHookSignature | undefined {
+    if (this.api.getGlobalHook(name)) return undefined;
+    const cached = this.hookSignatures?.get(name);
+    if (cached !== undefined) return cached ?? undefined;
+
+    const runs: string[][] = [];
+    for (const file of this.files.values()) {
+      for (const run of file.hookRuns) {
+        if (run.hookName === name && run.argTypes) runs.push(run.argTypes);
+      }
+    }
+
+    let signature: CustomHookSignature | undefined;
+    if (runs.length) {
+      const maxArity = Math.max(...runs.map((r) => r.length));
+      const params: string[] = [];
+      for (let i = 0; i < maxArity; i++) {
+        const seen = new Set(runs.filter((r) => i < r.length).map((r) => r[i]!));
+        // Passing nil says nothing about what the parameter is for, so it is
+        // no more informative than an unknown — typing one `nil` is worse than
+        // leaving it open.
+        seen.delete('any');
+        seen.delete('nil');
+        params.push(seen.size === 1 ? [...seen][0]! : 'any');
+      }
+      signature = {
+        params,
+        minArity: Math.min(...runs.map((r) => r.length)),
+        maxArity,
+        sites: runs.length,
+      };
+    }
+
+    this.hookSignatures ??= new Map();
+    this.hookSignatures.set(name, signature ?? null);
+    return signature;
   }
 
   private buildNetIndex(): void {
@@ -474,7 +554,13 @@ export class Workspace {
   /* ------------------------------------------------------------ scanning */
 
   /** Recursively finds .lua files under a folder, honouring the exclude list. */
-  scanFolder(folderFsPath: string): string[] {
+  scanFolder(folderFsPath: string, isProjectFolder = true): string[] {
+    // A library's content is not this addon's, so it stays out of the asset
+    // index as well as out of diagnostics.
+    if (isProjectFolder && !this.folders.includes(folderFsPath)) {
+      this.folders.push(folderFsPath);
+      this.assetIndex = null;
+    }
     const excluded = new Set([...DEFAULT_EXCLUDE, ...this.options.exclude.map((e) => e.toLowerCase())]);
     const found: string[] = [];
 
@@ -511,6 +597,36 @@ export class Workspace {
     } catch {
       return undefined;
     }
+  }
+
+  /* ---------------------------------------------------------- libraries */
+
+  /**
+   * Indexes a framework this project depends on but does not ship.
+   *
+   * ULib, DarkRP and Wiremod live on the server rather than in the addon repo,
+   * so every global they define reads as undefined. Indexing their source is
+   * exact and stays current by itself, which a hand-written list of names would
+   * not — but nothing in there is yours, so it is never reported on.
+   */
+  indexLibrary(rootFsPath: string): number {
+    let indexed = 0;
+    for (const file of this.scanFolder(rootFsPath, false)) {
+      const analysis = this.loadFromDisk(file);
+      if (!analysis) continue;
+      this.libraryUris.add(analysis.uri);
+      indexed++;
+    }
+    return indexed;
+  }
+
+  /** Came from a library root, so it is somebody else's code. */
+  isLibrary(uri: string): boolean {
+    return this.libraryUris.has(uri);
+  }
+
+  get libraryCount(): number {
+    return this.libraryUris.size;
   }
 }
 

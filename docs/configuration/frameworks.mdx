@@ -1,0 +1,78 @@
+---
+title: "Frameworks and Libraries"
+description: "Index ULib, DarkRP, Wiremod or any other framework your project depends on but does not contain, so its globals resolve instead of reading as undefined."
+icon: "layer-group"
+sidebarTitle: "Frameworks"
+---
+
+A gamemode usually depends on code it does not contain. ULib and ULX are
+installed on the server, DarkRP is a separate gamemode, Wiremod is a Workshop
+addon — none of it is in your repository, so every global they define reads as
+undefined.
+
+Point at their source and that stops:
+
+```json
+{
+  "glua.workspace.libraries": ["../ulib", "../../addons/wiremod"]
+}
+```
+
+Or commit it, since a dependency is a property of the project rather than of
+your machine:
+
+```json
+{
+  "workspace": {
+    "libraries": ["../ulib"]
+  }
+}
+```
+
+Paths are absolute, or relative to `.glua.json` when it is the source, otherwise
+to the workspace folder.
+
+## What this gets you
+
+Each tree is indexed the same way your own files are, so you get more than
+silence:
+
+```lua
+ULib.tsayError(ply, "no")
+--   ^ completes, with the parameter names from ULib's own source
+```
+
+Nothing in a library is ever reported on. It is not yours to fix, and a
+framework you have merely installed should not fill your Problems panel.
+
+## Why source, rather than a bundled list
+
+The obvious alternative is to ship a curated list of names per framework and
+enable it by name. That was the original plan and it is worse:
+
+- A hand-written list is a snapshot. It is wrong the moment a framework
+  releases, and every entry is a claim someone has to keep true.
+- It can only ever silence names. Reading the source gives real signatures,
+  parameter names, and every function rather than the popular ones.
+- It only covers the frameworks somebody thought to write down, whereas this
+  works for the internal library your server has and nobody else does.
+
+Cloning a framework you depend on is a small price for a definition set that
+cannot go stale.
+
+## Getting the source
+
+Most frameworks are a Git clone away:
+
+```bash
+git clone https://github.com/TeamUlysses/ulib.git ../ulib
+```
+
+If the framework only exists on the Workshop, point at the extracted copy in
+your server's `garrysmod/addons/`.
+
+<Note>
+  Indexing adds to startup time in proportion to the framework's size. ULib is
+  around 40 files and unnoticeable; a large one is worth excluding from
+  `--root` scans in CI if lint time starts to matter.
+</Note>

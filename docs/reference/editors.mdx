@@ -1,0 +1,127 @@
+---
+title: "Other Editors"
+description: "Run the GLua language server in Neovim, Helix, Zed, Sublime Text or any other editor with an LSP client, using the glua-lsp binary from npm."
+icon: "code"
+sidebarTitle: "Other Editors"
+---
+
+The VS Code extension is a thin wrapper around a standard language server.
+That server ships as its own binary, so any editor with an LSP client gets the
+same completion, hover, diagnostics, go-to-definition, rename, formatting and
+code lenses.
+
+## Install
+
+```bash
+npm install -g glua-cli
+```
+
+That puts two commands on your path: `glua` for [linting and
+formatting](/reference/cli), and `glua-lsp` for the language server. The wiki
+dataset is bundled, so neither needs a network connection.
+
+Check it starts:
+
+```bash
+glua-lsp --version
+```
+
+## Neovim
+
+With [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig), define the
+server once and attach it to Lua files inside Garry's Mod projects.
+
+```lua
+vim.lsp.config.glua = {
+  cmd = { "glua-lsp", "--stdio" },
+  filetypes = { "lua" },
+  root_markers = { "addon.json", "lua", "gamemodes", ".glua.json", ".git" },
+}
+
+vim.lsp.enable("glua")
+```
+
+<Warning>
+  If you already run `lua_ls`, both will attach to `.lua` files and you will get
+  two sets of completions. Either disable `lua_ls` for Garry's Mod projects, or
+  gate this one on a marker only your addons have, such as `addon.json`.
+</Warning>
+
+## Helix
+
+In `languages.toml`:
+
+```toml
+[language-server.glua-lsp]
+command = "glua-lsp"
+args = ["--stdio"]
+
+[[language]]
+name = "lua"
+language-servers = ["glua-lsp"]
+```
+
+## Zed
+
+In your settings, point the Lua language at the binary:
+
+```json
+{
+  "lsp": {
+    "glua-lsp": {
+      "binary": {
+        "path": "glua-lsp",
+        "arguments": ["--stdio"]
+      }
+    }
+  }
+}
+```
+
+## Sublime Text
+
+With [LSP](https://lsp.sublimetext.io/) installed, add to `LSP.sublime-settings`:
+
+```json
+{
+  "clients": {
+    "glua-lsp": {
+      "enabled": true,
+      "command": ["glua-lsp", "--stdio"],
+      "selector": "source.lua"
+    }
+  }
+}
+```
+
+## Anything else
+
+The server speaks LSP over stdio and takes the usual transport flags
+(`--stdio`, `--node-ipc`, `--socket=<port>`). Point your client at:
+
+```
+glua-lsp --stdio
+```
+
+## Settings
+
+Editors that support `workspace/configuration` can send the same settings the
+VS Code extension uses, under the `glua` key. Everything on the
+[configuration page](/configuration/overview) applies.
+
+If your client does not send configuration, the server falls back to its
+defaults, and a committed [`.glua.json`](/configuration/config-files) still
+works — it is read from disk rather than from the editor.
+
+## What you do not get
+
+Two things are VS Code commands rather than language server features, so they
+are unavailable elsewhere:
+
+- **The net message graph** (`GLua: Show Net Message Graph`), which renders in a
+  webview
+- **The realm status bar item** and its click-to-toggle activation
+
+Diagnostics, completion, hover, signature help, go-to-definition, references,
+rename, document and workspace symbols, code actions, inlay hints, formatting,
+code lenses and semantic tokens all work the same.

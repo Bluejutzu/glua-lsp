@@ -39,6 +39,38 @@ hook.Add("PlayerSay", "ChatFilter", function(sender, text, teamChat)
 end)
 ```
 
+## Hooks of your own
+
+A hook you invented is documented nowhere, so its `hook.Run` call sites are the
+only description of it that exists. Those are read as its signature, and the
+callbacks you register for it are typed from them.
+
+```lua
+-- somewhere in your addon
+hook.Run("MyAddon.TurretPlaced", ply, turret)
+
+-- somewhere else
+hook.Add("MyAddon.TurretPlaced", "log", function(ply, turret)
+    ply:Nick()      -- Player, because that is what the call site passes
+    turret:Remove()
+end)
+```
+
+Where call sites disagree about a position, it stays `any` rather than picking
+one. A site passing `nil` is ignored for the same reason — it says nothing about
+what the parameter is for.
+
+Declaring more parameters than anything passes is reported, since those extras
+are always `nil`:
+
+```lua
+hook.Run("MyAddon.Ping", count)
+
+hook.Add("MyAddon.Ping", "x", function(count, reason)
+    -- reason is always nil; nothing passes a second argument
+end)
+```
+
 ## ENT / SWEP / PANEL stubs
 
 When you define a scripted entity, weapon, or panel, the server can generate the full hook table for you.

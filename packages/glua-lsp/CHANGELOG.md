@@ -6,7 +6,37 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **Framework support.** `glua.workspace.libraries` (or `workspace.libraries` in
+  `.glua.json`) points at the source of frameworks your project uses but does
+  not contain — ULib, DarkRP, Wiremod. They are indexed for what they define, so
+  their globals resolve with real signatures instead of reading as undefined,
+  and nothing in them is ever reported on. On a real gamemode this cleared every
+  `ULib` finding.
+- **`glua init`**, which writes `.glua.json` and `.gluafmtrc.json` from the
+  defaults. Previously those could only be created from the VS Code command
+  palette, so anyone adopting the CLI in CI had to write them by hand.
+- **`glua lint --fix`**, applying the quick fixes that have one correct outcome
+  — a missing `util.AddNetworkString` or `AddCSLuaFile`, a C-style compound
+  assignment — and reporting the rest. `--fix-dry-run` shows the same without
+  writing.
+- **Asset path completion.** Material, model and sound paths complete from your
+  own content and, with `glua.workspace.gamePath` set, from the game install —
+  including everything packed inside VPK archives, which is nearly all of it.
+  There is a matching `missingAsset` rule for paths that do not resolve, off by
+  default because Workshop and content-pack assets cannot be seen from an
+  editor.
+- **Hooks of your own are typed.** A hook you invented has no documentation, so
+  its `hook.Run` call sites are read as its signature and callbacks registered
+  for it are typed from them. Positions the call sites disagree about stay
+  `any`. A callback declaring more parameters than anything passes is reported,
+  since the extras are always `nil`.
+- **Support for editors other than VS Code.** The language server now ships as
+  its own `glua-lsp` binary in the `glua-cli` npm package, so Neovim, Helix,
+  Zed, Sublime Text and anything else with an LSP client get the same
+  completion, diagnostics, navigation and formatting. Setup for each is on the
+  [Other Editors](https://glua.bluejutzu.dev/reference/editors) page.
 
 ## 0.3.0
 

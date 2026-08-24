@@ -14,6 +14,7 @@ import type { ApiFunction, Realm } from '../api/types.js';
 import { LineIndex } from '../util/lines.js';
 import { Scope, type VarSymbol } from './scope.js';
 import { analyseRealm, realmAt, type RealmInfo } from './realm.js';
+import { assetArgOf, type AssetKind } from './assets.js';
 import type { ScriptedClass } from './entities.js';
 import { parseLuaDoc, typeFromDoc, type LuaDoc } from './luadoc.js';
 import {
@@ -26,6 +27,7 @@ import {
   fromApiType,
   scriptedType,
   tableType,
+  typeName,
   union,
   type GType,
 } from './types.js';
@@ -69,6 +71,12 @@ export interface HookAddFact {
 export interface HookRunFact {
   hookName: string;
   nameSpan: Span;
+  /**
+   * Types passed at this call site, which is the only signature a hook of your
+   * own has. Absent for `gameevent.Listen`, which registers a name rather than
+   * firing it and so says nothing about the payload.
+   */
+  argTypes?: string[];
 }
 
 export interface NetOp {
@@ -164,6 +172,7 @@ export interface FileAnalysis {
   concommands: FileReference[];
   convars: FileReference[];
   timers: FileReference[];
+  assets: AssetReference[];
   accessors: GeneratedAccessor[];
   symbols: SymbolFact[];
   /**
@@ -190,6 +199,29 @@ export interface AnalyseOptions {
    * `ents.Create("my_turret")` can carry that class rather than a bare Entity.
    */
   scriptedClass?: (name: string) => ScriptedClass | undefined;
+  /**
+   * Signature of a hook this workspace fires itself, worked out from the
+   * `hook.Run` call sites. Lets a callback for your own hook be typed the same
+   * way a documented one is.
+   */
+  customHook?: (name: string) => CustomHookSignature | undefined;
+}
+
+/** A material, model or sound named by a string literal. */
+export interface AssetReference {
+  kind: AssetKind;
+  path: string;
+  span: Span;
+}
+
+/** What the `hook.Run` sites for one custom hook name agree on. */
+export interface CustomHookSignature {
+  /** Type per position, `any` where the call sites disagree. */
+  params: string[];
+  /** Fewest and most arguments any call site passes. */
+  minArity: number;
+  maxArity: number;
+  sites: number;
 }
 
 /**
@@ -381,6 +413,7 @@ export function analyseFile(
   const concommands: FileReference[] = [];
   const convars: FileReference[] = [];
   const timers: FileReference[] = [];
+  const assets: AssetReference[] = [];
   const accessors: GeneratedAccessor[] = [];
   const symbols: SymbolFact[] = [];
 
@@ -758,7 +791,14 @@ export function analyseFile(
       case 'hook.Run':
       case 'hook.Call': {
         const name = stringArg(args, 0);
-        if (name) hookRuns.push({ hookName: name.value, nameSpan: name.span });
+        if (!name) break;
+        // hook.Call takes the gamemode table between the name and the payload.
+        const payload = args.slice(path === 'hook.Call' ? 2 : 1);
+        hookRuns.push({
+          hookName: name.value,
+          nameSpan: name.span,
+          argTypes: payload.map((arg) => typeName(inferType(arg, scope))),
+        });
         break;
       }
       case 'gameevent.Listen': {
@@ -847,6 +887,14 @@ export function analyseFile(
         break;
     }
 
+    // Materials, models and sounds named by literal. Matched on the written
+    // call, since the method forms are written on a receiver variable.
+    const asset = assetArgOf(null, path);
+    if (asset) {
+      const named = stringArg(args, asset.arg);
+      if (named?.value) assets.push({ kind: asset.kind, path: named.value, span: named.span });
+    }
+
     // `self:NetworkVar("Int", 0, "Ammo")`, and the older DTVar spelling.
     const method = path.includes(':') ? path.slice(path.lastIndexOf(':') + 1) : '';
     if (method === 'NetworkVar' || method === 'DTVar' || method === 'NetworkVarElement') {
@@ -894,8 +942,13 @@ export function analyseFile(
       const name = stringArg(call.args, 0);
       if (!name) return null;
       const hook = api.getGlobalHook(name.value);
-      if (!hook) return null;
-      return hook.params.map((p) => ({ name: p.name, type: p.type }));
+      if (hook) return hook.params.map((p) => ({ name: p.name, type: p.type }));
+
+      // Not a documented hook, but if the workspace fires it, the call sites
+      // are its signature.
+      const custom = options.customHook?.(name.value);
+      if (!custom) return null;
+      return custom.params.map((type, i) => ({ name: `arg${i + 1}`, type }));
     }
 
     const known = CALLBACK_PARAMS[path];
@@ -1437,6 +1490,7 @@ export function analyseFile(
     concommands,
     convars,
     timers,
+    assets,
     accessors,
     symbols,
     guardedGlobals,

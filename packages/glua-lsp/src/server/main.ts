@@ -7,6 +7,7 @@ import {
   type FormattingOptions,
   type InitializeResult,
 } from 'vscode-languageserver/node.js';
+import path from 'node:path';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 
@@ -35,6 +36,36 @@ import { detectEndOfLine } from '../format/printer.js';
 import { ConfigResolver } from '../config/index.js';
 import { VERSION } from '../util/version.js';
 import { buildNetGraph } from './features/netGraph.js';
+
+/**
+ * An editor launches this with a transport flag. Anything else is a person
+ * running the binary by hand, who would otherwise get a stack trace out of the
+ * connection layer.
+ */
+const TRANSPORTS = ['--stdio', '--node-ipc', '--socket', '--pipe'];
+const argv = process.argv.slice(2);
+
+if (argv.includes('--version') || argv.includes('-v')) {
+  process.stdout.write(`${VERSION}\n`);
+  process.exit(0);
+}
+
+if (
+  argv.includes('--help') ||
+  argv.includes('-h') ||
+  !argv.some((arg) => TRANSPORTS.some((transport) => arg.startsWith(transport)))
+) {
+  const help = argv.includes('--help') || argv.includes('-h');
+  process.stdout.write(
+    `glua-lsp ${VERSION} — language server for Garry's Mod Lua\n\n` +
+      `Your editor starts this, not you. Point an LSP client at:\n\n` +
+      `  glua-lsp --stdio\n\n` +
+      `Setting that up in Neovim, Helix, Zed and others:\n` +
+      `  https://glua.bluejutzu.dev/reference/editors\n\n` +
+      `To lint or format from a terminal, use \`glua\` instead.\n`,
+  );
+  process.exit(help ? 0 : 1);
+}
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -102,10 +133,33 @@ connection.onInitialized(async () => {
  * Indexes every Lua file in the workspace, yielding to the event loop between
  * batches so requests from the editor are still answered while it runs.
  */
+/**
+ * A library path may be relative, since a framework usually sits beside the
+ * project. Relative to the config file if there is one, else the workspace.
+ */
+function resolveLibraryPath(library: string, folders: { uri: string }[]): string {
+  if (path.isAbsolute(library)) return library;
+  const base = config.root ?? (folders[0] ? URI.parse(folders[0].uri).fsPath : undefined);
+  return base ? path.resolve(base, library) : path.resolve(library);
+}
+
 async function indexWorkspace(): Promise<number> {
   const folders = (await connection.workspace.getWorkspaceFolders()) ?? [];
   const started = Date.now();
   let indexed = 0;
+
+  // Frameworks first, so the project's own files see what they define on the
+  // very first pass rather than only after a re-analysis.
+  const libraries = new Set([
+    ...settings.workspace.libraries,
+    ...config.projectSettings().workspace.libraries,
+  ]);
+  for (const library of libraries) {
+    const count = workspace.indexLibrary(resolveLibraryPath(library, folders));
+    if (count) connection.console.log(`GLua: indexed ${count} files from library ${library}.`);
+    else connection.console.warn(`GLua: library path '${library}' has no Lua files.`);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 
   for (const folder of folders) {
     const files = workspace.scanFolder(URI.parse(folder.uri).fsPath);
@@ -140,6 +194,7 @@ async function publishWorkspaceDiagnostics(): Promise<number> {
 
   for (const uri of [...workspace.uris()]) {
     if (documents.get(uri)) continue; // open documents publish on their own
+    if (workspace.isLibrary(uri)) continue; // somebody else's code
     const analysis = workspace.full(uri);
     if (!analysis) continue;
 
@@ -184,6 +239,7 @@ async function refreshSettings(): Promise<void> {
   workspace.setOptions({
     maxFiles: settings.workspace.maxFiles,
     exclude: settings.workspace.exclude,
+    gamePath: settings.workspace.gamePath || undefined,
   });
 }
 
