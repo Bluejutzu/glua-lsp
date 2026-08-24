@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
 import { API_DATA, OUT, file, uriOf } from './fixtures.mjs';
 
@@ -6,6 +9,8 @@ const { GmodApi } = await import(OUT('api/index.js'));
 const { Workspace } = await import(OUT('analyze/workspace.js'));
 const { typeToString } = await import(OUT('analyze/types.js'));
 const { scriptedClassOf } = await import(OUT('analyze/entities.js'));
+const { AssetIndex } = await import(OUT('analyze/assets.js'));
+const { readVpkDirectory } = await import(OUT('analyze/vpk.js'));
 const { completion } = await import(OUT('server/features/completion.js'));
 const { hover } = await import(OUT('server/features/hover.js'));
 const { signatureHelp } = await import(OUT('server/features/signature.js'));
@@ -641,6 +646,126 @@ test('array returns resolve on methods, not just library functions', () => {
     const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
     assert.ok(names.includes(expected), `${source.split('\n').pop()} should offer ${expected}`);
   }
+});
+
+/* ------------------------------------------------------------- assets */
+
+const withAssetCheck = (severity) => ({
+  ...DEFAULT_SETTINGS,
+  diagnostics: { ...DEFAULT_SETTINGS.diagnostics, missingAsset: severity },
+});
+
+/** A throwaway content tree, since the asset index reads real directories. */
+function makeAssetTree(files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'glua-assets-'));
+  for (const relative of files) {
+    const full = path.join(root, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, '');
+  }
+  return root;
+}
+
+test('an asset path resolves with or without its extension', () => {
+  const game = makeAssetTree([
+    'garrysmod/materials/vgui/logo.vmt',
+    'garrysmod/models/props/crate.mdl',
+    'garrysmod/sound/ui/click.wav',
+  ]);
+  const assets = new AssetIndex([], game);
+
+  assert.ok(assets.has('material', 'vgui/logo'), 'Material omits the extension');
+  assert.ok(assets.has('material', 'vgui/logo.vmt'));
+  assert.ok(assets.has('model', 'models/props/crate.mdl'), 'models are written in full');
+  assert.ok(assets.has('sound', 'ui/click.wav'));
+  assert.ok(!assets.has('material', 'vgui/nope'));
+  assert.ok(assets.canValidate, 'a game directory was supplied');
+
+  fs.rmSync(game, { recursive: true, force: true });
+});
+
+test('workspace content alone never enables the missing-asset check', () => {
+  const addon = makeAssetTree(['materials/myaddon/icon.png']);
+  const assets = new AssetIndex([addon], undefined);
+
+  assert.ok(assets.has('material', 'myaddon/icon'), 'still resolves for completion');
+  assert.equal(assets.canValidate, false, 'but cannot tell a typo from base game content');
+
+  fs.rmSync(addon, { recursive: true, force: true });
+});
+
+test('a missing material is reported once a game directory is set', () => {
+  const game = makeAssetTree(['garrysmod/materials/vgui/logo.vmt']);
+  const workspace = new Workspace(api, { maxFiles: 10, exclude: [], gamePath: game });
+  const uri = uriOf('lua', 'autorun', 'client', 'cl_ui.lua');
+  const analysis = workspace.analyse(
+    uri,
+    'local a = Material("vgui/logo")\nlocal b = Material("vgui/typo")\n',
+    1,
+  );
+
+  assert.equal(
+    diagnose(analysis, api, workspace, DEFAULT_SETTINGS).filter((x) => x.code === 'missing-asset').length,
+    0,
+    'off by default, because Workshop content is invisible from here',
+  );
+
+  const on = withAssetCheck('warning');
+  const found = diagnose(analysis, api, workspace, on);
+  const missing = found.filter((x) => x.code === 'missing-asset');
+  assert.equal(missing.length, 1, JSON.stringify(found.map((f) => f.message)));
+  assert.match(missing[0].message, /vgui\/typo/);
+  assert.match(missing[0].message, /checkerboard/);
+
+  fs.rmSync(game, { recursive: true, force: true });
+});
+
+test('a path built at runtime is not checked', () => {
+  const game = makeAssetTree(['garrysmod/materials/vgui/logo.vmt']);
+  const workspace = new Workspace(api, { maxFiles: 10, exclude: [], gamePath: game });
+  const analysis = workspace.analyse(
+    uriOf('lua', 'autorun', 'client', 'cl_dyn.lua'),
+    'local m = Material("vgui/icons/%s")\n',
+    1,
+  );
+
+  const found = diagnose(analysis, api, workspace, withAssetCheck('warning'));
+  assert.equal(found.filter((x) => x.code === 'missing-asset').length, 0);
+
+  fs.rmSync(game, { recursive: true, force: true });
+});
+
+test('a file that is not a VPK costs that archive, not the feature', () => {
+  const dir = makeAssetTree(['garrysmod/notreally_dir.vpk']);
+  const junk = path.join(dir, 'garrysmod', 'notreally_dir.vpk');
+  fs.writeFileSync(junk, Buffer.from('this is not a vpk at all'));
+
+  assert.deepEqual(readVpkDirectory(junk), []);
+  assert.deepEqual(readVpkDirectory(path.join(dir, 'missing_dir.vpk')), []);
+  // And the index still builds around it.
+  assert.equal(new AssetIndex([], dir).size, 0);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('asset references are recorded for every call form', () => {
+  const { analyses } = makeWorkspace({
+    'lua/autorun/sh_assets.lua':
+      'Material("a/b")\n' +
+      'ent:SetModel("models/c.mdl")\n' +
+      'ent:EmitSound("d/e.wav")\n' +
+      'surface.PlaySound("f.wav")\n' +
+      'util.PrecacheModel("models/g.mdl")\n',
+  });
+
+  const kinds = analyses['lua/autorun/sh_assets.lua'].assets.map((a) => `${a.kind}:${a.path}`);
+  assert.deepEqual(kinds, [
+    'material:a/b',
+    'model:models/c.mdl',
+    'sound:d/e.wav',
+    'sound:f.wav',
+    'model:models/g.mdl',
+  ]);
 });
 
 /* ------------------------------------------------------- custom hooks */

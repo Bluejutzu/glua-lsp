@@ -11,6 +11,7 @@ import {
   type Span,
 } from './binder.js';
 import type { Realm } from '../api/types.js';
+import { AssetIndex } from './assets.js';
 import { rankClassFile, scriptedClassOf, type ScriptedClass } from './entities.js';
 import { Scope } from './scope.js';
 import { tableType, UNKNOWN, type GType } from './types.js';
@@ -32,6 +33,8 @@ export interface Located<T> {
 export interface WorkspaceOptions {
   maxFiles: number;
   exclude: string[];
+  /** A Garry's Mod directory, so base game content counts as existing. */
+  gamePath?: string;
 }
 
 const DEFAULT_EXCLUDE = [
@@ -79,6 +82,8 @@ export class Workspace {
   private scriptedIndex: Map<string, ScriptedClassEntry> | null = null;
   /** null marks a name we looked up and found no fires for. */
   private hookSignatures: Map<string, CustomHookSignature | null> | null = null;
+  private assetIndex: AssetIndex | null = null;
+  private folders: string[] = [];
   private readonly accessorCache = new Map<string, Located<GeneratedAccessor>[]>();
   private duplicateCache: {
     hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
@@ -91,7 +96,25 @@ export class Workspace {
   ) {}
 
   setOptions(options: WorkspaceOptions): void {
+    const changed = options.gamePath !== this.options.gamePath;
     this.options = options;
+    if (changed) this.assetIndex = null;
+  }
+
+  /** Folders scanned for `.lua`, which is also where an addon keeps its content. */
+  setFolders(folders: string[]): void {
+    this.folders = folders;
+    this.assetIndex = null;
+  }
+
+  /**
+   * Materials, models and sounds reachable from the workspace and, if one is
+   * configured, the game directory. Built on first use — a full GMod install is
+   * tens of thousands of files, and most sessions never ask.
+   */
+  assets(): AssetIndex {
+    this.assetIndex ??= new AssetIndex(this.folders, this.options.gamePath);
+    return this.assetIndex;
   }
 
   get size(): number {
@@ -525,6 +548,10 @@ export class Workspace {
 
   /** Recursively finds .lua files under a folder, honouring the exclude list. */
   scanFolder(folderFsPath: string): string[] {
+    if (!this.folders.includes(folderFsPath)) {
+      this.folders.push(folderFsPath);
+      this.assetIndex = null;
+    }
     const excluded = new Set([...DEFAULT_EXCLUDE, ...this.options.exclude.map((e) => e.toLowerCase())]);
     const found: string[] = [];
 

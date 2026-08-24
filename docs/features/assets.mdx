@@ -1,0 +1,72 @@
+---
+title: "Asset Paths"
+description: "Complete material, model and sound paths from your workspace and your Garry's Mod install, including content packed inside VPK archives."
+icon: "image"
+sidebarTitle: "Asset Paths"
+---
+
+Missing content is one of the few kinds of mistake Lua never tells you about. A
+mistyped material renders as the purple-and-black checkerboard, a mistyped model
+becomes the error sign, and a mistyped sound is simply silence. Nothing raises an
+error, so nothing points at the line that caused it.
+
+Paths written as string literals are indexed and offered as completions:
+
+```lua
+Material("vgui/gradient-u")
+ent:SetModel("models/props_junk/wood_crate001a.mdl")
+surface.PlaySound("buttons/button15.wav")
+```
+
+Completion covers `Material`, `surface.GetTextureID`, `SetModel`,
+`util.PrecacheModel`, `ClientsideModel`, `EmitSound`, `surface.PlaySound`,
+`sound.Play` and `util.PrecacheSound`.
+
+## Pointing it at your game
+
+Your own `materials/`, `models/` and `sound/` folders are found automatically —
+they sit beside `lua/` in an addon. To also complete base game content, set the
+install directory:
+
+```json
+{
+  "glua.workspace.gamePath": "C:/Program Files (x86)/Steam/steamapps/common/GarrysMod"
+}
+```
+
+Almost nothing in an install is a loose file: the base game and Half-Life 2
+content live inside VPK archives. Those are read directly, so setting this takes
+the index from a few hundred files to somewhere north of seventy thousand.
+
+## Reporting missing paths
+
+There is a rule for paths that do not resolve, `missingAsset`, and it is **off
+by default**.
+
+<Warning>
+  Turn this on only if every asset you reference ships in this repository.
+
+  Content mounted from the Workshop, or shipped in a separate content-pack
+  addon, cannot be seen from your editor. Measured against a real 932-file
+  gamemode with a full install configured, the rule reported 41–67% of
+  references as missing — nearly all of them real files that simply live
+  somewhere the editor cannot reach.
+</Warning>
+
+For a self-contained addon it is genuinely useful, and there it catches the
+typos nothing else can:
+
+```json
+{
+  "diagnostics": {
+    "missingAsset": "warning"
+  }
+}
+```
+
+Paths built at runtime are skipped rather than guessed at:
+
+```lua
+Material("vgui/icons/" .. name)   -- not checked
+Material(string.format("hud/%s", key))  -- not checked
+```

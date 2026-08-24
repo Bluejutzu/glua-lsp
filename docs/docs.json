@@ -27,7 +27,8 @@
               "features/typing-your-code",
               "features/realms",
               "features/net-messages",
-              "features/hooks"
+              "features/hooks",
+              "features/assets"
             ]
           },
           {

@@ -49,6 +49,7 @@ export const enum Code {
   CompoundAssignment = 'compound-assignment',
   DuplicateHookIdentifier = 'duplicate-hook-identifier',
   DuplicateTimerName = 'duplicate-timer-name',
+  MissingAsset = 'missing-asset',
 }
 
 export interface DiagnoseContext {
@@ -356,6 +357,40 @@ export function diagnose(
       severityOf(d.argumentCount),
       Code.ArgumentCount,
     );
+  }
+
+  /* ----------------------------------------------------------- assets */
+
+  // Only ever runs with a game directory configured. Workspace content alone
+  // cannot tell a typo from a base-game path, and every finding would be wrong.
+  if (d.missingAsset !== 'off' && analysis.assets.length && workspace.assets().canValidate) {
+    const assets = workspace.assets();
+    const label: Record<string, string> = {
+      material: 'Material',
+      model: 'Model',
+      sound: 'Sound',
+    };
+
+    for (const asset of analysis.assets) {
+      // A path built at runtime is not something we can check.
+      if (/[%{}]|\.\./.test(asset.path)) continue;
+      if (assets.has(asset.kind, asset.path)) continue;
+
+      push(
+        { start: asset.span.start + 1, end: asset.span.end - 1 },
+        `${label[asset.kind]} '${asset.path}' was not found in the workspace or the game ` +
+          `directory. It will load as ${
+            asset.kind === 'material'
+              ? 'the missing-texture checkerboard'
+              : asset.kind === 'model'
+                ? 'the error model'
+                : 'silence'
+          } rather than raising an error.`,
+        severityOf(d.missingAsset),
+        Code.MissingAsset,
+        { data: { kind: asset.kind, path: asset.path } },
+      );
+    }
   }
 
   /* -------------------------------------------------------------- net */

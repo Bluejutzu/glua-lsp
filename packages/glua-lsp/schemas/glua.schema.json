@@ -35,6 +35,10 @@
           "$ref": "#/definitions/severity",
           "description": "Two hook.Add calls sharing an event and identifier, or two timer.Create calls sharing a name, in overlapping realms. The second silently replaces the first."
         },
+        "missingAsset": {
+          "$ref": "#/definitions/severity",
+          "description": "A material, model or sound path that does not exist. Off by default: it needs glua.workspace.gamePath, and only suits projects where every asset ships in the repository, since Workshop and content-pack assets cannot be seen from here."
+        },
         "scope": {
           "enum": ["open", "workspace"],
           "description": "Whether to report problems only in open files, or in every indexed file."

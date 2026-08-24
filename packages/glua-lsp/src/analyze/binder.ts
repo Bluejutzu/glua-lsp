@@ -14,6 +14,7 @@ import type { ApiFunction, Realm } from '../api/types.js';
 import { LineIndex } from '../util/lines.js';
 import { Scope, type VarSymbol } from './scope.js';
 import { analyseRealm, realmAt, type RealmInfo } from './realm.js';
+import { assetArgOf, type AssetKind } from './assets.js';
 import type { ScriptedClass } from './entities.js';
 import { parseLuaDoc, typeFromDoc, type LuaDoc } from './luadoc.js';
 import {
@@ -171,6 +172,7 @@ export interface FileAnalysis {
   concommands: FileReference[];
   convars: FileReference[];
   timers: FileReference[];
+  assets: AssetReference[];
   accessors: GeneratedAccessor[];
   symbols: SymbolFact[];
   /**
@@ -203,6 +205,13 @@ export interface AnalyseOptions {
    * way a documented one is.
    */
   customHook?: (name: string) => CustomHookSignature | undefined;
+}
+
+/** A material, model or sound named by a string literal. */
+export interface AssetReference {
+  kind: AssetKind;
+  path: string;
+  span: Span;
 }
 
 /** What the `hook.Run` sites for one custom hook name agree on. */
@@ -404,6 +413,7 @@ export function analyseFile(
   const concommands: FileReference[] = [];
   const convars: FileReference[] = [];
   const timers: FileReference[] = [];
+  const assets: AssetReference[] = [];
   const accessors: GeneratedAccessor[] = [];
   const symbols: SymbolFact[] = [];
 
@@ -875,6 +885,14 @@ export function analyseFile(
       }
       default:
         break;
+    }
+
+    // Materials, models and sounds named by literal. Matched on the written
+    // call, since the method forms are written on a receiver variable.
+    const asset = assetArgOf(null, path);
+    if (asset) {
+      const named = stringArg(args, asset.arg);
+      if (named?.value) assets.push({ kind: asset.kind, path: named.value, span: named.span });
     }
 
     // `self:NetworkVar("Int", 0, "Ammo")`, and the older DTVar spelling.
@@ -1472,6 +1490,7 @@ export function analyseFile(
     concommands,
     convars,
     timers,
+    assets,
     accessors,
     symbols,
     guardedGlobals,

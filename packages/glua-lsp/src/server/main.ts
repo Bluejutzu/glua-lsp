@@ -214,6 +214,7 @@ async function refreshSettings(): Promise<void> {
   workspace.setOptions({
     maxFiles: settings.workspace.maxFiles,
     exclude: settings.workspace.exclude,
+    gamePath: settings.workspace.gamePath || undefined,
   });
 }
 

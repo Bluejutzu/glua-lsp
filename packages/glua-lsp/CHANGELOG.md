@@ -8,6 +8,12 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **Asset path completion.** Material, model and sound paths complete from your
+  own content and, with `glua.workspace.gamePath` set, from the game install —
+  including everything packed inside VPK archives, which is nearly all of it.
+  There is a matching `missingAsset` rule for paths that do not resolve, off by
+  default because Workshop and content-pack assets cannot be seen from an
+  editor.
 - **Hooks of your own are typed.** A hook you invented has no documentation, so
   its `hook.Run` call sites are read as its signature and callbacks registered
   for it are typed from them. Positions the call sites disagree about stay
