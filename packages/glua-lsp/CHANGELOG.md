@@ -8,6 +8,13 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **`glua init`**, which writes `.glua.json` and `.gluafmtrc.json` from the
+  defaults. Previously those could only be created from the VS Code command
+  palette, so anyone adopting the CLI in CI had to write them by hand.
+- **`glua lint --fix`**, applying the quick fixes that have one correct outcome
+  — a missing `util.AddNetworkString` or `AddCSLuaFile`, a C-style compound
+  assignment — and reporting the rest. `--fix-dry-run` shows the same without
+  writing.
 - **Asset path completion.** Material, model and sound paths complete from your
   own content and, with `glua.workspace.gamePath` set, from the game install —
   including everything packed inside VPK archives, which is nearly all of it.

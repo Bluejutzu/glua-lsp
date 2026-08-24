@@ -66,20 +66,37 @@ program
     -1,
   )
   .option('-q, --quiet', 'only report errors', false)
+  .option('--fix', 'apply the fixes that have one sensible outcome, then report the rest', false)
+  .option('--fix-dry-run', 'show what --fix would change without writing', false)
   .option('--no-progress', 'do not print progress while linting')
   .action(
-    (
+    async (
       paths: string[],
       options: {
         format: LintFormat;
         maxWarnings: number;
         quiet: boolean;
+        fix: boolean;
+        fixDryRun: boolean;
         root?: string;
         progress: boolean;
       },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
       if (options.format === 'github' || options.format === 'json') setColourEnabled(false);
+
+      if (options.fix || options.fixDryRun) {
+        const { fix } = await import('./fix.js');
+        const result = fix(paths, {
+          dryRun: options.fixDryRun,
+          progress: options.progress && supportsProgress(),
+          ...(options.root ? { root: options.root } : {}),
+        });
+        if (result.output.trim()) process.stdout.write(`${result.output}\n`);
+        // Anything a fix could not settle is still a reason to fail a build.
+        if (result.remaining > 0 && options.maxWarnings === 0) process.exitCode = 1;
+        return;
+      }
 
       const result = lint(paths, {
         format: options.format,
@@ -131,6 +148,31 @@ program
       if (result.skipped.length) process.exitCode = 1;
     },
   );
+
+/* ------------------------------------------------------------------ init */
+
+program
+  .command('init')
+  .description('Write .glua.json and .gluafmtrc.json, seeded from the defaults')
+  .option('--lint-only', 'write only .glua.json', false)
+  .option('--format-only', 'write only .gluafmtrc.json', false)
+  .option('--root <dir>', 'directory to write them in', '.')
+  .option('-f, --force', 'overwrite a config that already exists', false)
+  .action(async (options: { lintOnly: boolean; formatOnly: boolean; root: string; force: boolean }) => {
+    if (options.lintOnly && options.formatOnly) {
+      program.error('--lint-only and --format-only cannot be used together.');
+    }
+
+    const { init } = await import('./init.js');
+    const result = init({
+      kinds: options.lintOnly ? ['lint'] : options.formatOnly ? ['format'] : ['lint', 'format'],
+      root: options.root,
+      force: options.force,
+    });
+
+    process.stdout.write(`${result.output}\n`);
+    if (!result.written.length) process.exitCode = 1;
+  });
 
 /* ----------------------------------------------------------------- extra */
 

@@ -72,6 +72,11 @@ export const RULES: RuleInfo[] = [
     summary: 'Two timer.Create calls sharing a name; the second replaces the first.',
   },
   {
+    code: 'missing-asset',
+    settingsKey: 'missingAsset',
+    summary: 'A material, model or sound path that does not exist. Off by default.',
+  },
+  {
     code: 'net-unregistered',
     settingsKey: 'netMessage',
     summary: 'net.Start on a message never passed to util.AddNetworkString.',

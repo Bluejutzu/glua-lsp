@@ -5,18 +5,28 @@ import path from 'node:path';
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
-/** The API dataset ships next to the bundle so the CLI has no runtime deps on it. */
-const copyApiData = {
-  name: 'copy-api-data',
+/**
+ * The API dataset and the config schemas ship next to the bundle, so the CLI
+ * has no runtime dependencies and `glua init` can point $schema at a real file.
+ */
+const copyAssets = {
+  name: 'copy-assets',
   setup(build) {
     build.onEnd(async () => {
-      const from = path.resolve('../glua-lsp/src/api/data/gmod-api.json');
-      const to = path.resolve('dist/gmod-api.json');
       try {
-        await fs.mkdir('dist', { recursive: true });
-        await fs.copyFile(from, to);
+        await fs.mkdir('dist/schemas', { recursive: true });
+        await fs.copyFile(
+          path.resolve('../glua-lsp/src/api/data/gmod-api.json'),
+          path.resolve('dist/gmod-api.json'),
+        );
+        for (const schema of await fs.readdir(path.resolve('../glua-lsp/schemas'))) {
+          await fs.copyFile(
+            path.resolve('../glua-lsp/schemas', schema),
+            path.resolve('dist/schemas', schema),
+          );
+        }
       } catch (error) {
-        console.error(`Could not copy the API dataset: ${error.message}`);
+        console.error(`Could not copy bundled data: ${error.message}`);
         console.error('Run `pnpm run generate-api` in packages/glua-lsp first.');
         process.exitCode = 1;
       }
@@ -47,7 +57,7 @@ const contexts = await Promise.all([
     ...shared,
     entryPoints: ['src/glua.ts'],
     outfile: 'dist/glua.js',
-    plugins: [copyApiData],
+    plugins: [copyAssets],
   }),
   // The same language server the VS Code extension runs, exposed as its own
   // binary so any editor with an LSP client can drive it.
