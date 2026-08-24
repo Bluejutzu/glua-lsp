@@ -36,6 +36,36 @@ import { ConfigResolver } from '../config/index.js';
 import { VERSION } from '../util/version.js';
 import { buildNetGraph } from './features/netGraph.js';
 
+/**
+ * An editor launches this with a transport flag. Anything else is a person
+ * running the binary by hand, who would otherwise get a stack trace out of the
+ * connection layer.
+ */
+const TRANSPORTS = ['--stdio', '--node-ipc', '--socket', '--pipe'];
+const argv = process.argv.slice(2);
+
+if (argv.includes('--version') || argv.includes('-v')) {
+  process.stdout.write(`${VERSION}\n`);
+  process.exit(0);
+}
+
+if (
+  argv.includes('--help') ||
+  argv.includes('-h') ||
+  !argv.some((arg) => TRANSPORTS.some((transport) => arg.startsWith(transport)))
+) {
+  const help = argv.includes('--help') || argv.includes('-h');
+  process.stdout.write(
+    `glua-lsp ${VERSION} — language server for Garry's Mod Lua\n\n` +
+      `Your editor starts this, not you. Point an LSP client at:\n\n` +
+      `  glua-lsp --stdio\n\n` +
+      `Setting that up in Neovim, Helix, Zed and others:\n` +
+      `  https://glua.bluejutzu.dev/reference/editors\n\n` +
+      `To lint or format from a terminal, use \`glua\` instead.\n`,
+  );
+  process.exit(help ? 0 : 1);
+}
+
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 

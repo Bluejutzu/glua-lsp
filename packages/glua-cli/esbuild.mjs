@@ -27,9 +27,7 @@ const copyApiData = {
 // Baked in rather than written out in a constant, which only ever goes stale.
 const { version } = JSON.parse(await fs.readFile('package.json', 'utf8'));
 
-const context = await esbuild.context({
-  entryPoints: ['src/glua.ts'],
-  outfile: 'dist/glua.js',
+const shared = {
   define: { __GLUA_VERSION__: JSON.stringify(version) },
   bundle: true,
   format: 'cjs',
@@ -42,12 +40,27 @@ const context = await esbuild.context({
   tsconfig: 'tsconfig.json',
   banner: { js: '#!/usr/bin/env node' },
   logLevel: 'info',
-  plugins: [copyApiData],
-});
+};
+
+const contexts = await Promise.all([
+  esbuild.context({
+    ...shared,
+    entryPoints: ['src/glua.ts'],
+    outfile: 'dist/glua.js',
+    plugins: [copyApiData],
+  }),
+  // The same language server the VS Code extension runs, exposed as its own
+  // binary so any editor with an LSP client can drive it.
+  esbuild.context({
+    ...shared,
+    entryPoints: ['../glua-lsp/src/server/main.ts'],
+    outfile: 'dist/glua-lsp.js',
+  }),
+]);
 
 if (watch) {
-  await context.watch();
+  await Promise.all(contexts.map((context) => context.watch()));
 } else {
-  await context.rebuild();
-  await context.dispose();
+  await Promise.all(contexts.map((context) => context.rebuild()));
+  await Promise.all(contexts.map((context) => context.dispose()));
 }

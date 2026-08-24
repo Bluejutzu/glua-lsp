@@ -58,6 +58,7 @@
               "reference/annotations",
               "reference/commands",
               "reference/cli",
+              "reference/editors",
               "reference/performance"
             ]
           }

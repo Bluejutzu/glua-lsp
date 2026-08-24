@@ -19,7 +19,8 @@
   ],
   "type": "commonjs",
   "bin": {
-    "glua": "./dist/glua.js"
+    "glua": "./dist/glua.js",
+    "glua-lsp": "./dist/glua-lsp.js"
   },
   "files": [
     "dist",

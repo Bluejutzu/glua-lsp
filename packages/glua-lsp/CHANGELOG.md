@@ -6,7 +6,13 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **Support for editors other than VS Code.** The language server now ships as
+  its own `glua-lsp` binary in the `glua-cli` npm package, so Neovim, Helix,
+  Zed, Sublime Text and anything else with an LSP client get the same
+  completion, diagnostics, navigation and formatting. Setup for each is on the
+  [Other Editors](https://glua.bluejutzu.dev/reference/editors) page.
 
 ## 0.3.0
 
