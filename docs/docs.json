@@ -29,6 +29,7 @@
               "features/net-messages",
               "features/hooks",
               "features/assets",
+              "features/hot-paths",
               "features/report"
             ]
           },

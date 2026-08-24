@@ -13,6 +13,8 @@ import {
 import type { Realm } from '../api/types.js';
 import { AssetIndex } from './assets.js';
 import { rankClassFile, scriptedClassOf, type ScriptedClass } from './entities.js';
+import { CLASS_TABLES } from './callgraph.js';
+import { CallIndex, type HotFinding } from './hotpath.js';
 import { Scope } from './scope.js';
 import { tableType, UNKNOWN, type GType } from './types.js';
 
@@ -23,6 +25,13 @@ export interface ScriptedClassEntry extends ScriptedClass {
   uris: string[];
   /** Shared directory, or the containing directory for a single-file class. */
   dir: string;
+}
+
+/** A function the workspace defines and never mentions again. */
+export interface DeadFunction {
+  uri: string;
+  path: string;
+  nameSpan: Span;
 }
 
 export interface Located<T> {
@@ -92,6 +101,9 @@ export class Workspace {
   /** Files that came from a library root, so nothing reports on them. */
   private readonly libraryUris = new Set<string>();
   private readonly accessorCache = new Map<string, Located<GeneratedAccessor>[]>();
+  private callIndex: CallIndex | null = null;
+  private hotCache: Map<string, HotFinding[]> | null = null;
+  private deadCache: Map<string, DeadFunction[]> | null = null;
   private duplicateCache: {
     hooks: Map<string, Located<{ span: Span; realm: Realm }>[]>;
     timers: Map<string, Located<{ span: Span; realm: Realm }>[]>;
@@ -152,6 +164,108 @@ export class Workspace {
     this.hookSignatures = null;
     this.accessorCache.clear();
     this.duplicateCache = null;
+    this.callIndex = null;
+    this.hotCache = null;
+    this.deadCache = null;
+  }
+
+  /**
+   * The workspace call graph. Built on demand rather than with the rest of the
+   * indexes: most sessions never ask, and the ones that do — hot path
+   * diagnostics, call hierarchy, the project report — can pay for it once.
+   */
+  calls(): CallIndex {
+    this.callIndex ??= new CallIndex(this.files.values());
+    return this.callIndex;
+  }
+
+  /** Expensive calls on a per-frame path, for one file. */
+  hotPathsIn(uri: string): HotFinding[] {
+    this.hotCache ??= this.calls().hotPaths();
+    return this.hotCache.get(uri) ?? [];
+  }
+
+  /** Every hot path finding in the workspace, for the project report. */
+  hotPaths(): HotFinding[] {
+    this.hotCache ??= this.calls().hotPaths();
+    return [...this.hotCache.values()].flat();
+  }
+
+  /**
+   * Functions nothing in the workspace ever mentions.
+   *
+   * Deliberately conservative, because being wrong here means telling someone
+   * to delete working code. Only plain dotted functions count: a method
+   * defined with a colon is reached through a value rather than a name, and
+   * anything hung off an API library can be called as a method on its own
+   * receiver. A path referenced anywhere, even through a prefix someone took a
+   * local of, is alive.
+   */
+  deadFunctionsIn(uri: string): DeadFunction[] {
+    this.deadCache ??= this.buildDeadIndex();
+    return this.deadCache.get(uri) ?? [];
+  }
+
+  deadFunctions(): DeadFunction[] {
+    this.deadCache ??= this.buildDeadIndex();
+    return [...this.deadCache.values()].flat();
+  }
+
+  private buildDeadIndex(): Map<string, DeadFunction[]> {
+    const referenced = new Set<string>();
+    const aliased = new Set<string>();
+    for (const file of this.files.values()) {
+      for (const alias of file.aliasedGlobals) aliased.add(alias);
+      // A path referring to itself inside its own definition is not a use:
+      // `MyAddon = MyAddon or {}` is how the table is declared, and a
+      // recursive call is the function talking to itself.
+      const own = new Map<string, Span[]>();
+      for (const def of file.globalDefs) {
+        const spans = own.get(def.path);
+        if (spans) spans.push(def.span);
+        else own.set(def.path, [def.span]);
+      }
+      for (const ref of file.globalRefs) {
+        if (ref.write) continue;
+        const inside = own
+          .get(ref.path)
+          ?.some((span) => ref.span.start >= span.start && ref.span.end <= span.end);
+        if (inside) continue;
+        referenced.add(ref.path);
+      }
+    }
+
+    const alive = (path: string): boolean => {
+      if (referenced.has(path)) return true;
+      // Reached through an alias: `local cfg = MyAddon.Config` then `cfg.Fn()`.
+      // The call site records `cfg.Fn`, which no path here would ever match.
+      for (let cut = path.length; cut > 0; cut--) {
+        const char = path[cut];
+        if (char !== '.' && char !== ':') continue;
+        if (aliased.has(path.slice(0, cut))) return true;
+      }
+      return false;
+    };
+
+    const out = new Map<string, DeadFunction[]>();
+    for (const file of this.files.values()) {
+      if (this.libraryUris.has(file.uri)) continue;
+      for (const def of file.globalDefs) {
+        if (def.kind !== 'function' || def.isMethod) continue;
+        if (def.path.includes(':')) continue;
+        if (!def.path.includes('.')) continue; // bare globals may be an entry point
+        const root = def.root;
+        if (CLASS_TABLES.has(root)) continue;
+        if (this.api.getLibrary(root) || this.api.isKnownGlobal(root)) continue;
+        if (alive(def.path)) continue;
+
+        const list = out.get(file.uri);
+        const dead = { uri: file.uri, path: def.path, nameSpan: def.nameSpan };
+        if (list) list.push(dead);
+        else out.set(file.uri, [dead]);
+      }
+    }
+    return out;
   }
 
   /**
@@ -167,8 +281,13 @@ export class Workspace {
       scriptedClass: (name) => this.scriptedClass(name),
       customHook: (name) => this.customHookSignature(name),
     });
+    const previous = this.files.get(uri);
     this.files.set(uri, retainAst ? analysis : releaseAst(analysis));
-    this.invalidate();
+    // Identical text yields identical facts, so every cross-file index built
+    // from them is still correct. Worth checking: the project report re-parses
+    // each file to get a tree back, and invalidating on that made rebuilding
+    // the indexes quadratic in the size of the workspace.
+    if (!previous || previous.text !== text) this.invalidate();
     return analysis;
   }
 

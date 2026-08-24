@@ -41,6 +41,17 @@ export interface Settings {
      * real gamemode the rule reported 41-67% of references as missing.
      */
     missingAsset: SeveritySetting;
+    /**
+     * Expensive work reached from something the engine runs every frame or
+     * tick. The one rule here that is about how the game feels rather than
+     * whether the code is correct.
+     */
+    perfHotPath: SeveritySetting;
+    /**
+     * Functions nothing in the workspace calls. Off by default: an addon that
+     * is meant to be extended by other addons is full of them on purpose.
+     */
+    unusedFunction: SeveritySetting;
     /** `open` reports only files you have open; `workspace` reports everything. */
     scope: 'open' | 'workspace';
   };
@@ -91,6 +102,8 @@ export const DEFAULT_SETTINGS: Settings = {
     globalWrite: 'off',
     duplicateIdentifier: 'warning',
     missingAsset: 'off',
+    perfHotPath: 'warning',
+    unusedFunction: 'off',
     scope: 'open',
   },
   inlayHints: {

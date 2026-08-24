@@ -56,7 +56,7 @@ program
   .argument('[paths...]', 'files or directories to check', ['.'])
   .addOption(
     new Option('-f, --format <format>', 'output format')
-      .choices(['pretty', 'compact', 'github', 'json'])
+      .choices(['pretty', 'compact', 'github', 'json', 'sarif'])
       .default('pretty'),
   )
   .option('--root <dir>', 'project root for config files and relative paths')
@@ -84,7 +84,7 @@ program
       },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
-      if (options.format === 'github' || options.format === 'json') setColourEnabled(false);
+      if (options.format !== 'pretty' && options.format !== 'compact') setColourEnabled(false);
 
       if (options.fix || options.fixDryRun) {
         const { fix } = await import('./fix.js');

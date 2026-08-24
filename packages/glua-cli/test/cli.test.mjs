@@ -96,6 +96,31 @@ test('json output is machine readable', { skip: !built }, () => {
   }
 });
 
+test('sarif output is valid enough for code scanning to ingest', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/client/cl_hot.lua':
+      'hook.Add("HUDPaint", "x", function()\n\tsurface.SetMaterial(Material("a.png"))\nend)\n',
+  });
+  const result = run(['lint', root, '--root', root, '--format', 'sarif']);
+  const sarif = JSON.parse(result.stdout);
+
+  assert.equal(sarif.version, '2.1.0');
+  const [runResult] = sarif.runs;
+  assert.equal(runResult.tool.driver.name, 'glua');
+  assert.ok(runResult.tool.driver.rules.length > 0);
+  assert.ok(runResult.results.length > 0);
+
+  const finding = runResult.results.find((r) => r.ruleId === 'perf-hot-path');
+  assert.ok(finding, 'the hot path finding should be reported');
+  assert.equal(runResult.tool.driver.rules[finding.ruleIndex].id, 'perf-hot-path');
+  assert.equal(finding.level, 'warning');
+
+  const location = finding.locations[0].physicalLocation;
+  assert.equal(location.artifactLocation.uri, 'lua/autorun/client/cl_hot.lua');
+  assert.ok(location.region.startLine >= 1);
+  assert.ok(location.region.startColumn >= 1);
+});
+
 test('github output uses annotation syntax and never wraps lines', { skip: !built }, () => {
   const root = addon({ 'lua/autorun/sh_bad.lua': 'local x = 1\nx += 1\nprint(x)\n' });
   const result = run(['lint', root, '--root', root, '--format', 'github']);

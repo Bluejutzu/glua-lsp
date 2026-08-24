@@ -30,6 +30,11 @@ import { diagnose } from './features/diagnostics.js';
 import { LEGEND, semanticTokens } from './features/semanticTokens.js';
 import { inlayHints } from './features/inlayHints.js';
 import { codeActions } from './features/codeActions.js';
+import {
+  incomingCalls,
+  outgoingCalls,
+  prepareCallHierarchy,
+} from './features/callHierarchy.js';
 import { formatting, rangeFormatting } from './features/formatting.js';
 import { codeLenses } from './features/codeLens.js';
 import { detectEndOfLine } from '../format/printer.js';
@@ -110,6 +115,7 @@ connection.onInitialize((params): InitializeResult => {
       documentFormattingProvider: true,
       documentRangeFormattingProvider: true,
       codeLensProvider: { resolveProvider: false },
+      callHierarchyProvider: true,
       semanticTokensProvider: {
         legend: LEGEND,
         full: true,
@@ -538,6 +544,21 @@ connection.languages.inlayHint.on(
     const analysis = analysisFor(params.textDocument.uri);
     return analysis ? inlayHints(analysis, params.range, settings) : [];
   }),
+);
+
+connection.languages.callHierarchy.onPrepare(
+  guarded('callHierarchy/prepare', [], (params) => {
+    const analysis = analysisFor(params.textDocument.uri);
+    return analysis ? prepareCallHierarchy(analysis, params.position, workspace) : [];
+  }),
+);
+
+connection.languages.callHierarchy.onIncomingCalls(
+  guarded('callHierarchy/incoming', [], (params) => incomingCalls(params.item, workspace)),
+);
+
+connection.languages.callHierarchy.onOutgoingCalls(
+  guarded('callHierarchy/outgoing', [], (params) => outgoingCalls(params.item, workspace)),
 );
 
 connection.languages.semanticTokens.on(

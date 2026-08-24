@@ -128,6 +128,29 @@ test('a workspace of many files indexes in reasonable time', () => {
   assert.ok(total < 12000, `indexing took ${total.toFixed(0)}ms`);
 });
 
+test('the hot path scan over a large workspace is not the expensive part', () => {
+  // Every file here defines the same paths and calls them, which is the shape
+  // that made an eagerly resolved call graph cost the square of the workspace.
+  const workspace = new Workspace(api, { maxFiles: 2000, exclude: [] });
+  const source = bigSource(4);
+  const files = 300;
+  for (let i = 0; i < files; i++) {
+    workspace.analyse(uriOf('lua', 'myaddon', `hot_${i}.lua`), source, 1, false);
+  }
+
+  const started = performance.now();
+  const iterations = 5;
+  for (let i = 0; i < iterations; i++) {
+    // A fresh index each time: this is what one keystroke costs.
+    workspace.analyse(uriOf('lua', 'myaddon', 'hot_0.lua'), `${source}\nlocal e_${i} = ${i}\n`, i + 2);
+    workspace.hotPathsIn(uriOf('lua', 'myaddon', 'hot_0.lua'));
+  }
+  const each = (performance.now() - started) / iterations;
+
+  console.log(`  call graph + hot paths over ${files} files: ${each.toFixed(1)}ms`);
+  assert.ok(each < 200, `hot path scan took ${each.toFixed(1)}ms, expected under 200ms`);
+});
+
 test('editing one file in a large workspace stays interactive', () => {
   // The worst case for cross-file work: every keystroke invalidates the indexes
   // that diagnostics then rebuild.

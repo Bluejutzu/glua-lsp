@@ -42,3 +42,13 @@ counter += 1
 
 -- 8. A local that is never read.
 local unusedValue = MyAddon.Version
+
+-- 9. Expensive work on a path the engine runs every frame. The material is
+--    looked up by name on every call, and the entity sweep walks the whole map.
+--    Both are reported at the call, with the chain that reaches them.
+hook.Add("HUDPaint", "hotpath.example", function()
+	surface.SetMaterial(Material("icon16/cog.png"))
+	for _, turret in ipairs(ents.FindByClass("my_turret")) do
+		surface.DrawRect(0, 0, 4, 4)
+	end
+end)

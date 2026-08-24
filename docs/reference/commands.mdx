@@ -28,6 +28,19 @@ Counts appear above the things whose other half lives in another file — a
 custom `hook.Add` how many call sites, and a global function how many
 references. Clicking one opens the peek view.
 
+## Call hierarchy
+
+Put the cursor on a function and open the call hierarchy — **Shift\+Alt\+H** in
+VS Code, or `Show Call Hierarchy` from the Command Palette — to see who calls it
+across the workspace, or switch the tree to outgoing calls to see what it
+reaches. Callbacks are named after what registers them, so a chain ending in a
+render hook says so, which is the same graph the
+[hot path rule](/features/hot-paths) walks.
+
+Calls made through a value rather than a name — a function passed in as an
+argument, or stored in a table and looked up at runtime — are left out rather
+than guessed at.
+
 ## Outside the editor
 
 Everything the linter and formatter do is also available from the

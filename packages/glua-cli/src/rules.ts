@@ -102,6 +102,16 @@ export const RULES: RuleInfo[] = [
     summary: 'The write sequence does not match the read sequence in the handler.',
   },
   {
+    code: 'perf-hot-path',
+    settingsKey: 'perfHotPath',
+    summary: 'Expensive work reached from something the engine runs every frame or tick.',
+  },
+  {
+    code: 'unused-function',
+    settingsKey: 'unusedFunction',
+    summary: 'A function nothing in the workspace calls or registers. Off by default.',
+  },
+  {
     code: 'missing-addcsluafile',
     settingsKey: 'missingAddCSLuaFile',
     summary: 'A clientside file that is included but never sent with AddCSLuaFile.',

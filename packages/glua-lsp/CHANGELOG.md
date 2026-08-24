@@ -6,7 +6,36 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **Hot path analysis.** The workspace index now builds a call graph, walks it
+  from everything the engine runs on a schedule — the per-frame and per-tick
+  hooks, `ENT:Think`, `SWEP:DrawHUD`, `PANEL:Paint`, `timer.Create` of 0.5s or
+  less — and reports expensive work anywhere along it. About forty calls count:
+  registration that should happen once, disk and database and HTTP,
+  serialisation, map-wide entity sweeps, string lookups like `Material`, and
+  `net.Start` / `SetNW*`. The message names the chain that reaches the call, so
+  a finding four functions and two files away from its hook explains itself. A
+  function that rate-limits itself — a `CurTime()` guard, a `nextThink` field, a
+  one-time `if not x then` gate — is not a hot path, and neither is anything it
+  reaches. `Material("...")` with a literal argument gets a quick fix that
+  hoists it to file scope. Rule `perf-hot-path`, keyed `perfHotPath`, on as a
+  warning.
+- **Call hierarchy**, over the same graph: who calls this function across the
+  workspace, and what it calls. Callbacks are named after what registers them,
+  so a chain ending in a render hook says so. Calls made through a value rather
+  than a name are left out rather than guessed at.
+- **Dead code detection.** `unused-function` reports functions this workspace
+  defines and never calls, references or registers. Methods defined with a
+  colon, scripted class hooks and anything extending an API library are exempt,
+  since those are reached through a value. Off by default — an addon meant to be
+  extended by other addons is full of them on purpose — but `glua doctor` lists
+  them either way.
+- **`glua lint --format sarif`**, writing SARIF 2.1.0 for GitHub code scanning.
+  Findings get a history, somewhere to be dismissed, and a diff against the base
+  branch, rather than an annotation that disappears with the workflow run.
+- The project report gained **Hot paths** and **Never called** sections, in the
+  editor, the HTML file and the terminal.
 
 ## 0.4.0
 

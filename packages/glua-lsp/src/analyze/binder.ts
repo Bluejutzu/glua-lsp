@@ -12,6 +12,7 @@ import { parse } from '../parser/parser.js';
 import { GmodApi, HOOK_TABLES } from '../api/index.js';
 import type { ApiFunction, Realm } from '../api/types.js';
 import { LineIndex } from '../util/lines.js';
+import { buildCallGraph, type CallGraph } from './callgraph.js';
 import { Scope, type VarSymbol } from './scope.js';
 import { analyseRealm, realmAt, type RealmInfo } from './realm.js';
 import { assetArgOf, type AssetKind } from './assets.js';
@@ -175,12 +176,16 @@ export interface FileAnalysis {
   assets: AssetReference[];
   accessors: GeneratedAccessor[];
   symbols: SymbolFact[];
+  /** Who calls what in this file, and which bodies the engine runs every frame. */
+  callGraph: CallGraph;
   /**
    * Globals the file tests for existence before using — `if eightbit and ...`.
    * Reporting these as undefined would punish the correct way to depend on an
    * optional addon.
    */
   guardedGlobals: Set<string>;
+  /** Global paths bound to another name, so their members escape path analysis. */
+  aliasedGlobals: Set<string>;
   /** Locals that are declared but never read, for the unused diagnostic. */
   unusedLocals: VarSymbol[];
   typeOf(expr: Expression): GType;
@@ -1393,6 +1398,27 @@ export function analyseFile(
     }
   }
 
+  /* ------------------------------------------------------ aliased tables */
+
+  // `local cfg = MyAddon.Config` puts everything under that table one name
+  // away from any analysis that works on paths. Recording the alias is what
+  // keeps the dead-code rule from calling those members unused.
+  const aliasedGlobals = new Set<string>();
+  {
+    const markAlias = (expr: Expression | undefined): void => {
+      if (!expr) return;
+      if (expr.type !== 'Identifier' && expr.type !== 'MemberExpression') return;
+      const path = exprToPath(expr);
+      if (path) aliasedGlobals.add(path);
+    };
+
+    walk(chunk, (node) => {
+      if (node.type === 'LocalStatement' || node.type === 'AssignmentStatement') {
+        for (const init of node.init) markAlias(init);
+      }
+    });
+  }
+
   /* ----------------------------------------------------- guarded globals */
 
   const guardedGlobals = new Set<string>();
@@ -1493,7 +1519,9 @@ export function analyseFile(
     assets,
     accessors,
     symbols,
+    callGraph: buildCallGraph(chunk),
     guardedGlobals,
+    aliasedGlobals,
     unusedLocals,
     typeOf: (expr) => inferType(expr, root.scopeAt(expr.start)),
     scopeAt: (offset) => root.scopeAt(offset),

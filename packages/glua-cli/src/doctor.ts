@@ -115,6 +115,8 @@ function renderPretty(report: ProjectReport, root: string): string {
     ['timer clashes', report.timers.collisions.length, 'same name, one silently replaces the other'],
     ['unknown names', report.undefinedGlobals.reduce((sum, g) => sum + g.count, 0),
       'globals defined nowhere we can see'],
+    ['hot paths', report.performance.findings,
+      'expensive work on something that runs every frame or tick'],
   ];
 
   for (const [label, count, note] of problems) {
@@ -187,6 +189,45 @@ function renderPretty(report: ProjectReport, root: string): string {
         `  ${c.text(pad(entity.name, width))}  ${c.faint(pad(entity.kind, 7))}  ` +
           `${c.text(pad(String(entity.members), 4))} ${c.faint('members')}  ` +
           `${c.faint(`${entity.files} file${entity.files === 1 ? '' : 's'}`)}`,
+      );
+    }
+  }
+
+  if (report.performance.worst.length) {
+    lines.push(heading('Hot paths'));
+    lines.push('');
+    lines.push(
+      `  ${c.faint('Expensive calls the engine reaches from something it runs every frame or tick.')}`,
+    );
+    lines.push('');
+    const width = Math.max(...report.performance.worst.map((f) => f.callee.length));
+    for (const finding of report.performance.worst) {
+      const where = path.relative(root, finding.file).replace(/\\/g, '/');
+      lines.push(
+        `  ${c.warning(symbols.warning)} ${c.accent(pad(finding.callee, width))}  ` +
+          `${c.faint(`${where}:${finding.line}`)}`,
+      );
+      lines.push(
+        `    ${c.muted(finding.entry)}${
+          finding.chain.length ? c.faint(` → ${finding.chain.join(' → ')}`) : ''
+        }`,
+      );
+    }
+  }
+
+  if (report.deadCode.functions.length) {
+    lines.push(heading('Never called'));
+    lines.push('');
+    lines.push(`  ${c.faint('Nothing in this project names these. Fine if another addon does.')}`);
+    lines.push('');
+    const width = Math.max(...report.deadCode.functions.map((fn) => fn.path.length));
+    for (const fn of report.deadCode.functions) {
+      const where = path.relative(root, fn.file).replace(/\\/g, '/');
+      lines.push(`  ${c.text(pad(fn.path, width))}  ${c.faint(`${where}:${fn.line}`)}`);
+    }
+    if (report.deadCode.total > report.deadCode.functions.length) {
+      lines.push(
+        `  ${c.faint(`… and ${number(report.deadCode.total - report.deadCode.functions.length)} more`)}`,
       );
     }
   }

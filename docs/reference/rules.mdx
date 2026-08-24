@@ -57,6 +57,18 @@ Severity accepts `error`, `warning`, `information`, `hint` or `off`.
     | `argument-type` | `argumentType` | `warning` | An argument whose inferred type cannot match the documented parameter. Only fires when no documented overload accepts what was passed. |
   </Accordion>
 
+  <Accordion title="Performance">
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `perf-hot-path` | `perfHotPath` | `warning` | Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` of 0.5s or less. The message names the chain of functions that reaches it. Calls behind a `CurTime()` guard, a `nextThink`-style field, or a one-time `if not x then` gate are skipped. [Full description](/features/hot-paths). |
+  </Accordion>
+
+  <Accordion title="Dead code">
+    | Code | Settings key | Default | Description |
+    | --- | --- | --- | --- |
+    | `unused-function` | `unusedFunction` | `off` | A function this workspace defines and never calls, references or registers. Methods defined with a colon, scripted class hooks and anything extending an API library are exempt, since those are reached through a value rather than a name. **Off by default**: an addon meant to be used by other addons is full of these on purpose. `glua doctor` lists them either way. |
+  </Accordion>
+
   <Accordion title="Files">
     | Code | Settings key | Default | Description |
     | --- | --- | --- | --- |
@@ -92,7 +104,9 @@ Tune rules in `.glua.json` using the **settings key** column above. Each accepts
     "argumentCount": "warning",
     "argumentType": "warning",
     "missingAddCSLuaFile": "warning",
-    "globalWrite": "off"
+    "globalWrite": "off",
+    "perfHotPath": "warning",
+    "unusedFunction": "off"
   }
 }
 ```

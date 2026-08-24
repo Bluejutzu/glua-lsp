@@ -5,7 +5,7 @@ import {
   type Range,
   type TextEdit,
 } from 'vscode-languageserver';
-import { walk } from '../../parser/ast.js';
+import { walk, type CallExpression } from '../../parser/ast.js';
 import type { GmodApi } from '../../api/index.js';
 import { exprToPath, type FileAnalysis } from '../../analyze/binder.js';
 import type { Workspace } from '../../analyze/workspace.js';
@@ -120,6 +120,13 @@ export function codeActions(
         break;
       }
 
+      case Code.PerfHotPath: {
+        const data = diagnostic.data as { callee?: string; hoistable?: boolean } | undefined;
+        if (!data?.hoistable || !data.callee) break;
+        pushHoistAction(analysis, diagnostic, data.callee, actions, edit);
+        break;
+      }
+
       case Code.UnknownHook: {
         const name = (diagnostic.data as { name?: string })?.name;
         if (!name) break;
@@ -144,6 +151,94 @@ export function codeActions(
   pushCStyleRewrite(analysis, actions);
 
   return actions;
+}
+
+/* ----------------------------------------------------------- hoisting */
+
+/** Short prefix for the local a hoisted call is bound to. */
+const HOIST_PREFIX: Record<string, string> = {
+  Material: 'mat',
+  'surface.GetTextureID': 'tex',
+};
+
+/**
+ * Turns `Material("icon16/cog.png")` inside a render path into a file-scope
+ * local, and points the call site at it.
+ *
+ * Only offered when every argument is a literal. Anything else — a variable, a
+ * concatenation, a call — may differ between runs, and hoisting it would change
+ * what the code does rather than how often it does it.
+ */
+function pushHoistAction(
+  analysis: FileAnalysis,
+  diagnostic: Diagnostic,
+  callee: string,
+  actions: CodeAction[],
+  edit: (edits: TextEdit[]) => CodeAction['edit'],
+): void {
+  const offset = analysis.lines.offsetAt(diagnostic.range.start);
+  const call = callAt(analysis, offset);
+  if (!call || !call.args.length) return;
+
+  const literal = call.args.every(
+    (arg) =>
+      arg.type === 'StringLiteral' ||
+      arg.type === 'NumberLiteral' ||
+      arg.type === 'BooleanLiteral',
+  );
+  if (!literal) return;
+
+  const first = call.args[0];
+  if (first?.type !== 'StringLiteral') return;
+
+  const insert = insertAtTop(analysis, '');
+  const site = analysis.lines.rangeAt(call.start, call.end);
+  // The local has to end up above the call for the file to still make sense.
+  if (insert.range.start.line >= site.start.line) return;
+
+  const name = freeName(analysis, `${HOIST_PREFIX[callee] ?? 'cached'}_${slug(first.value)}`);
+  const source = analysis.text.slice(call.start, call.end);
+
+  actions.push({
+    title: `Hoist into a file-scope local '${name}'`,
+    kind: CodeActionKind.QuickFix,
+    isPreferred: true,
+    diagnostics: [diagnostic],
+    edit: edit([
+      { ...insert, newText: `local ${name} = ${source}\n` },
+      { range: site, newText: name },
+    ]),
+  });
+}
+
+/** `materials/icon16/cog.png` -> `cog`, and never something Lua would reject. */
+function slug(value: string): string {
+  const base = value.split(/[\\/]/).pop() ?? value;
+  const cleaned = base.replace(/\.[a-z0-9]+$/i, '').replace(/[^A-Za-z0-9]+/g, '_');
+  const trimmed = cleaned.replace(/^_+|_+$/g, '').slice(0, 24);
+  return /^[A-Za-z_]/.test(trimmed) ? trimmed : `_${trimmed}`;
+}
+
+/** A name the file is not already using, since the edit declares it. */
+function freeName(analysis: FileAnalysis, base: string): string {
+  const taken = (name: string) =>
+    new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(analysis.text);
+  if (!taken(base)) return base;
+  for (let i = 2; i < 100; i++) {
+    if (!taken(`${base}_${i}`)) return `${base}_${i}`;
+  }
+  return `${base}_x`;
+}
+
+/** Innermost call expression starting at an offset. */
+function callAt(analysis: FileAnalysis, offset: number): CallExpression | null {
+  let found: CallExpression | null = null;
+  walk(analysis.chunk, (node) => {
+    if (node.type !== 'CallExpression') return;
+    if (node.start !== offset) return;
+    found = node;
+  });
+  return found;
 }
 
 /* -------------------------------------------------------------- helpers */

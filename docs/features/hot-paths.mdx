@@ -1,0 +1,209 @@
+---
+title: "Hot Path Analysis for Garry's Mod Lua"
+description: "Find expensive work that runs every frame or tick — material lookups, entity sweeps, serialisation and networking reached from render hooks, ENT:Think and short timers."
+icon: "gauge-high"
+sidebarTitle: "Hot paths"
+---
+
+Most of what this extension reports is about whether code is *correct*. This one
+is about whether the server keeps its tick rate.
+
+Garry's Mod runs some of your functions sixty-odd times a second, forever. The
+work inside them is usually fine on its own, which is why it survives review —
+a `Material` lookup or an `ents.FindByClass` sweep looks like nothing. It stops
+looking like nothing when it happens on every frame, four calls below a hook you
+wrote a year ago.
+
+```lua
+hook.Add("HUDPaint", "myaddon.hud", function()
+    MyAddon.DrawBars()
+end)
+
+function MyAddon.DrawBars()
+    surface.SetMaterial(Material("myaddon/bar.png"))  -- reported here
+    for _, ply in ipairs(player.GetAll()) do          -- and here
+        -- ...
+    end
+end
+```
+
+Neither line looks wrong where it is written. The problem lives in the join, and
+the join is in another file.
+
+## How it works
+
+The workspace index builds a call graph: every function body, and every call it
+makes that lands on a function this workspace defines. From there, it starts at
+the places the engine calls into and walks outwards.
+
+**Entry points** are the things that run on a schedule:
+
+| Kind | Examples |
+| --- | --- |
+| Per-frame and per-tick hooks | `Think`, `Tick`, `HUDPaint`, `CreateMove`, `PostDrawOpaqueRenderables`, `CalcView`, and the rest of the render set |
+| Scripted class methods | `ENT:Think`, `ENT:Draw`, `SWEP:DrawHUD`, `PANEL:Paint`, `EFFECT:Render`, `TOOL:DrawToolScreen` |
+| Short timers | `timer.Create` with an interval of 0.5s or less |
+
+A hook registered by name counts too — `hook.Add("Think", "id", MyAddon.Update)`
+makes `MyAddon.Update` an entry point, the same as writing the function inline.
+
+Anything reachable from one of those, up to six calls deep, is a hot path. A
+call that costs something and sits on one gets reported where it is written,
+with the chain that reaches it:
+
+```
+'ents.FindByClass' sweeps every entity in the map, and this runs every tick —
+reached from the Think hook via MyAddon.Sweep. Collect them once and maintain
+the list from OnEntityCreated and EntityRemoved.
+```
+
+## What counts as expensive
+
+Roughly forty calls, in five groups:
+
+<AccordionGroup>
+  <Accordion title="Setup that should happen once">
+    `surface.CreateFont`, `hook.Add`, `hook.Remove`, `timer.Create`,
+    `concommand.Add`, `CreateConVar`, `CreateClientConVar`,
+    `util.AddNetworkString`, `net.Receive`, `sound.Add`, `language.Add`,
+    `killicon.Add`, `resource.AddFile`, `include`, `AddCSLuaFile`,
+    `CompileString`, `RunString`, `CompileFile`.
+
+    A registration inside a per-frame function replaces itself before it can do
+    anything. `surface.CreateFont` in a paint hook is the classic version of
+    this, and the most expensive.
+  </Accordion>
+
+  <Accordion title="Disk, database and HTTP">
+    `file.Read`, `file.Write`, `file.Append`, `file.Find`, `file.Exists`,
+    `file.Size`, `file.Time`, `sql.Query`, `sql.QueryRow`, `sql.QueryValue`,
+    `http.Fetch`, `http.Post`, `HTTP`.
+  </Accordion>
+
+  <Accordion title="Serialisation">
+    `util.TableToJSON`, `util.JSONToTable`, `util.TableToKeyValues`,
+    `util.KeyValuesToTable`, `util.Compress`, `util.Decompress`, `util.CRC`,
+    `util.Base64Encode`, `util.Base64Decode`, `table.Copy`.
+
+    All of these walk the whole value. Doing that when the data changes rather
+    than when it is read is usually a one-line change.
+  </Accordion>
+
+  <Accordion title="Sweeps over the map">
+    `ents.GetAll`, `ents.FindByClass`, `ents.FindByClassAndParent`,
+    `ents.FindByModel`, `ents.FindByName`, `ents.FindInSphere`,
+    `ents.FindInBox`, `ents.FindInCone`, `ents.FindAlongRay`,
+    `player.GetAll`, `player.GetHumans`, `player.GetBots`, `team.GetPlayers`.
+  </Accordion>
+
+  <Accordion title="Lookups and networking">
+    `Material` and `surface.GetTextureID` look their argument up by string;
+    `GetConVarNumber` and `GetConVarString` look the console variable up by
+    name. `net.Start` and the `SetNW*` / `SetNW2*` setters send to every
+    client — a value written every tick is bandwidth every tick, whether or not
+    it changed.
+  </Accordion>
+</AccordionGroup>
+
+## What it leaves alone
+
+A per-frame function that rate-limits itself is not a hot path, and reporting on
+one is the fastest way to get a rule switched off. Three shapes are recognised:
+
+```lua
+function ENT:Think()
+    -- An early return guarded by a time comparison: nothing below this line
+    -- counts as per-frame.
+    if CurTime() < (self.NextScan or 0) then return end
+    self.NextScan = CurTime() + 1
+
+    local nearby = ents.FindInSphere(self:GetPos(), 512)  -- not reported
+end
+```
+
+```lua
+hook.Add("Think", "myaddon.tick", function()
+    if CurTime() > nextRun then          -- a wrapping condition works too
+        nextRun = CurTime() + 5
+        MyAddon.Sweep()
+    end
+end)
+```
+
+```lua
+hook.Add("HUDPaint", "myaddon.setup", function()
+    if not built then                    -- a one-time gate
+        built = true
+        surface.CreateFont("MyFont", {})
+    end
+end)
+```
+
+Anything mentioning `CurTime`, `RealTime`, `SysTime`, `UnPredictedCurTime`,
+`FrameNumber`, `engine.TickCount` or `os.clock` counts as a time guard, as does
+a name beginning `next`, `last`, `cooldown` or `delay`. A `not x` or `x == nil`
+condition counts as a one-time gate. Calls behind any of those are skipped, and
+so is anything they reach.
+
+Hooks that fire on an event rather than a clock — `PlayerSay`, `PlayerSpawn`,
+`EntityTakeDamage` — are not entry points at all.
+
+## The quick fix
+
+`Material` and `surface.GetTextureID` with literal arguments can be lifted out
+of the frame mechanically, so the light bulb offers it:
+
+```lua
+-- before
+hook.Add("HUDPaint", "x", function()
+    surface.SetMaterial(Material("myaddon/bar.png"))
+end)
+
+-- after: Hoist into a file-scope local 'mat_bar'
+local mat_bar = Material("myaddon/bar.png")
+
+hook.Add("HUDPaint", "x", function()
+    surface.SetMaterial(mat_bar)
+end)
+```
+
+Only offered when every argument is a literal. A variable or a concatenation
+might differ between calls, and hoisting it would change what the code does
+rather than how often it does it.
+
+## Seeing the whole picture
+
+`GLua: Project Report` — or `glua doctor` on the command line — has a **Hot
+paths** section listing the findings furthest from their entry point, since
+those are the ones nobody spots by reading a single file. It also counts how
+many entry points the project has, and which expensive calls turn up most often
+across all of them.
+
+## Turning it down
+
+The rule is `perf-hot-path`, keyed `perfHotPath`, and reported as a warning:
+
+```json
+{
+  "diagnostics": {
+    "perfHotPath": "information"
+  }
+}
+```
+
+Suppress a single finding inline when the cost is deliberate — a cache being
+built on purpose, work that really does have to happen every frame:
+
+```lua
+-- glua-ignore perf-hot-path
+local mat = Material(self:GetSkinMaterial())
+```
+
+## Reading the call graph directly
+
+The same index answers **call hierarchy**, so you can walk it yourself rather
+than waiting for a finding. Put the cursor on a function and use your editor's
+call hierarchy command — <kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> in VS
+Code — to see who calls it, or switch the tree to outgoing calls to see what it
+reaches. Callbacks registered on a hook are named after the hook they serve, so
+a chain that ends at `HUDPaint` says so.
