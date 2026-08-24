@@ -8,6 +8,11 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **Hooks of your own are typed.** A hook you invented has no documentation, so
+  its `hook.Run` call sites are read as its signature and callbacks registered
+  for it are typed from them. Positions the call sites disagree about stay
+  `any`. A callback declaring more parameters than anything passes is reported,
+  since the extras are always `nil`.
 - **Support for editors other than VS Code.** The language server now ships as
   its own `glua-lsp` binary in the `glua-cli` npm package, so Neovim, Helix,
   Zed, Sublime Text and anything else with an LSP client get the same

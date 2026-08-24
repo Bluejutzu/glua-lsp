@@ -321,8 +321,10 @@ export function diagnose(
       }
     }
 
-    if (documented && callback?.type === 'FunctionExpression' && !callback.isVararg) {
-      const declared = callback.params.length;
+    if (callback?.type !== 'FunctionExpression' || callback.isVararg) return;
+    const declared = callback.params.length;
+
+    if (documented) {
       const available = documented.params.length;
       if (declared > available) {
         push(
@@ -333,7 +335,27 @@ export function diagnose(
           Code.ArgumentCount,
         );
       }
+      return;
     }
+
+    // A hook of your own: every hook.Run for it is the documentation.
+    const custom = workspace.customHookSignature(nameArg.value);
+    if (!custom || declared <= custom.maxArity) return;
+
+    // Call sites that disagree with each other are a weaker claim, so say what
+    // was actually seen rather than asserting one arity.
+    const spread = custom.minArity === custom.maxArity;
+    push(
+      { start: callback.params[custom.maxArity]!.start, end: callback.params[declared - 1]!.end },
+      `Nothing passes this many arguments to '${nameArg.value}'. ` +
+        (spread
+          ? `Its ${custom.sites} call site${custom.sites === 1 ? '' : 's'} pass ${custom.maxArity}, ` +
+            `but this callback declares ${declared}.`
+          : `Its ${custom.sites} call sites pass between ${custom.minArity} and ${custom.maxArity}, ` +
+            `but this callback declares ${declared}.`),
+      severityOf(d.argumentCount),
+      Code.ArgumentCount,
+    );
   }
 
   /* -------------------------------------------------------------- net */

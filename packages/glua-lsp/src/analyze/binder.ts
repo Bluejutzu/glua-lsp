@@ -26,6 +26,7 @@ import {
   fromApiType,
   scriptedType,
   tableType,
+  typeName,
   union,
   type GType,
 } from './types.js';
@@ -69,6 +70,12 @@ export interface HookAddFact {
 export interface HookRunFact {
   hookName: string;
   nameSpan: Span;
+  /**
+   * Types passed at this call site, which is the only signature a hook of your
+   * own has. Absent for `gameevent.Listen`, which registers a name rather than
+   * firing it and so says nothing about the payload.
+   */
+  argTypes?: string[];
 }
 
 export interface NetOp {
@@ -190,6 +197,22 @@ export interface AnalyseOptions {
    * `ents.Create("my_turret")` can carry that class rather than a bare Entity.
    */
   scriptedClass?: (name: string) => ScriptedClass | undefined;
+  /**
+   * Signature of a hook this workspace fires itself, worked out from the
+   * `hook.Run` call sites. Lets a callback for your own hook be typed the same
+   * way a documented one is.
+   */
+  customHook?: (name: string) => CustomHookSignature | undefined;
+}
+
+/** What the `hook.Run` sites for one custom hook name agree on. */
+export interface CustomHookSignature {
+  /** Type per position, `any` where the call sites disagree. */
+  params: string[];
+  /** Fewest and most arguments any call site passes. */
+  minArity: number;
+  maxArity: number;
+  sites: number;
 }
 
 /**
@@ -758,7 +781,14 @@ export function analyseFile(
       case 'hook.Run':
       case 'hook.Call': {
         const name = stringArg(args, 0);
-        if (name) hookRuns.push({ hookName: name.value, nameSpan: name.span });
+        if (!name) break;
+        // hook.Call takes the gamemode table between the name and the payload.
+        const payload = args.slice(path === 'hook.Call' ? 2 : 1);
+        hookRuns.push({
+          hookName: name.value,
+          nameSpan: name.span,
+          argTypes: payload.map((arg) => typeName(inferType(arg, scope))),
+        });
         break;
       }
       case 'gameevent.Listen': {
@@ -894,8 +924,13 @@ export function analyseFile(
       const name = stringArg(call.args, 0);
       if (!name) return null;
       const hook = api.getGlobalHook(name.value);
-      if (!hook) return null;
-      return hook.params.map((p) => ({ name: p.name, type: p.type }));
+      if (hook) return hook.params.map((p) => ({ name: p.name, type: p.type }));
+
+      // Not a documented hook, but if the workspace fires it, the call sites
+      // are its signature.
+      const custom = options.customHook?.(name.value);
+      if (!custom) return null;
+      return custom.params.map((type, i) => ({ name: `arg${i + 1}`, type }));
     }
 
     const known = CALLBACK_PARAMS[path];

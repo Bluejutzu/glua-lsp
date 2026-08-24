@@ -115,6 +115,31 @@ export function typeToString(type: GType): string {
   }
 }
 
+/**
+ * A type name that reads back through `fromApiType`, for facts that cross file
+ * boundaries. `typeToString` is for display and does not round trip — it writes
+ * a scripted entity as `Entity (my_turret)`, which names no type at all.
+ */
+export function typeName(type: GType): string {
+  switch (type.kind) {
+    case 'class':
+      return type.name;
+    case 'number':
+    case 'string':
+    case 'boolean':
+    case 'nil':
+      return type.kind;
+    case 'table':
+      return type.struct ?? 'table';
+    case 'function':
+      return 'function';
+    case 'union':
+      return type.options.map(typeName).join('|');
+    default:
+      return 'any';
+  }
+}
+
 export function formatApiSignature(fn: ApiFunction): string {
   const params = fn.params
     .map((p) => {

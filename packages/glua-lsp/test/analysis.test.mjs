@@ -643,6 +643,91 @@ test('array returns resolve on methods, not just library functions', () => {
   }
 });
 
+/* ------------------------------------------------------- custom hooks */
+
+test('a custom hook callback is typed from the hook.Run call sites', () => {
+  const { text, offset } = withCursor(`
+hook.Add("MyAddon.TurretPlaced", "x", function(ply, turret)
+  ply:|
+end)
+`);
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/server/sv_fire.lua':
+      'local ply = player.GetByID(1)\nhook.Run("MyAddon.TurretPlaced", ply, ents.GetAll()[1])\n',
+    'lua/autorun/server/sv_handle.lua': text,
+  });
+  const analysis = analyses['lua/autorun/server/sv_handle.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('Nick'), 'the first argument was a Player at the call site');
+  assert.ok(names.includes('SetHealth'), 'and Player inherits Entity');
+});
+
+test('call sites that disagree about a position leave it untyped', () => {
+  const { workspace } = makeWorkspace({
+    'lua/autorun/sh_a.lua': 'local ply = player.GetByID(1)\nhook.Run("Amb.Thing", ply)\n',
+    'lua/autorun/sh_b.lua': 'hook.Run("Amb.Thing", "a string")\n',
+  });
+
+  const signature = workspace.customHookSignature('Amb.Thing');
+  assert.equal(signature.params[0], 'any', 'a Player in one place and a string in another');
+  assert.equal(signature.sites, 2);
+});
+
+test('a call site passing nil does not type the parameter as nil', () => {
+  const { workspace } = makeWorkspace({
+    'lua/autorun/sh_nil.lua':
+      'local ply = player.GetByID(1)\nhook.Run("N.Hurt", nil, 1)\nhook.Run("N.Hurt", ply, 2)\n',
+  });
+
+  const signature = workspace.customHookSignature('N.Hurt');
+  assert.match(signature.params[0], /Player/, 'the informative call site wins over the nil one');
+  assert.equal(signature.params[1], 'number');
+});
+
+test('hook.Call skips the gamemode table when reading the payload', () => {
+  const { workspace } = makeWorkspace({
+    'lua/autorun/sh_call.lua':
+      'local ply = player.GetByID(1)\nhook.Call("Cm.Fired", GAMEMODE, ply)\n',
+  });
+
+  const signature = workspace.customHookSignature('Cm.Fired');
+  assert.equal(signature.params.length, 1, 'the gamemode table is not part of the payload');
+  assert.match(signature.params[0], /Player/);
+});
+
+test('gameevent.Listen does not claim the hook takes no arguments', () => {
+  const { workspace } = makeWorkspace({
+    'lua/autorun/sh_ev.lua':
+      'gameevent.Listen("player_hurt")\nhook.Run("player_hurt", 1, 2)\n',
+  });
+
+  const signature = workspace.customHookSignature('player_hurt');
+  assert.equal(signature.maxArity, 2, 'the Listen call registers a name, it does not fire one');
+  assert.equal(signature.sites, 1);
+});
+
+test('a callback taking more than any call site passes is flagged', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/sh_run.lua': 'hook.Run("MyAddon.Ping", 1)\n',
+    'lua/autorun/sh_add.lua': 'hook.Add("MyAddon.Ping", "x", function(a, b, c) end)\n',
+  });
+
+  const found = diagnose(analyses['lua/autorun/sh_add.lua'], api, workspace, DEFAULT_SETTINGS);
+  const arity = found.filter((x) => x.code === 'argument-count');
+  assert.equal(arity.length, 1, JSON.stringify(found.map((f) => f.message)));
+  assert.match(arity[0].message, /Nothing passes this many arguments/);
+});
+
+test('a hook nothing fires is left alone by the arity check', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/sh_only.lua': 'hook.Add("PlayerSay", "x", function(a, b) end)\n',
+  });
+
+  const found = diagnose(analyses['lua/autorun/sh_only.lua'], api, workspace, DEFAULT_SETTINGS);
+  assert.equal(found.filter((x) => x.code === 'argument-count').length, 0);
+});
+
 /* --------------------------------------------------- scripted classes */
 
 test('a class name comes from the directory, or the file for a single-file class', () => {
