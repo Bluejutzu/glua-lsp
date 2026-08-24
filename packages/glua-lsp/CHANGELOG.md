@@ -23,10 +23,8 @@ _Nothing yet._
 
 ### Changed
 
-- `glua-cli` is on npm, and the release workflow publishes it over OIDC rather
-  than a stored token. It declares no dependencies — everything is bundled —
-  and its version now moves in lockstep with the extension, since it carries
-  the same analyser.
+- `glua-cli` is now published on npm, with the formatter and linter available
+  directly in the terminal.
 
 ## 0.2.3
 

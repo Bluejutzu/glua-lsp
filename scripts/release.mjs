@@ -14,10 +14,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bold, c, heading, symbols } from '../packages/glua-lsp/tools/palette.mjs';
+import { renderChangelogDocs } from './lib/changelog-docs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = path.join(ROOT, 'packages', 'glua-lsp', 'package.json');
 const CHANGELOG = path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md');
+const CHANGELOG_DOCS = path.join(ROOT, 'docs', 'changelog.mdx');
 
 /**
  * The CLI bundles the analyser straight from the extension's source, so any
@@ -169,6 +171,10 @@ const staged = [path.relative(ROOT, MANIFEST), path.relative(ROOT, CLI_MANIFEST)
 if (changelog.contents) {
   fs.writeFileSync(CHANGELOG, changelog.contents);
   staged.push(path.relative(ROOT, CHANGELOG));
+
+  const repoUrl = manifest.repository.url.replace(/\.git$/, '');
+  fs.writeFileSync(CHANGELOG_DOCS, renderChangelogDocs(changelog.contents, { repoUrl }));
+  staged.push(path.relative(ROOT, CHANGELOG_DOCS));
 }
 
 git('add', ...staged);
