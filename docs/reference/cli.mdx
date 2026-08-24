@@ -105,7 +105,16 @@ above an include, and a C-style compound assignment.
 </Note>
 
 Fixes run in passes, since resolving one can reveal another, capped at five so a
-pair that undo each other cannot spin.
+pair that undo each other cannot spin. An identical fix asked for twice — two
+sends of the same unregistered message both wanting the same
+`util.AddNetworkString` line — is written once.
+
+<Warning>
+  Fixing does not change the exit code rules. Anything left over is still
+  reported, so an error no fix could settle still exits `1`, and
+  `--max-warnings` still applies to what remains. `--fix` cannot turn a failing
+  build green.
+</Warning>
 
 <Note>
   The whole project gets indexed even when you lint a single file. Cross-file rules — an unhandled net message, a duplicate hook identifier, a missing `AddCSLuaFile` — are only correct once the index has seen everything.

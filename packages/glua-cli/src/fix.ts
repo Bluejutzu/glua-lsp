@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CodeAction, TextEdit } from 'vscode-languageserver-types';
+import { DiagnosticSeverity, type CodeAction, type TextEdit } from 'vscode-languageserver-types';
 
 import { codeActions } from '@glua/server/features/codeActions.js';
 import { diagnose } from '@glua/server/features/diagnostics.js';
@@ -19,6 +19,12 @@ export interface FixResult {
   /** Files changed, with how many fixes each took. */
   fixed: { file: string; applied: number; titles: string[] }[];
   remaining: number;
+  /**
+   * Severity of what is left. Fixing must not turn a failing build green: a
+   * parse error no fix could resolve is still an error.
+   */
+  remainingErrors: number;
+  remainingWarnings: number;
   filesChecked: number;
   output: string;
 }
@@ -48,6 +54,8 @@ export function fix(targets: string[], options: FixOptions): FixResult {
 
   const fixed: FixResult['fixed'] = [];
   let remaining = 0;
+  let remainingErrors = 0;
+  let remainingWarnings = 0;
 
   files.forEach((file, i) => {
     const relative = path.relative(root, file).replace(/\\/g, '/');
@@ -85,9 +93,14 @@ export function fix(targets: string[], options: FixOptions): FixResult {
 
     // Whatever no preferred fix could resolve is still a finding.
     const finalAnalysis = workspace.analyse(uriOf(file), text, MAX_PASSES + 1);
-    remaining += diagnose(finalAnalysis, api, workspace, config.settingsFor(finalAnalysis.fsPath), {
+    const left = diagnose(finalAnalysis, api, workspace, config.settingsFor(finalAnalysis.fsPath), {
       extraGlobals: config.globalsFor(finalAnalysis.fsPath),
-    }).length;
+    });
+    remaining += left.length;
+    for (const diagnostic of left) {
+      if (diagnostic.severity === DiagnosticSeverity.Error) remainingErrors++;
+      else if (diagnostic.severity === DiagnosticSeverity.Warning) remainingWarnings++;
+    }
 
     if (applied) {
       fixed.push({ file, applied, titles });
@@ -101,8 +114,10 @@ export function fix(targets: string[], options: FixOptions): FixResult {
   return {
     fixed,
     remaining,
+    remainingErrors,
+    remainingWarnings,
     filesChecked: files.length,
-    output: render(fixed, remaining, files.length, root, options.dryRun ?? false),
+    output: render(fixed, remaining, remainingErrors, files.length, root, options.dryRun ?? false),
   };
 }
 
@@ -137,17 +152,28 @@ function applyEdits(
   edits: TextEdit[],
   analysis: { lines: { offsetAt(position: { line: number; character: number }): number } },
 ): string {
-  const resolved = edits
-    .map((edit) => ({
-      start: analysis.lines.offsetAt(edit.range.start),
-      end: analysis.lines.offsetAt(edit.range.end),
-      newText: edit.newText,
-    }))
-    .sort((a, b) => b.start - a.start);
+  const seen = new Set<string>();
+  const resolved: { start: number; end: number; newText: string }[] = [];
+
+  for (const edit of edits) {
+    const start = analysis.lines.offsetAt(edit.range.start);
+    const end = analysis.lines.offsetAt(edit.range.end);
+    // Two diagnostics for the same message each ask for the same insertion at
+    // the top of the file, and applying both writes the line twice.
+    const key = `${start}:${end}:${edit.newText}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    resolved.push({ start, end, newText: edit.newText });
+  }
+
+  resolved.sort((a, b) => b.start - a.start);
 
   let out = text;
   let lastStart = Number.POSITIVE_INFINITY;
   for (const edit of resolved) {
+    // Genuine overlap only. Two *different* insertions at one offset — one per
+    // unregistered message, say — are both wanted, and applying them back to
+    // front stacks them correctly.
     if (edit.end > lastStart) continue;
     out = out.slice(0, edit.start) + edit.newText + out.slice(edit.end);
     lastStart = edit.start;
@@ -158,6 +184,7 @@ function applyEdits(
 function render(
   fixed: FixResult['fixed'],
   remaining: number,
+  remainingErrors: number,
   filesChecked: number,
   root: string,
   dryRun: boolean,
@@ -188,8 +215,12 @@ function render(
   }
 
   if (remaining) {
+    const errors = remainingErrors
+      ? `${c.failure(`${remainingErrors} error${remainingErrors === 1 ? '' : 's'}`)}${c.faint(' of ')}`
+      : '';
     lines.push(
-      `  ${c.warning(String(remaining))} ${c.faint('left, which need a look — run `glua lint` to see them')}`,
+      `  ${errors}${c.warning(String(remaining))} ` +
+        c.faint('left, which need a look — run `glua lint` to see them'),
     );
   }
 

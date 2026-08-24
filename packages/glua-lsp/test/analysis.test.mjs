@@ -939,6 +939,55 @@ test('a file that is not a VPK costs that archive, not the feature', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('asset completion narrows by what is typed before it truncates', () => {
+  // A game directory holds far more paths than are worth sending, so the list
+  // is cut — but cutting before filtering means later keystrokes can never
+  // reach anything outside that first arbitrary slice.
+  const many = [];
+  for (let i = 0; i < 900; i++) many.push(`garrysmod/materials/bulk/pad${i}.vmt`);
+  many.push('garrysmod/materials/hud/needle.vmt');
+  const game = makeAssetTree(many);
+
+  const workspace = new Workspace(api, { maxFiles: 10, exclude: [], gamePath: game });
+  const { text, offset } = withCursor('local m = Material("hud/nee|")\n');
+  const analysis = workspace.analyse(uriOf('lua', 'autorun', 'client', 'cl_m.lua'), text, 1);
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('hud/needle'), 'the one match must survive the cut');
+  assert.ok(names.length < 900, 'and the list is still bounded');
+
+  fs.rmSync(game, { recursive: true, force: true });
+});
+
+test('a library file open in the editor is still not reported on', () => {
+  const library = makeLibrary({ 'lua/ulib/bad.lua': 'local unused = 1\nx += 1\n' });
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+
+  const uri = [...workspace.uris()][0];
+  assert.ok(workspace.isLibrary(uri), 'and it stays a library once opened');
+
+  // Re-analysing it the way opening a document does must not change that.
+  const onDisk = fs.readFileSync(path.join(library, 'lua', 'ulib', 'bad.lua'), 'utf8');
+  workspace.analyse(uri, onDisk, 2, true);
+  assert.ok(workspace.isLibrary(uri));
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
+test('clearing libraries drops their globals again', () => {
+  const library = makeLibrary({ 'lua/ulib/shared.lua': 'ULib = {}\nfunction ULib.go() end\n' });
+  const workspace = new Workspace(api, { maxFiles: 50, exclude: [] });
+  workspace.indexLibrary(library);
+  assert.ok(workspace.isKnownGlobalPath('ULib'));
+
+  workspace.clearLibraries();
+  assert.equal(workspace.libraryCount, 0);
+  assert.ok(!workspace.isKnownGlobalPath('ULib'), 'removing it from the config must mean something');
+
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
 test('asset references are recorded for every call form', () => {
   const { analyses } = makeWorkspace({
     'lua/autorun/sh_assets.lua':

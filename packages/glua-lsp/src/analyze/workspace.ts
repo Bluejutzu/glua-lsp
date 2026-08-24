@@ -625,6 +625,19 @@ export class Workspace {
     return this.libraryUris.has(uri);
   }
 
+  /**
+   * Forgets every indexed library.
+   *
+   * Removing one from the config has to actually drop its files, or its globals
+   * keep resolving after you have said the dependency is gone.
+   */
+  clearLibraries(): void {
+    if (!this.libraryUris.size) return;
+    for (const uri of this.libraryUris) this.files.delete(uri);
+    this.libraryUris.clear();
+    this.invalidate();
+  }
+
   get libraryCount(): number {
     return this.libraryUris.size;
   }
