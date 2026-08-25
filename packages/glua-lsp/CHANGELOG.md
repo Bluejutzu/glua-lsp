@@ -6,7 +6,12 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Changed
+
+- Extension id is now `blight.glua`, not `blight.glua-lsp` as 0.5.2 said. The
+  Marketplace ties extension names to the Azure DevOps organisation rather
+  than the publisher, and `glua-lsp` was already taken there — `glua` is the
+  name that actually published.
 
 ## 0.5.2
 

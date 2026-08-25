@@ -12,11 +12,11 @@ Same build, three ways to get it. Pick whichever your editor installs from.
     **Available now.** Download the `.vsix` and install it in any editor.
   </Card>
 
-  <Card title="Open VSX" icon="box" href="https://open-vsx.org/extension/blight/glua-lsp">
+  <Card title="Open VSX" icon="box" href="https://open-vsx.org/extension/blight/glua">
     For **Cursor**, VSCodium, Gitpod and Theia.
   </Card>
 
-  <Card title="VS Code Marketplace" icon="microsoft" href="https://marketplace.visualstudio.com/items?itemName=blight.glua-lsp">
+  <Card title="VS Code Marketplace" icon="microsoft" href="https://marketplace.visualstudio.com/items?itemName=blight.glua">
     For **VS Code**.
   </Card>
 </CardGroup>
@@ -30,15 +30,15 @@ Same build, three ways to get it. Pick whichever your editor installs from.
 <CodeGroup>
 
 ```bash VS Code
-code --install-extension blight.glua-lsp
+code --install-extension blight.glua
 ```
 
 ```bash Cursor
-cursor --install-extension blight.glua-lsp
+cursor --install-extension blight.glua
 ```
 
 ```bash From a .vsix
-code --install-extension glua-lsp-<version>.vsix 
+code --install-extension glua-<version>.vsix 
 ```
 
 </CodeGroup>
@@ -47,7 +47,7 @@ code --install-extension glua-lsp-<version>.vsix
 
 <Steps>
   <Step title="Download the VSIX">
-    Grab `glua-lsp-<version>.vsix` from the [latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest).
+    Grab `glua-<version>.vsix` from the [latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest).
   </Step>
   <Step title="Install it">
     Run this from the folder you saved the file in.
@@ -55,11 +55,11 @@ code --install-extension glua-lsp-<version>.vsix
     <CodeGroup>
 
     ```bash VS Code
-    code --install-extension glua-lsp-<version>.vsix
+    code --install-extension glua-<version>.vsix
     ```
 
     ```bash Cursor
-    cursor --install-extension glua-lsp-<version>.vsix
+    cursor --install-extension glua-<version>.vsix
     ```
 
     </CodeGroup>
@@ -109,13 +109,13 @@ Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pic
     pnpm run package
     ```
 
-    That writes `packages/glua-lsp/glua-lsp-<version>.vsix`.
+    That writes `packages/glua-lsp/glua-<version>.vsix`.
   </Step>
   <Step title="Run or install">
     Press **F5** to launch the extension in a new Extension Development Host window, or install the package you just built.
 
     ```bash
-    code --install-extension packages/glua-lsp/glua-lsp-<version>.vsix
+    code --install-extension packages/glua-lsp/glua-<version>.vsix
     ```
   </Step>
 </Steps>
@@ -135,7 +135,7 @@ Register it as the default formatter for the `glua` language in your user or wor
 ```json
 {
   "[glua]": {
-    "editor.defaultFormatter": "blight.glua-lsp",
+    "editor.defaultFormatter": "blight.glua",
     "editor.formatOnSave": true
   }
 }

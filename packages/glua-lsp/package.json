@@ -1,5 +1,5 @@
 {
-  "name": "glua-lsp",
+  "name": "glua",
   "displayName": "GLua for Garry's Mod",
   "description": "Language server for Garry's Mod Lua — AST-based IntelliSense, realm awareness, hook and net message analysis, cross-file diagnostics.",
   "version": "0.5.2",
@@ -507,7 +507,7 @@
     ],
     "configurationDefaults": {
       "[glua]": {
-        "editor.defaultFormatter": "blight.glua-lsp"
+        "editor.defaultFormatter": "blight.glua"
       }
     },
     "semanticTokenScopes": [
