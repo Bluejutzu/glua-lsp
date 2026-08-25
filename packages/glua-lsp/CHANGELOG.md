@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.5.0
+
 ### Added
 
 - **`unused-suppression`**, reporting a `-- glua-ignore` or `-- glua-disable`
