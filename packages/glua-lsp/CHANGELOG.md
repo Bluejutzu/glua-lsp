@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.5.2
+
 ### Changed
 
 - Now published under the `blight` publisher on the VS Code Marketplace and
