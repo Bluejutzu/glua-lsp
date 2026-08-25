@@ -93,6 +93,18 @@ test('json output is machine readable', { skip: !built }, () => {
     assert.ok(Number.isInteger(finding.line));
     assert.ok(typeof finding.code === 'string');
     assert.ok(typeof finding.message === 'string');
+    assert.equal(finding.url, `https://glua.bluejutzu.dev/reference/rules#${finding.code}`);
+  }
+});
+
+test('sarif points every rule at its own section', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_bad.lua': 'local x = 1\nx += 1\nprint(x)\n' });
+  const parsed = JSON.parse(run(['lint', root, '--root', root, '--format', 'sarif']).stdout);
+  const rules = parsed.runs[0].tool.driver.rules;
+
+  assert.ok(rules.length > 10, 'the catalogue should carry every rule');
+  for (const rule of rules) {
+    assert.equal(rule.helpUri, `https://glua.bluejutzu.dev/reference/rules#${rule.id}`);
   }
 });
 

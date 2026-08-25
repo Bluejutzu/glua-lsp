@@ -202,6 +202,28 @@ end
   );
 });
 
+test('every diagnostic carries a link to the rule that produced it', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/server/sv_mixed.lua':
+      'net.Start("my_msg")\nnet.Broadcast()\nlocal unused = 1\nUnknownThing()\n',
+  });
+  const found = diagnose(
+    analyses['lua/autorun/server/sv_mixed.lua'],
+    api,
+    workspace,
+    DEFAULT_SETTINGS,
+  );
+
+  assert.ok(found.length > 2, 'the fixture should produce several findings');
+  for (const diagnostic of found) {
+    assert.equal(
+      diagnostic.codeDescription?.href,
+      `https://glua.bluejutzu.dev/reference/rules#${diagnostic.code}`,
+      `no rule link on ${diagnostic.code}`,
+    );
+  }
+});
+
 /* ------------------------------------------------------------------- net */
 
 test('flags a net message that is never registered or received', () => {

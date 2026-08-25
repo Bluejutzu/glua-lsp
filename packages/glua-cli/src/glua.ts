@@ -290,7 +290,7 @@ program
   .command('rules')
   .description('List every diagnostic rule and its settings key')
   .action(async () => {
-    const { RULES } = await import('./rules.js');
+    const { RULES, DOCS_BASE } = await import('@glua/rules.js');
     process.stdout.write(`${heading('Diagnostic rules')}\n\n`);
     const width = Math.max(...RULES.map((r) => r.code.length));
     for (const rule of RULES) {
@@ -300,7 +300,8 @@ program
       );
     }
     process.stdout.write(
-      `\n  ${c.faint(`suppress one inline with ${bold('-- glua-ignore <code>')}`)}\n\n`,
+      `\n  ${c.faint(`suppress one inline with ${bold('-- glua-ignore <code>')}`)}\n` +
+        `  ${c.faint(`each rule is explained at ${DOCS_BASE}/reference/rules`)}\n\n`,
     );
   });
 

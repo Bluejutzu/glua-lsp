@@ -14,81 +14,217 @@ Each rule has two names, and they are not the same thing:
 
 Severity accepts `error`, `warning`, `information`, `hint` or `off`.
 
-<AccordionGroup>
-  <Accordion title="Globals">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `undefined-global` | `undefinedGlobal` | `warning` | A global that is neither a known GMod API member nor assigned anywhere in the workspace. Existence checks like `if x and x.y then` are respected, so depending on an optional addon does not trigger it. Declare external addons under [`globals`](/configuration/config-files) rather than turning this off. |
-    | `global-write` | `globalWrite` | `off` | Writing to a global instead of declaring a local. Noisy by design, so it ships off. |
-    | `unused-local` | `unusedLocal` | `hint` | A local declared but never read. Names starting with `_` are exempt. |
-  </Accordion>
+Every rule has its own section below, and the code shown in the Problems panel
+links straight to it. `glua rules` lists the same catalogue in the terminal, and
+SARIF output carries the same links into GitHub code scanning.
 
-  <Accordion title="Realms">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `realm-violation` | `realmViolation` | `warning` | A call to API that cannot exist in this file's realm, for example a serverside-only function in a clientside file. Reported as `information` instead when the realm came from a `cl_`/`sv_` filename prefix, since that is a convention rather than a guarantee. |
-  </Accordion>
+## Globals
 
-  <Accordion title="Net messages">
-    All four share the `netMessage` settings key, except the payload check.
+### `undefined-global`
 
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `net-unregistered` | `netMessage` | `warning` | `net.Start` on a message never passed to `util.AddNetworkString`. Fails at runtime. |
-    | `net-never-dispatched` | `netMessage` | `warning` | A `net.Start` block that never calls `net.Send`, `net.Broadcast` or `net.SendToServer`, so the message is built and dropped. |
-    | `net-never-received` | `netMessage` | `warning` | A message that is sent but has no `net.Receive` anywhere. |
-    | `net-never-sent` | `netMessage` | `warning` | A `net.Receive` for a message nothing ever sends. |
-    | `net-payload-mismatch` | `netReadWriteMismatch` | `warning` | The `net.Write*` sequence in the sender does not match the `net.Read*` sequence in the handler. |
-  </Accordion>
+`undefinedGlobal` · default `warning`
 
-  <Accordion title="Hooks and timers">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `unknown-hook` | `unknownHook` | `information` | A hook name that is neither documented nor fired anywhere in the workspace. Quick fixes offer the closest known names by edit distance. |
-    | `duplicate-hook-identifier` | `duplicateIdentifier` | `warning` | Two `hook.Add` calls with the same event and identifier in overlapping realms. The second silently replaces the first. |
-    | `duplicate-timer-name` | `duplicateIdentifier` | `warning` | Two `timer.Create` calls with the same name in overlapping realms. |
-  </Accordion>
+A global that is neither a known GMod API member nor assigned anywhere in the
+workspace — usually a typo, sometimes a dependency this project does not declare.
 
-  <Accordion title="API calls">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `deprecated` | `deprecated` | `warning` | Use of API the wiki marks deprecated or removed. The message includes the documented replacement. |
-    | `argument-count` | `argumentCount` | `warning` | The wrong number of arguments, checked against every documented call form. Skipped for the Lua standard library, whose documented signatures are not precise enough. |
-    | `argument-type` | `argumentType` | `warning` | An argument whose inferred type cannot match the documented parameter. Only fires when no documented overload accepts what was passed. |
-  </Accordion>
+Existence checks are respected, so the usual way of depending on an optional
+addon does not trigger it:
 
-  <Accordion title="Performance">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `perf-hot-path` | `perfHotPath` | `warning` | Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` that repeats forever at 0.5s or less. The message names the chain of functions that reaches it. Calls behind a `CurTime()` guard, a `nextThink`-style field, or a one-time `if not x then` gate are skipped. [Full description](/features/hot-paths). |
-  </Accordion>
+```lua
+if DarkRP and DarkRP.getPhrase then
+  print(DarkRP.getPhrase("hello"))
+end
+```
 
-  <Accordion title="Dead code">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `unused-function` | `unusedFunction` | `off` | A function this workspace defines and never calls, references or registers. Methods defined with a colon, scripted class hooks and anything extending an API library are exempt, since those are reached through a value rather than a name. **Off by default**: an addon meant to be used by other addons is full of these on purpose. `glua doctor` lists them either way. |
-  </Accordion>
+For a hard dependency, declare it under [`globals`](/configuration/config-files)
+rather than turning the rule off — that keeps the check working for real typos.
 
-  <Accordion title="Files">
-    | Code | Settings key | Default | Description |
-    | --- | --- | --- | --- |
-    | `missing-addcsluafile` | `missingAddCSLuaFile` | `warning` | A clientside file that is `include`d but never sent with `AddCSLuaFile`, so clients never receive it. Directories the engine networks itself are skipped. A quick fix inserts the missing call. |
-  </Accordion>
+### `global-write`
 
-  <Accordion title="Syntax">
-    Always reported as errors, and not configurable.
+`globalWrite` · default `off`
 
-    | Code | Description |
-    | --- | --- |
-    | `syntax` | The file does not parse. Formatting is disabled for the file while this is present. |
-    | `compound-assignment` | `x += 1` is not valid Lua. A quick fix rewrites it as `x = x + 1`. |
-  </Accordion>
-</AccordionGroup>
+Writing to a global instead of declaring a local, which leaks the name into `_G`
+where any other addon can collide with it. Noisy by design in code that uses a
+single global table on purpose, so it ships off.
+
+### `unused-local`
+
+`unusedLocal` · default `hint`
+
+A local declared but never read. Names starting with `_` are exempt, which is
+the conventional way to say a value is deliberately ignored.
+
+## Realms
+
+### `realm-violation`
+
+`realmViolation` · default `warning`
+
+A call to API that cannot exist in this file's realm — a serverside-only
+function in a clientside file, or the reverse. The call is `nil` at runtime, so
+this is an error waiting to happen rather than a style question.
+
+Reported as `information` instead when the realm was inferred from a `cl_`/`sv_`
+filename prefix, since that is a convention rather than a guarantee: plenty of
+addons include a `cl_` file on both realms. A directory such as `lua/autorun/server/`
+is treated as certain.
+
+## Net messages
+
+### `net-unregistered`
+
+`netMessage` · default `warning`
+
+`net.Start` on a message never passed to `util.AddNetworkString`. Fails at
+runtime. A quick fix inserts the registration.
+
+### `net-never-dispatched`
+
+`netMessage` · default `warning`
+
+A `net.Start` block that never calls `net.Send`, `net.Broadcast` or
+`net.SendToServer`, so the message is built and dropped. Silent at runtime,
+which is what makes it worth reporting.
+
+### `net-never-received`
+
+`netMessage` · default `warning`
+
+A message that is sent but has no `net.Receive` anywhere in the workspace.
+
+### `net-never-sent`
+
+`netMessage` · default `warning`
+
+A `net.Receive` for a message nothing ever sends — usually a rename that
+happened on one side only.
+
+### `net-payload-mismatch`
+
+`netReadWriteMismatch` · default `warning`
+
+The `net.Write*` sequence in the sender does not match the `net.Read*` sequence
+in the handler. Reading a string where an integer was written does not error; it
+returns nonsense.
+
+## Hooks and timers
+
+### `unknown-hook`
+
+`unknownHook` · default `information`
+
+A hook name that is neither documented nor fired anywhere in the workspace.
+Quick fixes offer the closest known names by edit distance.
+
+### `duplicate-hook-identifier`
+
+`duplicateIdentifier` · default `warning`
+
+Two `hook.Add` calls with the same event and identifier in overlapping realms.
+The second silently replaces the first, so one of the two never runs.
+
+### `duplicate-timer-name`
+
+`duplicateIdentifier` · default `warning`
+
+Two `timer.Create` calls with the same name in overlapping realms, with the same
+consequence: the second replaces the first.
+
+## API calls
+
+### `deprecated`
+
+`deprecated` · default `warning`
+
+Use of API the wiki marks deprecated or removed. The message includes the
+documented replacement.
+
+### `argument-count`
+
+`argumentCount` · default `warning`
+
+The wrong number of arguments, checked against every documented call form.
+Skipped for the Lua standard library, whose documented signatures are not
+precise enough to check against — `table.insert` is documented only in its
+three-argument form, and the two-argument form is everywhere in real code.
+
+### `argument-type`
+
+`argumentType` · default `warning`
+
+An argument whose inferred type cannot match the documented parameter. Only
+fires when no documented overload accepts what was passed.
+
+## Performance
+
+### `perf-hot-path`
+
+`perfHotPath` · default `warning`
+
+Expensive work reached from something the engine runs every frame or tick — a
+render hook, `ENT:Think`, a `timer.Create` that repeats forever at 0.5s or less.
+The message names the chain of functions that reaches it, so a finding four
+calls and two files away from its hook still explains itself.
+
+Calls behind a `CurTime()` guard, a `nextThink`-style field, or a one-time
+`if not x then` gate are skipped, since those already rate-limit themselves.
+[Full description](/features/hot-paths).
+
+## Dead code
+
+### `unused-function`
+
+`unusedFunction` · default `off`
+
+A function this workspace defines and never calls, references or registers.
+Methods defined with a colon, scripted class hooks and anything extending an API
+library are exempt, since those are reached through a value rather than a name.
+
+**Off by default**: an addon meant to be used by other addons is full of these
+on purpose. `glua doctor` lists them either way.
+
+## Files
+
+### `missing-addcsluafile`
+
+`missingAddCSLuaFile` · default `warning`
+
+A clientside file that is `include`d but never sent with `AddCSLuaFile`, so
+clients never receive it. Directories the engine networks itself are skipped. A
+quick fix inserts the missing call.
+
+### `missing-asset`
+
+`missingAsset` · default `off`
+
+A material, model or sound path that does not exist. Missing content never
+raises a Lua error — it renders as the checkerboard, the error model, or
+silence — which is exactly why a typo here can survive a long time.
+
+Requires [`workspace.gamePath`](/configuration/config-files), and **off by
+default on purpose**: content mounted from the Workshop or a separate content
+pack is invisible from here, so on a typical server most findings would be
+wrong. Turn it on only if every asset you reference ships in this repository.
+
+## Syntax
+
+Always reported as errors, and not configurable.
+
+### `syntax`
+
+The file does not parse. Formatting is disabled for the file while this is
+present, since reformatting a file the parser could not read would lose code.
+
+### `compound-assignment`
+
+`x += 1` is not valid Lua, however much it looks like it should be. A quick fix
+rewrites it as `x = x + 1`.
+
 
 ## Setting severity
 
-Tune rules in `.glua.json` using the **settings key** column above. Each accepts
-`error`, `warning`, `information`, `hint` or `off`.
+Tune rules in `.glua.json` using the **settings key** given under each rule
+above. Each accepts `error`, `warning`, `information`, `hint` or `off`.
 
 ```json
 {
@@ -106,7 +242,8 @@ Tune rules in `.glua.json` using the **settings key** column above. Each accepts
     "missingAddCSLuaFile": "warning",
     "globalWrite": "off",
     "perfHotPath": "warning",
-    "unusedFunction": "off"
+    "unusedFunction": "off",
+    "missingAsset": "off"
   }
 }
 ```

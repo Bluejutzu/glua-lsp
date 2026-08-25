@@ -6,7 +6,22 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **Every diagnostic links to its rule.** The code in the Problems panel is now
+  a link to the section explaining what the rule catches and why it exists —
+  `codeDescription`, so clicking through works in any editor that supports it.
+  SARIF output carries the same links into GitHub code scanning, `--format json`
+  gained a `url` field, and the rules page was restructured so each rule has its
+  own section to land on rather than a row in a wide table. `missing-asset` was
+  never documented at all; it is now.
+
+### Changed
+
+- The rule catalogue moved next to the analyser, so the codes on diagnostics,
+  the links behind them, the SARIF `rules` array and `glua rules` all read from
+  one list. A test fails if a code has no entry, or an entry has no section on
+  the rules page.
 
 ## 0.4.1
 

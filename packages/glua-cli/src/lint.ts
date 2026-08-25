@@ -13,7 +13,7 @@ import {
   writeBaseline,
 } from './baseline.js';
 import { loadProject, uriOf } from './project.js';
-import { RULES } from './rules.js';
+import { DOCS_BASE, RULES, ruleDocUrl } from '@glua/rules.js';
 import { createProgress } from './progress.js';
 
 export type LintFormat = 'pretty' | 'json' | 'github' | 'compact' | 'sarif';
@@ -303,8 +303,6 @@ function renderGithub(findings: Finding[], root: string): string {
 
 declare const __GLUA_VERSION__: string | undefined;
 
-const DOCS = 'https://glua.bluejutzu.dev';
-
 /**
  * SARIF 2.1.0, which is what GitHub code scanning ingests.
  *
@@ -337,13 +335,13 @@ function renderSarif(findings: Finding[], root: string): string {
           tool: {
             driver: {
               name: 'glua',
-              informationUri: DOCS,
+              informationUri: DOCS_BASE,
               version: typeof __GLUA_VERSION__ === 'string' ? __GLUA_VERSION__ : '0.0.0-dev',
               rules: RULES.map((rule) => ({
                 id: rule.code,
                 name: rule.code,
                 shortDescription: { text: rule.summary },
-                helpUri: `${DOCS}/reference/rules`,
+                helpUri: ruleDocUrl(rule.code),
                 properties: { settingsKey: rule.settingsKey },
               })),
             },
@@ -394,6 +392,9 @@ function renderJson(findings: Finding[], root: string): string {
       endColumn: diagnostic.range.end.character + 1,
       severity: severityName(diagnostic.severity),
       code: diagnostic.code,
+      // Whatever consumes this can link a code back to its explanation without
+      // keeping a copy of the mapping.
+      url: ruleDocUrl(String(diagnostic.code ?? '')),
       message: messageOf(diagnostic),
     })),
     null,

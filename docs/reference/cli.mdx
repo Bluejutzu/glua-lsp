@@ -192,6 +192,7 @@ lua/autorun/sh_mistakes.lua:41:9: error: Compound assignment '+=' is not valid L
     "column": 9,
     "severity": "error",
     "code": "compound-assignment",
+    "url": "https://glua.bluejutzu.dev/reference/rules#compound-assignment",
     "message": "Compound assignment '+=' is not valid Lua."
   }
 ]
@@ -202,7 +203,17 @@ lua/autorun/sh_mistakes.lua:41:9: error: Compound assignment '+=' is not valid L
   "version": "2.1.0",
   "runs": [
     {
-      "tool": { "driver": { "name": "glua", "rules": [] } },
+      "tool": {
+        "driver": {
+          "name": "glua",
+          "rules": [
+            {
+              "id": "compound-assignment",
+              "helpUri": "https://glua.bluejutzu.dev/reference/rules#compound-assignment"
+            }
+          ]
+        }
+      },
       "results": [
         {
           "ruleId": "compound-assignment",
@@ -241,6 +252,10 @@ glua fmt lua/ --check    # verify, for CI
 Lists every diagnostic code alongside its settings key. Worth knowing because
 the two are different: `net-payload-mismatch` is what you suppress inline,
 `netReadWriteMismatch` is what you set in `.glua.json`.
+
+Each code has a section in the [rule reference](/reference/rules) explaining
+what it catches. Diagnostics link there directly, so in an editor you can click
+the code in the Problems panel rather than looking it up.
 
 ## Configuration
 
