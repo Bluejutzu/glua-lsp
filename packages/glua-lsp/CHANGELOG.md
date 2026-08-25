@@ -10,16 +10,20 @@ commit; this file covers what actually changed for you.
 
 - **Hot path analysis.** The workspace index now builds a call graph, walks it
   from everything the engine runs on a schedule — the per-frame and per-tick
-  hooks, `ENT:Think`, `SWEP:DrawHUD`, `PANEL:Paint`, `timer.Create` of 0.5s or
-  less — and reports expensive work anywhere along it. About forty calls count:
+  hooks, `ENT:Think`, `SWEP:DrawHUD`, `PANEL:Paint`, a `timer.Create` that
+  repeats forever at 0.5s or less — and reports expensive work anywhere along
+  it. About forty calls count:
   registration that should happen once, disk and database and HTTP,
   serialisation, map-wide entity sweeps, string lookups like `Material`, and
   `net.Start` / `SetNW*`. The message names the chain that reaches the call, so
   a finding four functions and two files away from its hook explains itself. A
   function that rate-limits itself — a `CurTime()` guard, a `nextThink` field, a
   one-time `if not x then` gate — is not a hot path, and neither is anything it
-  reaches. `Material("...")` with a literal argument gets a quick fix that
-  hoists it to file scope. Rule `perf-hot-path`, keyed `perfHotPath`, on as a
+  reaches — though a guard around a *registration* says nothing about the
+  callback it registers, which still runs every frame. `Material("...")` with a
+  literal argument gets a quick fix that hoists it out of the frame, placed
+  inside whatever guard the call site was already under so a shared file's realm
+  checks still hold. Rule `perf-hot-path`, keyed `perfHotPath`, on as a
   warning.
 - **Call hierarchy**, over the same graph: who calls this function across the
   workspace, and what it calls. Callbacks are named after what registers them,

@@ -216,15 +216,16 @@ function MyAddon.DrawBars()
 ```
 
 - Entry points are the per-frame and per-tick hooks, `ENT:Think`, `SWEP:DrawHUD`,
-  `PANEL:Paint` and friends, and any `timer.Create` of 0.5s or less
+  `PANEL:Paint` and friends, and any `timer.Create` that repeats forever at 0.5s
+  or less
 - About forty calls count as expensive: registration that should happen once,
   disk and database and HTTP, serialisation, map-wide entity sweeps, string
   lookups like `Material`, and `net.Start` / `SetNW*`
 - A function that rate-limits itself — a `CurTime()` guard, a `nextThink` field,
   a one-time `if not x then` gate — is not a hot path, and neither is anything it
   reaches
-- `Material("...")` with a literal argument gets a quick fix that hoists it to
-  file scope
+- `Material("...")` with a literal argument gets a quick fix that hoists it out
+  of the frame, without moving it past a realm guard
 - `glua doctor` lists the findings furthest from their entry point, which are
   the ones nobody spots by reading one file
 

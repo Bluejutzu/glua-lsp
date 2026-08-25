@@ -41,7 +41,7 @@
         },
         "perfHotPath": {
           "$ref": "#/definitions/severity",
-          "description": "Expensive work reached from something the engine runs every frame or tick — a render hook, ENT:Think, a short timer. Calls behind a guard that limits how often they run are left alone."
+          "description": "Expensive work reached from something the engine runs every frame or tick — a render hook, ENT:Think, a timer that repeats forever at 0.5s or less. Calls behind a guard that limits how often they run are left alone."
         },
         "unusedFunction": {
           "$ref": "#/definitions/severity",

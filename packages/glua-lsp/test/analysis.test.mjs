@@ -1481,6 +1481,39 @@ end)
   assert.match(found[0].message, /every 0\.1s/);
 });
 
+test('a guard around a registration does not excuse the callback', () => {
+  // The condition decides whether the hook is added, not how often it runs.
+  const found = hotFindings(
+    {
+      'lua/autorun/client/cl_guarded.lua': `
+if not MyAddon.Registered then
+  MyAddon.Registered = true
+  hook.Add("HUDPaint", "x", function()
+    surface.SetMaterial(Material("a.png"))
+  end)
+end
+`,
+    },
+    'lua/autorun/client/cl_guarded.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /Material/);
+});
+
+test('a timer that fires a fixed number of times is not a hot path', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_once.lua': `
+timer.Create("myaddon.once", 0.1, 1, function()
+  file.Read("data/x.txt")
+end)
+`,
+    },
+    'lua/autorun/server/sv_once.lua',
+  );
+  assert.deepEqual(found, []);
+});
+
 test('a timer slow enough not to matter is not a hot path', () => {
   const found = hotFindings(
     {
@@ -1507,7 +1540,33 @@ test('the hot path rule can be switched off', () => {
   assert.deepEqual(found.filter((d) => d.code === 'perf-hot-path'), []);
 });
 
-test('a hoistable hot path call offers to move it to file scope', () => {
+/** The hoist quick fix for the first perf finding in a single-file fixture. */
+function hoistFix(source, name = 'lua/autorun/client/cl_fix.lua') {
+  const { workspace, analyses } = makeWorkspace({ [name]: source });
+  const analysis = analyses[name];
+  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {}).filter(
+    (d) => d.code === 'perf-hot-path',
+  );
+  if (!found.length) return { analysis, found, action: undefined };
+  const actions = codeActions(analysis, found[0].range, found, { api, workspace });
+  return { analysis, found, action: actions.find((a) => a.title.startsWith('Hoist')) };
+}
+
+/** Applies a code action's edits to the source it came from. */
+function applyEdits(source, edits) {
+  const lines = source.split('\n');
+  const at = (position) =>
+    lines.slice(0, position.line).reduce((sum, line) => sum + line.length + 1, 0) +
+    position.character;
+  return [...edits]
+    .sort((a, b) => at(b.range.start) - at(a.range.start))
+    .reduce(
+      (text, edit) => text.slice(0, at(edit.range.start)) + edit.newText + text.slice(at(edit.range.end)),
+      source,
+    );
+}
+
+test('a hoistable hot path call offers to move it out of the frame', () => {
   const source = `-- header
 local a = 1
 
@@ -1515,21 +1574,43 @@ hook.Add("HUDPaint", "x", function()
   surface.SetMaterial(Material("materials/icons/cog.png"))
 end)
 `;
-  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/client/cl_fix.lua': source });
-  const analysis = analyses['lua/autorun/client/cl_fix.lua'];
-  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {}).filter(
-    (d) => d.code === 'perf-hot-path',
-  );
-  const actions = codeActions(analysis, found[0].range, found, { api, workspace });
-  const hoist = actions.find((action) => action.title.startsWith('Hoist'));
+  const { analysis, action } = hoistFix(source);
 
-  assert.ok(hoist, 'expected a hoist action');
-  const edits = hoist.edit.changes[analysis.uri];
+  assert.ok(action, 'expected a hoist action');
+  const edits = action.edit.changes[analysis.uri];
   assert.equal(edits.length, 2);
   assert.match(edits[0].newText, /^local mat_cog = Material\("materials\/icons\/cog\.png"\)\n$/);
   assert.equal(edits[1].newText, 'mat_cog');
-  // The declaration has to land above the use.
+  // The declaration has to land above the use for the closure to capture it.
   assert.ok(edits[0].range.start.line < edits[1].range.start.line);
+});
+
+test('a hoist stays below a realm guard and inside its own block', () => {
+  const source = `if SERVER then return end
+
+if CLIENT then
+  hook.Add("HUDPaint", "x", function()
+    surface.SetTexture(surface.GetTextureID("icon"))
+  end)
+end
+`;
+  const { analysis, action } = hoistFix(source, 'lua/autorun/sh_guarded.lua');
+  assert.ok(action, 'expected a hoist action');
+
+  const applied = applyEdits(source, action.edit.changes[analysis.uri]);
+  const lines = applied.split('\n');
+  const declaration = lines.findIndex((line) => line.includes('local tex_icon ='));
+
+  assert.ok(declaration > lines.indexOf('if SERVER then return end'), 'must stay below the guard');
+  assert.ok(declaration > lines.indexOf('if CLIENT then'), 'must stay inside the CLIENT branch');
+  assert.match(lines[declaration], /^ {2}local tex_icon = surface\.GetTextureID\("icon"\)$/);
+  assert.match(applied, /surface\.SetTexture\(tex_icon\)/);
+});
+
+test('a hoist is not offered when there is nothing to hoist out of', () => {
+  // The call is already at file scope, so a "hoist" would move nothing.
+  const { found } = hoistFix('local mat = Material("a.png")\n', 'lua/autorun/client/cl_top.lua');
+  assert.deepEqual(found, []);
 });
 
 /* ------------------------------------------------------------- dead code */

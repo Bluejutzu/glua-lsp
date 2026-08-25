@@ -42,10 +42,14 @@ the places the engine calls into and walks outwards.
 | --- | --- |
 | Per-frame and per-tick hooks | `Think`, `Tick`, `HUDPaint`, `CreateMove`, `PostDrawOpaqueRenderables`, `CalcView`, and the rest of the render set |
 | Scripted class methods | `ENT:Think`, `ENT:Draw`, `SWEP:DrawHUD`, `PANEL:Paint`, `EFFECT:Render`, `TOOL:DrawToolScreen` |
-| Short timers | `timer.Create` with an interval of 0.5s or less |
+| Short timers | `timer.Create` with an interval of 0.5s or less **and** repetitions of `0` |
 
 A hook registered by name counts too — `hook.Add("Think", "id", MyAddon.Update)`
 makes `MyAddon.Update` an entry point, the same as writing the function inline.
+
+Repetitions matter for a timer, and only `0` means forever:
+`timer.Create("x", 0.1, 1, fn)` fires once and is left alone however expensive
+it is, because what it costs is bounded. Running forever is the whole premise.
 
 Anything reachable from one of those, up to six calls deep, is a hot path. A
 call that costs something and sits on one gets reported where it is written,
@@ -145,6 +149,22 @@ a name beginning `next`, `last`, `cooldown` or `delay`. A `not x` or `x == nil`
 condition counts as a one-time gate. Calls behind any of those are skipped, and
 so is anything they reach.
 
+A guard only covers what it actually gates, though. Registering a hook behind
+one says nothing about the callback:
+
+```lua
+if not registered then
+    registered = true
+    hook.Add("HUDPaint", "x", function()
+        surface.SetMaterial(Material("a.png"))  -- still reported
+    end)
+end
+```
+
+The condition decides whether the hook is added. Once it is, the callback runs
+every frame like any other, so a function body only counts as guarded by the
+conditions opened *inside* it.
+
 Hooks that fire on an event rather than a clock — `PlayerSay`, `PlayerSpawn`,
 `EntityTakeDamage` — are not entry points at all.
 
@@ -159,7 +179,7 @@ hook.Add("HUDPaint", "x", function()
     surface.SetMaterial(Material("myaddon/bar.png"))
 end)
 
--- after: Hoist into a file-scope local 'mat_bar'
+-- after: Hoist into a local 'mat_bar'
 local mat_bar = Material("myaddon/bar.png")
 
 hook.Add("HUDPaint", "x", function()
@@ -170,6 +190,24 @@ end)
 Only offered when every argument is a literal. A variable or a concatenation
 might differ between calls, and hoisting it would change what the code does
 rather than how often it does it.
+
+The local goes immediately above the statement that writes the function, rather
+than at the top of the file, so it stays inside every guard the call site was
+already under:
+
+```lua
+if SERVER then return end
+
+if CLIENT then
+    local tex_icon = surface.GetTextureID("icon")   -- here, not above the guard
+    hook.Add("HUDPaint", "x", function()
+        surface.SetTexture(tex_icon)
+    end)
+end
+```
+
+Lifted to the top of the file instead, that line would run on the server, where
+`surface` does not exist.
 
 ## Seeing the whole picture
 

@@ -250,12 +250,12 @@ const COST_RULES: CostRule[] = [
   {
     match: 'Material', kind: 'path', hoistable: true,
     why: 'looks the material up by string',
-    advice: 'Hoist it into a file-scope local.',
+    advice: 'Hoist it into a local outside the frame.',
   },
   {
     match: 'surface.GetTextureID', kind: 'path', hoistable: true,
     why: 'looks the texture up by string',
-    advice: 'Hoist it into a file-scope local.',
+    advice: 'Hoist it into a local outside the frame.',
   },
   {
     match: 'GetConVarNumber', kind: 'path',
@@ -438,6 +438,15 @@ export function buildCallGraph(chunk: Chunk): CallGraph {
   const unitStack: number[] = [0];
   /** End offsets of blocks guarded by a throttling condition. */
   const throttleStack: number[] = [];
+  /**
+   * Guards that were already open when each unit began.
+   *
+   * A guard around where a function is *written* says nothing about how often
+   * its body runs: `if not registered then hook.Add("HUDPaint", ...) end` gates
+   * the registration, and the callback still runs every frame once it happens.
+   * So a body only counts as guarded by the conditions opened inside it.
+   */
+  const throttleBase: number[] = [0];
 
   const currentUnit = (): CallUnit => units[unitStack[unitStack.length - 1]!]!;
 
@@ -455,7 +464,16 @@ export function buildCallGraph(chunk: Chunk): CallGraph {
     if (path === 'timer.Create' || path === 'timer.Adjust') {
       const name = stringArg(args, 0);
       const interval = numberArg(args, 1);
-      if (name !== null && interval !== null && interval <= HOT_TIMER_INTERVAL) {
+      // Repetitions of 0 is the only form that runs forever, and running
+      // forever is the whole premise. A timer that fires a fixed number of
+      // times finishes, so what it costs is bounded whatever the interval.
+      const repetitions = numberArg(args, 2);
+      if (
+        name !== null &&
+        interval !== null &&
+        interval <= HOT_TIMER_INTERVAL &&
+        repetitions === 0
+      ) {
         return { kind: 'timer', name, interval };
       }
     }
@@ -576,6 +594,7 @@ export function buildCallGraph(chunk: Chunk): CallGraph {
           ...(info.entry ? { entry: info.entry } : {}),
         });
         if (bodyIsRateLimited(node.body)) rateLimited.add(index);
+        throttleBase[index] = throttleStack.length;
         unitStack.push(index);
         break;
       }
@@ -589,7 +608,9 @@ export function buildCallGraph(chunk: Chunk): CallGraph {
           callee: path,
           span: { start: node.base.start, end: node.base.end },
           args: node.args.length,
-          throttled: throttleStack.length > 0 || rateLimited.has(unitIndex),
+          throttled:
+            throttleStack.length > (throttleBase[unitIndex] ?? 0) ||
+            rateLimited.has(unitIndex),
         });
 
         const entry = entryForCall(path, node.args);

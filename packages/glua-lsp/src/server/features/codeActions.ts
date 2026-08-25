@@ -5,7 +5,7 @@ import {
   type Range,
   type TextEdit,
 } from 'vscode-languageserver';
-import { walk, type CallExpression } from '../../parser/ast.js';
+import { nodePathAt, walk, type CallExpression } from '../../parser/ast.js';
 import type { GmodApi } from '../../api/index.js';
 import { exprToPath, type FileAnalysis } from '../../analyze/binder.js';
 import type { Workspace } from '../../analyze/workspace.js';
@@ -162,12 +162,19 @@ const HOIST_PREFIX: Record<string, string> = {
 };
 
 /**
- * Turns `Material("icon16/cog.png")` inside a render path into a file-scope
- * local, and points the call site at it.
+ * Lifts `Material("icon16/cog.png")` out of a render path and points the call
+ * site at a local instead.
  *
  * Only offered when every argument is a literal. Anything else — a variable, a
  * concatenation, a call — may differ between runs, and hoisting it would change
  * what the code does rather than how often it does it.
+ *
+ * The local goes immediately above the statement that *writes* the function,
+ * not at the top of the file. A shared file often opens with a realm guard
+ * (`if SERVER then return end`), and a clientside call hoisted above one runs
+ * on the server, where the library it belongs to does not exist. Staying in the
+ * call site's own block keeps every guard around it intact, and still gets the
+ * work out of the frame.
  */
 function pushHoistAction(
   analysis: FileAnalysis,
@@ -191,25 +198,63 @@ function pushHoistAction(
   const first = call.args[0];
   if (first?.type !== 'StringLiteral') return;
 
-  const insert = insertAtTop(analysis, '');
+  const anchor = hoistAnchor(analysis, call.start);
+  if (anchor === null) return;
+
   const site = analysis.lines.rangeAt(call.start, call.end);
-  // The local has to end up above the call for the file to still make sense.
-  if (insert.range.start.line >= site.start.line) return;
+  const anchorLine = analysis.lines.lineOf(anchor);
+  // A closure only captures a local declared above it, so anything else is
+  // not a hoist.
+  if (anchorLine >= site.start.line) return;
 
   const name = freeName(analysis, `${HOIST_PREFIX[callee] ?? 'cached'}_${slug(first.value)}`);
   const source = analysis.text.slice(call.start, call.end);
+  const indent = analysis.lines.lineText(anchorLine).match(/^[ \t]*/)?.[0] ?? '';
 
   actions.push({
-    title: `Hoist into a file-scope local '${name}'`,
+    title: `Hoist into a local '${name}'`,
     kind: CodeActionKind.QuickFix,
     isPreferred: true,
     diagnostics: [diagnostic],
     edit: edit([
-      { ...insert, newText: `local ${name} = ${source}\n` },
+      {
+        range: {
+          start: { line: anchorLine, character: 0 },
+          end: { line: anchorLine, character: 0 },
+        },
+        newText: `${indent}local ${name} = ${source}\n`,
+      },
       { range: site, newText: name },
     ]),
   });
 }
+
+/**
+ * Where a hoisted local can go: the start of the statement that contains the
+ * outermost function body the call sits inside.
+ *
+ * That is as far out as the value can move without leaving a block — and so
+ * without escaping an `if CLIENT then` or an early-returning realm guard — but
+ * still outside every function that runs repeatedly. Returns null when the call
+ * is not inside a function at all, since then there is nothing to hoist out of.
+ */
+function hoistAnchor(analysis: FileAnalysis, offset: number): number | null {
+  // Root first, so the first function body found is the outermost one.
+  const path = nodePathAt(analysis.chunk, offset).reverse();
+  let statement: number | null = null;
+  for (const node of path) {
+    if (node.type === 'FunctionExpression') return statement;
+    if (STATEMENTS.has(node.type)) statement = node.start;
+  }
+  return null;
+}
+
+/** Node types that can carry a `local` declaration beside them in a block. */
+const STATEMENTS = new Set([
+  'LocalStatement', 'AssignmentStatement', 'CallStatement', 'DoStatement',
+  'WhileStatement', 'RepeatStatement', 'IfStatement', 'NumericForStatement',
+  'GenericForStatement', 'FunctionDeclaration', 'ReturnStatement',
+]);
 
 /** `materials/icon16/cog.png` -> `cog`, and never something Lua would reject. */
 function slug(value: string): string {

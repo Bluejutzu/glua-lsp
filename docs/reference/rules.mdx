@@ -60,7 +60,7 @@ Severity accepts `error`, `warning`, `information`, `hint` or `off`.
   <Accordion title="Performance">
     | Code | Settings key | Default | Description |
     | --- | --- | --- | --- |
-    | `perf-hot-path` | `perfHotPath` | `warning` | Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` of 0.5s or less. The message names the chain of functions that reaches it. Calls behind a `CurTime()` guard, a `nextThink`-style field, or a one-time `if not x then` gate are skipped. [Full description](/features/hot-paths). |
+    | `perf-hot-path` | `perfHotPath` | `warning` | Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` that repeats forever at 0.5s or less. The message names the chain of functions that reaches it. Calls behind a `CurTime()` guard, a `nextThink`-style field, or a one-time `if not x then` gate are skipped. [Full description](/features/hot-paths). |
   </Accordion>
 
   <Accordion title="Dead code">
