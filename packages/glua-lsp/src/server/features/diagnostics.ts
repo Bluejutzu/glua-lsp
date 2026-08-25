@@ -12,6 +12,7 @@ import { cadenceOf, entryLabel } from '../../analyze/hotpath.js';
 import { Suppressions } from '../../analyze/suppressions.js';
 import { isAssignable, fromApiType, typeToString } from '../../analyze/types.js';
 import type { Workspace } from '../../analyze/workspace.js';
+import { ruleDocUrl } from '../../rules.js';
 import { realmLabel } from '../render.js';
 import { severityOf, type Settings } from '../settings.js';
 
@@ -87,6 +88,10 @@ export function diagnose(
       message,
       severity,
       code,
+      // What the editor puts behind the code in the Problems panel. A rule
+      // whose message you disagree with is worth an explanation of why it
+      // exists, and hunting for one in a settings list is not that.
+      codeDescription: { href: ruleDocUrl(code) },
       source: SOURCE,
       ...extra,
     });

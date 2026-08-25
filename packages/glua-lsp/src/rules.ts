@@ -1,13 +1,39 @@
-// The rule catalogue, for `glua rules`.
+// The rule catalogue: every diagnostic this can report, in one list.
 //
 // Codes appear in diagnostics and in `-- glua-ignore`; settings keys appear in
 // .glua.json and VS Code settings. Keeping the mapping in one place is what
 // stops the docs claiming a key that does not exist.
+//
+// Four things read this list, and they must agree: the `code` on a diagnostic,
+// the link the editor puts behind it, the `rules` array in SARIF output, and
+// `glua rules`. A test asserts every code has an entry and every entry has a
+// section on the rules page to land on, because a documentation link that
+// scrolls to the top of a long page is worse than no link — it looks answered.
 
 export interface RuleInfo {
   code: string;
   settingsKey: string;
   summary: string;
+}
+
+/** Where the published documentation lives. */
+export const DOCS_BASE = 'https://glua.bluejutzu.dev';
+
+/**
+ * The page section explaining a rule.
+ *
+ * Each rule has its own heading on the rules page, and the anchor is the code
+ * itself, so this needs no table to maintain alongside the catalogue.
+ */
+export function ruleDocUrl(code: string): string {
+  return `${DOCS_BASE}/reference/rules#${code}`;
+}
+
+const BY_CODE = new Map<string, RuleInfo>();
+
+export function ruleInfo(code: string): RuleInfo | undefined {
+  if (!BY_CODE.size) for (const rule of RULES) BY_CODE.set(rule.code, rule);
+  return BY_CODE.get(code);
 }
 
 export const RULES: RuleInfo[] = [

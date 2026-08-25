@@ -184,3 +184,57 @@ test('documented diagnostic codes all exist', () => {
 
   assert.deepEqual(failures, [], `\n${failures.join('\n')}\n`);
 });
+
+/**
+ * Every diagnostic carries a `codeDescription.href` pointing at its section on
+ * the rules page. Nothing at runtime can tell whether that section exists, so
+ * the link either lands on an explanation or scrolls to the top of a long page
+ * and looks answered. These three assertions are what keep it honest.
+ */
+test('every rule has a catalogue entry and a section to link to', () => {
+  const diagnostics = fs.readFileSync(
+    path.join(ROOT, 'src', 'server', 'features', 'diagnostics.ts'),
+    'utf8',
+  );
+  const codes = [...diagnostics.matchAll(/= '([a-z][a-z-]+)',/g)].map((m) => m[1]);
+  assert.ok(codes.length > 10, 'failed to read the diagnostic codes');
+
+  const catalogue = fs.readFileSync(path.join(ROOT, 'src', 'rules.ts'), 'utf8');
+  const listed = [...catalogue.matchAll(/code: '([a-z][a-z-]+)'/g)].map((m) => m[1]);
+
+  const page = fs.readFileSync(path.join(DOCS, 'reference', 'rules.mdx'), 'utf8');
+  // The anchor Mintlify generates for `### \`some-code\`` is `some-code`.
+  const sections = [...page.matchAll(/^#{2,3} `([a-z][a-z-]+)`\s*$/gm)].map((m) => m[1]);
+
+  assert.deepEqual(
+    codes.filter((code) => !listed.includes(code)),
+    [],
+    'diagnostic codes with no entry in src/rules.ts',
+  );
+  assert.deepEqual(
+    listed.filter((code) => !codes.includes(code)),
+    [],
+    'catalogue entries for codes nothing reports',
+  );
+  assert.deepEqual(
+    listed.filter((code) => !sections.includes(code)),
+    [],
+    'rules with no section on docs/reference/rules.mdx to link to',
+  );
+});
+
+test('every settings key in the catalogue exists in the manifest', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const known = new Set(
+    Object.keys(manifest.contributes.configuration.properties)
+      .filter((key) => key.startsWith('glua.diagnostics.'))
+      .map((key) => key.slice('glua.diagnostics.'.length)),
+  );
+
+  const catalogue = fs.readFileSync(path.join(ROOT, 'src', 'rules.ts'), 'utf8');
+  const unknown = [...catalogue.matchAll(/settingsKey: '([a-zA-Z]+)'/g)]
+    .map((m) => m[1])
+    .filter((key) => !known.has(key));
+
+  assert.deepEqual(unknown, [], 'settings keys the extension does not contribute');
+});
