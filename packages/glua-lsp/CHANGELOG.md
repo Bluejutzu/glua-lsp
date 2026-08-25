@@ -22,7 +22,7 @@ _Nothing yet._
 ### Fixed
 
 - **A suppression naming something that is not a rule silenced every rule on the
-  line.** `-- glua-ignore unusedLocal` — the settings key where the code
+  line.** `-- glua-ignore` followed by `unusedLocal` — the settings key where the code
   belonged — parsed as naming no rules at all, and a directive naming no rules
   means "all of them". A mistake that looked specific was the broadest
   suppression available. It now names a rule nothing reports, so it silences
