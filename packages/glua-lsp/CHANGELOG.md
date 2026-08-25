@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.4.1
+
 ### Added
 
 - **Safe and unsafe fixes.** `glua lint --fix` now applies only the fixes that
