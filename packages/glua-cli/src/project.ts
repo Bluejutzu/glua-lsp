@@ -8,6 +8,7 @@ import { GmodApi } from '@glua/api/index.js';
 import { Workspace } from '@glua/analyze/workspace.js';
 import { ConfigResolver } from '@glua/config/index.js';
 import { DEFAULT_SETTINGS } from '@glua/server/settings.js';
+import { FactCache, hashOf } from './cache.js';
 
 const SKIP_DIRECTORIES = new Set([
   'node_modules', '.git', '.svn', 'out', 'dist', 'cache', 'downloads', 'download',
@@ -81,6 +82,8 @@ export interface LoadedProject {
   files: string[];
   /** Directory config files were resolved from. */
   root: string;
+  /** How much of the index came off disk rather than being parsed again. */
+  cache: { hits: number; misses: number };
 }
 
 /**
@@ -99,6 +102,8 @@ export function loadProject(
     onIndex?: (done: number, total: number, file: string) => void;
     /** A Garry's Mod directory, so base game content counts as existing. */
     gamePath?: string;
+    /** Read and write the fact cache. On unless asked otherwise. */
+    cache?: boolean;
   } = {},
 ): LoadedProject {
   const api = loadApi();
@@ -129,6 +134,12 @@ export function loadProject(
   // every explicitly named target is in there too. Callers that only care
   // about the target files (e.g. formatting) can skip this.
   const files = collectLuaFiles(targets, maxFiles);
+  // A caller that indexes nothing must not touch the cache: saving prunes
+  // entries this run did not look at, so `glua fmt` would empty the cache that
+  // `glua lint` had just filled.
+  const cache =
+    options.cache === false || !indexProject ? FactCache.disabled() : FactCache.open(root);
+
   if (indexProject) {
     // Frameworks first: their globals are what stop the project's own files
     // reading as full of undefined names.
@@ -138,16 +149,50 @@ export function loadProject(
 
     const indexed = collectLuaFiles([root], maxFiles);
     indexed.forEach((file, i) => {
-      workspace.loadFromDisk(file);
+      index(workspace, cache, root, file);
       options.onIndex?.(i + 1, indexed.length, file);
     });
 
     for (const file of files) {
-      if (!workspace.get(uriOf(file))) workspace.loadFromDisk(file);
+      if (!workspace.get(uriOf(file))) index(workspace, cache, root, file);
     }
   }
 
-  return { api, workspace, config, files, root };
+  cache.save();
+
+  return { api, workspace, config, files, root, cache: cache.stats };
+}
+
+/**
+ * Puts one file into the workspace, off the cache when its contents match.
+ *
+ * A hit still reads the file — the text is needed either way, to hash it and
+ * because findings quote it. What it skips is the parse and the bind, which is
+ * where the time actually goes.
+ */
+function index(workspace: Workspace, cache: FactCache, root: string, file: string): void {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return;
+  }
+
+  // Relative, so a cache survives the project being moved or checked out
+  // somewhere else — a CI runner and a laptop can share one.
+  const key = path.relative(root, file).replace(/\\/g, '/');
+  const hash = hashOf(text);
+  const uri = uriOf(file);
+
+  const cached = cache.get(key, hash);
+  if (cached) {
+    workspace.adopt(uri, text, 0, cached);
+    return;
+  }
+
+  workspace.analyse(uri, text, 0, false);
+  const facts = workspace.factsFor(uri);
+  if (facts) cache.set(key, hash, facts);
 }
 
 /**

@@ -79,6 +79,7 @@ glua lint . --quiet --max-warnings 0
 | `--unsafe-fixes` | Let `--fix` also apply fixes that change what the code does |
 | `--no-code-frames` | One line per finding, without the source |
 | `--timing` | Report where the time went |
+| `--no-cache` | Do not read or write `.glua-cache` |
 
 Exits `1` when there are errors, or when `--max-warnings` is exceeded. Otherwise `0`.
 
@@ -120,7 +121,40 @@ Timing
 
 Indexing covers the whole project even when you lint one file, since cross-file
 rules are only correct once the index has seen everything. When those two
-numbers are far apart, that is what you are paying for.
+numbers are far apart, that is what you are paying for — which is what the cache
+below is for.
+
+### Caching
+
+Each file's facts — the globals it defines, the hooks it adds, the net messages
+it sends, who calls what — are written to `.glua-cache` keyed by a hash of the
+file's contents. A later run reads them back instead of parsing the file again.
+
+On a 300-file addon:
+
+| | cold | warm |
+| --- | --- | --- |
+| `glua lint .` | 917ms | 622ms |
+| `glua lint one-file.lua` | 385ms | 124ms |
+
+Linting one file gains most, because the other 299 are indexed purely so the
+cross-file rules are right, and none of that work changed.
+
+<Note>
+  Findings are never cached, only facts. `net-never-received` depends on every
+  other file in the project, so a cached finding would be wrong the moment an
+  unrelated file gained a `net.Receive`. Every finding is recomputed from the
+  whole set on every run, cache or no cache.
+</Note>
+
+The key is a content hash rather than a modification time, so a checkout, a
+branch switch or a restored backup does not invalidate anything, and `touch` is
+not a reason to redo the work. The directory writes its own `.gitignore`, and
+an upgrade of `glua` discards the cache rather than reading facts a different
+build wrote. Anything that goes wrong with it — corrupt file, read-only
+checkout — is a cache miss rather than an error.
+
+`--no-cache` skips it in both directions. `glua fmt` never touches it.
 
 ### Fixing
 

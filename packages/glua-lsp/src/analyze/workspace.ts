@@ -12,6 +12,7 @@ import {
 } from './binder.js';
 import type { Realm } from '../api/types.js';
 import { AssetIndex } from './assets.js';
+import { analysisFromFacts, factsOf, type FileFacts } from './facts.js';
 import { rankClassFile, scriptedClassOf, type ScriptedClass } from './entities.js';
 import { CLASS_TABLES } from './callgraph.js';
 import { CallIndex, type HotFinding } from './hotpath.js';
@@ -289,6 +290,28 @@ export class Workspace {
     // the indexes quadratic in the size of the workspace.
     if (!previous || previous.text !== text) this.invalidate();
     return analysis;
+  }
+
+  /**
+   * Takes a file's facts without parsing it.
+   *
+   * The caller is asserting these facts came from this exact text — the CLI
+   * cache checks a content hash before calling. Nothing here can verify that,
+   * so a wrong claim yields wrong answers rather than an error, which is why
+   * the cache keys on content rather than on a modification time.
+   */
+  adopt(uri: string, text: string, version: number, facts: FileFacts): FileAnalysis {
+    const analysis = analysisFromFacts(uri, URI.parse(uri).fsPath, text, version, facts);
+    const previous = this.files.get(uri);
+    this.files.set(uri, analysis);
+    if (!previous || previous.text !== text) this.invalidate();
+    return analysis;
+  }
+
+  /** The facts a file contributes, for writing to a cache. */
+  factsFor(uri: string): FileFacts | undefined {
+    const cached = this.files.get(uri);
+    return cached ? factsOf(cached) : undefined;
   }
 
   /** An analysis guaranteed to carry a syntax tree, re-parsing if needed. */

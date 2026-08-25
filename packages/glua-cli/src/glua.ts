@@ -83,6 +83,7 @@ program
   )
   .option('--no-code-frames', 'do not print the offending source line under each finding')
   .option('--timing', 'report where the time went', false)
+  .option('--no-cache', `do not read or write ${'.glua-cache'}`)
   .option('--no-progress', 'do not print progress while linting')
   .action(
     async (
@@ -101,6 +102,7 @@ program
         ignoreBaseline: boolean;
         codeFrames: boolean;
         timing: boolean;
+        cache: boolean;
       },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
@@ -156,6 +158,7 @@ program
         ignoreBaseline: options.ignoreBaseline,
         codeFrames: options.codeFrames,
         timing: options.timing,
+        cache: options.cache,
         ...(options.root ? { root: options.root } : {}),
       });
 
