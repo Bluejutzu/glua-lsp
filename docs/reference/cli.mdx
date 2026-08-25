@@ -67,7 +67,7 @@ glua lint . --quiet --max-warnings 0
 
 | Flag | Description |
 | --- | --- |
-| `-f, --format <format>` | `pretty` (default), `compact`, `github`, `json` |
+| `-f, --format <format>` | `pretty` (default), `compact`, `github`, `json`, `sarif` |
 | `--root <dir>` | Project root for config files and relative paths |
 | `--max-warnings <n>` | Exit non-zero above this many warnings |
 | `-q, --quiet` | Only report errors |
@@ -156,6 +156,25 @@ lua/autorun/sh_mistakes.lua:41:9: error: Compound assignment '+=' is not valid L
 ]
 ```
 
+```json sarif
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": { "driver": { "name": "glua", "rules": [] } },
+      "results": [
+        {
+          "ruleId": "compound-assignment",
+          "level": "error",
+          "message": { "text": "Compound assignment '+=' is not valid Lua." },
+          "locations": []
+        }
+      ]
+    }
+  ]
+}
+```
+
 </CodeGroup>
 
 ## `glua fmt`
@@ -211,6 +230,43 @@ jobs:
       - run: pnpm exec glua lint lua/ --format github
       - run: pnpm exec glua fmt lua/ --check
 ```
+
+### Code scanning
+
+`--format sarif` writes [SARIF 2.1.0](https://sarifweb.azurewebsites.net), which
+GitHub code scanning ingests. Worth having over `--format github`: annotations
+live and die with one workflow run, whereas uploaded findings get a history, a
+place to be dismissed, and a diff between the pull request and the base branch.
+
+```yaml
+name: Lint
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  glua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec glua lint lua/ --format sarif > glua.sarif
+        continue-on-error: true
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: glua.sarif
+```
+
+<Note>
+  Paths in the file are relative to `--root`, or to the directory you ran from. Run it from the repository root, or pass `--root`, so the uploaded locations line up with the files on the diff. `continue-on-error` is there so findings still upload when the lint exits non-zero.
+</Note>
 
 ## Colour
 

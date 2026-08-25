@@ -5,7 +5,7 @@ import {
   type Range,
   type TextEdit,
 } from 'vscode-languageserver';
-import { walk } from '../../parser/ast.js';
+import { nodePathAt, walk, type CallExpression } from '../../parser/ast.js';
 import type { GmodApi } from '../../api/index.js';
 import { exprToPath, type FileAnalysis } from '../../analyze/binder.js';
 import type { Workspace } from '../../analyze/workspace.js';
@@ -24,6 +24,14 @@ export function codeActions(
 ): CodeAction[] {
   const actions: CodeAction[] = [];
   const edit = (edits: TextEdit[]): CodeAction['edit'] => ({ changes: { [analysis.uri]: edits } });
+  /**
+   * Names already handed out by an action in this batch. `glua lint --fix`
+   * applies every preferred action from one call together, so two hoists that
+   * would both pick `mat_icon` have to be told about each other — otherwise the
+   * file ends up with two declarations of that name and one call site reading
+   * the wrong one.
+   */
+  const claimed = new Set<string>();
 
   for (const diagnostic of diagnostics) {
     switch (diagnostic.code) {
@@ -120,6 +128,13 @@ export function codeActions(
         break;
       }
 
+      case Code.PerfHotPath: {
+        const data = diagnostic.data as { callee?: string; hoistable?: boolean } | undefined;
+        if (!data?.hoistable || !data.callee) break;
+        pushHoistAction(analysis, diagnostic, data.callee, actions, edit, claimed);
+        break;
+      }
+
       case Code.UnknownHook: {
         const name = (diagnostic.data as { name?: string })?.name;
         if (!name) break;
@@ -144,6 +159,142 @@ export function codeActions(
   pushCStyleRewrite(analysis, actions);
 
   return actions;
+}
+
+/* ----------------------------------------------------------- hoisting */
+
+/** Short prefix for the local a hoisted call is bound to. */
+const HOIST_PREFIX: Record<string, string> = {
+  Material: 'mat',
+  'surface.GetTextureID': 'tex',
+};
+
+/**
+ * Lifts `Material("icon16/cog.png")` out of a render path and points the call
+ * site at a local instead.
+ *
+ * Only offered when every argument is a literal. Anything else — a variable, a
+ * concatenation, a call — may differ between runs, and hoisting it would change
+ * what the code does rather than how often it does it.
+ *
+ * The local goes immediately above the statement that *writes* the function,
+ * not at the top of the file. A shared file often opens with a realm guard
+ * (`if SERVER then return end`), and a clientside call hoisted above one runs
+ * on the server, where the library it belongs to does not exist. Staying in the
+ * call site's own block keeps every guard around it intact, and still gets the
+ * work out of the frame.
+ */
+function pushHoistAction(
+  analysis: FileAnalysis,
+  diagnostic: Diagnostic,
+  callee: string,
+  actions: CodeAction[],
+  edit: (edits: TextEdit[]) => CodeAction['edit'],
+  claimed: Set<string>,
+): void {
+  const offset = analysis.lines.offsetAt(diagnostic.range.start);
+  const call = callAt(analysis, offset);
+  if (!call || !call.args.length) return;
+
+  const literal = call.args.every(
+    (arg) =>
+      arg.type === 'StringLiteral' ||
+      arg.type === 'NumberLiteral' ||
+      arg.type === 'BooleanLiteral',
+  );
+  if (!literal) return;
+
+  const first = call.args[0];
+  if (first?.type !== 'StringLiteral') return;
+
+  const anchor = hoistAnchor(analysis, call.start);
+  if (anchor === null) return;
+
+  const site = analysis.lines.rangeAt(call.start, call.end);
+  const anchorLine = analysis.lines.lineOf(anchor);
+  // A closure only captures a local declared above it, so anything else is
+  // not a hoist.
+  if (anchorLine >= site.start.line) return;
+
+  const name = freeName(analysis, `${HOIST_PREFIX[callee] ?? 'cached'}_${slug(first.value)}`, claimed);
+  claimed.add(name);
+  const source = analysis.text.slice(call.start, call.end);
+  const indent = analysis.lines.lineText(anchorLine).match(/^[ \t]*/)?.[0] ?? '';
+
+  actions.push({
+    title: `Hoist into a local '${name}'`,
+    kind: CodeActionKind.QuickFix,
+    isPreferred: true,
+    diagnostics: [diagnostic],
+    edit: edit([
+      {
+        range: {
+          start: { line: anchorLine, character: 0 },
+          end: { line: anchorLine, character: 0 },
+        },
+        newText: `${indent}local ${name} = ${source}\n`,
+      },
+      { range: site, newText: name },
+    ]),
+  });
+}
+
+/**
+ * Where a hoisted local can go: the start of the statement that contains the
+ * outermost function body the call sits inside.
+ *
+ * That is as far out as the value can move without leaving a block — and so
+ * without escaping an `if CLIENT then` or an early-returning realm guard — but
+ * still outside every function that runs repeatedly. Returns null when the call
+ * is not inside a function at all, since then there is nothing to hoist out of.
+ */
+function hoistAnchor(analysis: FileAnalysis, offset: number): number | null {
+  // Root first, so the first function body found is the outermost one.
+  const path = nodePathAt(analysis.chunk, offset).reverse();
+  let statement: number | null = null;
+  for (const node of path) {
+    if (node.type === 'FunctionExpression') return statement;
+    if (STATEMENTS.has(node.type)) statement = node.start;
+  }
+  return null;
+}
+
+/** Node types that can carry a `local` declaration beside them in a block. */
+const STATEMENTS = new Set([
+  'LocalStatement', 'AssignmentStatement', 'CallStatement', 'DoStatement',
+  'WhileStatement', 'RepeatStatement', 'IfStatement', 'NumericForStatement',
+  'GenericForStatement', 'FunctionDeclaration', 'ReturnStatement',
+]);
+
+/** `materials/icon16/cog.png` -> `cog`, and never something Lua would reject. */
+function slug(value: string): string {
+  const base = value.split(/[\\/]/).pop() ?? value;
+  const cleaned = base.replace(/\.[a-z0-9]+$/i, '').replace(/[^A-Za-z0-9]+/g, '_');
+  const trimmed = cleaned.replace(/^_+|_+$/g, '').slice(0, 24);
+  return /^[A-Za-z_]/.test(trimmed) ? trimmed : `_${trimmed}`;
+}
+
+/** A name neither the file nor another action in this batch is using. */
+function freeName(analysis: FileAnalysis, base: string, claimed: Set<string>): string {
+  const taken = (name: string) =>
+    claimed.has(name) ||
+    new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(analysis.text);
+  if (!taken(base)) return base;
+  for (let i = 2; i < 100; i++) {
+    if (!taken(`${base}_${i}`)) return `${base}_${i}`;
+  }
+  return `${base}_x`;
+}
+
+/** Innermost call expression starting at an offset. */
+function callAt(analysis: FileAnalysis, offset: number): CallExpression | null {
+  let found: CallExpression | null = null;
+  walk(analysis.chunk, (node) => {
+    if (node.type !== 'CallExpression') return;
+    if (node.start !== offset) return;
+    found = node;
+  });
+  return found;
 }
 
 /* -------------------------------------------------------------- helpers */

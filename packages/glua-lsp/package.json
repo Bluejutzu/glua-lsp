@@ -323,6 +323,30 @@
           "default": "warning",
           "markdownDescription": "Two `hook.Add` calls sharing an event and identifier, or two `timer.Create` calls sharing a name, in overlapping realms. The second silently replaces the first."
         },
+        "glua.diagnostics.perfHotPath": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "warning",
+          "markdownDescription": "Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` that repeats forever at 0.5s or less. The call is reported where it is written, with the chain of functions that reaches it.\n\nCalls behind a guard that plainly limits how often they run — a `CurTime()` comparison, a `nextThink` field, a one-time `if not x then` gate wrapping a block — are left alone. A validity check like `if not IsValid(ent) then return end` is not one of those, and neither is a guard around the registration rather than the callback."
+        },
+        "glua.diagnostics.unusedFunction": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "off",
+          "markdownDescription": "Functions this workspace defines and never calls, references or registers anywhere.\n\n**Off by default**: a library meant to be used by other addons is full of these on purpose, and nothing here can see the addon that calls them. Turn it on for a self-contained gamemode, where the workspace really is the whole program. `glua doctor` lists them either way."
+        },
         "glua.diagnostics.scope": {
           "type": "string",
           "enum": [

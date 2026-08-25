@@ -3,6 +3,7 @@ import type { GmodApi } from '../../api/index.js';
 import type { Realm } from '../../api/types.js';
 import type { Workspace } from '../../analyze/workspace.js';
 import type { Settings } from '../settings.js';
+import { entryLabel } from '../../analyze/hotpath.js';
 import { diagnose } from './diagnostics.js';
 
 /**
@@ -83,6 +84,35 @@ export interface ProjectReport {
   assets: { references: number; byKind: Record<string, number>; indexed: number };
 
   diagnostics: { total: number; byCode: Counted[] };
+
+  /**
+   * What the engine ends up running on a schedule. Distinct from the rest of
+   * the report, which is about whether the code is right: this is about whether
+   * the server keeps its tick rate.
+   */
+  performance: {
+    /** Functions registered somewhere that runs them every frame or tick. */
+    entryPoints: number;
+    /** Expensive calls reachable from one of them. */
+    findings: number;
+    /** Which expensive calls turn up most often on those paths. */
+    byCall: Counted[];
+    /** The ones furthest from their entry point, which are the easiest to miss. */
+    worst: {
+      file: string;
+      line: number;
+      callee: string;
+      entry: string;
+      chain: string[];
+      advice: string;
+    }[];
+  };
+
+  /** Functions defined here that nothing here ever names. */
+  deadCode: {
+    total: number;
+    functions: { file: string; line: number; path: string }[];
+  };
 
   /** Globals used but defined nowhere, which is usually a missing dependency. */
   undefinedGlobals: Counted[];
@@ -196,6 +226,8 @@ export async function buildReport(
       total: totalFindings,
       byCode: rank(byCode, Number.POSITIVE_INFINITY),
     },
+    performance: performanceHealth(workspace, top),
+    deadCode: deadCodeHealth(workspace, top),
     undefinedGlobals: rank(undefinedNames, top),
     worstFiles: files
       .sort((a, b) => b.findings - a.findings || b.lines - a.lines)
@@ -332,6 +364,53 @@ function entityHealth(workspace: Workspace, top: number): ProjectReport['entitie
     total: sized.length,
     byKind: Object.fromEntries(byKind),
     largest: sized.sort((a, b) => b.members - a.members).slice(0, top),
+  };
+}
+
+/* ----------------------------------------------------------- performance */
+
+function performanceHealth(workspace: Workspace, top: number): ProjectReport['performance'] {
+  const findings = workspace.hotPaths().filter((f) => !workspace.isLibrary(f.uri));
+  const byCall = new Map<string, number>();
+  for (const finding of findings) {
+    byCall.set(finding.callee, (byCall.get(finding.callee) ?? 0) + 1);
+  }
+
+  const entryPoints = workspace
+    .calls()
+    .entryPoints()
+    .filter((seed) => !workspace.isLibrary(seed.ref.uri)).length;
+
+  const worst = [...findings]
+    .sort((a, b) => b.chain.length - a.chain.length)
+    .slice(0, top)
+    .map((finding) => ({
+      file: workspace.get(finding.uri)?.fsPath ?? finding.uri,
+      line: (workspace.get(finding.uri)?.lines.lineOf(finding.span.start) ?? 0) + 1,
+      callee: finding.callee,
+      entry: entryLabel(finding.entry),
+      chain: finding.chain,
+      advice: finding.rule.advice,
+    }));
+
+  return { entryPoints, findings: findings.length, byCall: rank(byCall, top), worst };
+}
+
+/* -------------------------------------------------------------- dead code */
+
+function deadCodeHealth(workspace: Workspace, top: number): ProjectReport['deadCode'] {
+  const dead = workspace.deadFunctions();
+  return {
+    total: dead.length,
+    functions: dead
+      .slice()
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .slice(0, top)
+      .map((fn) => ({
+        file: workspace.get(fn.uri)?.fsPath ?? fn.uri,
+        line: (workspace.get(fn.uri)?.lines.lineOf(fn.nameSpan.start) ?? 0) + 1,
+        path: fn.path,
+      })),
   };
 }
 

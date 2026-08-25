@@ -198,6 +198,37 @@ realms. The workspace index connects them.
 - `function ENT:` / `function SWEP:` / `function PANEL:` complete the right hook
   table and insert a full stub
 
+### Hot path analysis
+
+The mistakes that cost a server its tick rate are structural: a `Material`
+lookup or an entity sweep is fine on its own and ruinous four calls below
+`HUDPaint`. The workspace index builds a call graph, walks it from everything
+the engine runs on a schedule, and reports what it finds on the way.
+
+```lua
+hook.Add("HUDPaint", "myaddon.hud", function()
+  MyAddon.DrawBars()
+end)
+
+function MyAddon.DrawBars()
+  surface.SetMaterial(Material("myaddon/bar.png"))  -- reported, with the chain
+  for _, ply in ipairs(player.GetAll()) do          -- that reaches it
+```
+
+- Entry points are the per-frame and per-tick hooks, `ENT:Think`, `SWEP:DrawHUD`,
+  `PANEL:Paint` and friends, and any `timer.Create` that repeats forever at 0.5s
+  or less
+- About forty calls count as expensive: registration that should happen once,
+  disk and database and HTTP, serialisation, map-wide entity sweeps, string
+  lookups like `Material`, and `net.Start` / `SetNW*`
+- A function that rate-limits itself — a `CurTime()` guard, a `nextThink` field,
+  a one-time `if not x then` gate — is not a hot path, and neither is anything it
+  reaches
+- `Material("...")` with a literal argument gets a quick fix that hoists it out
+  of the frame, without moving it past a realm guard
+- `glua doctor` lists the findings furthest from their entry point, which are
+  the ones nobody spots by reading one file
+
 ### Cross-file navigation
 
 `MyAddon.Config` completes, resolves and renames across files. `include()` and
@@ -227,15 +258,16 @@ Set it as your formatter for GLua files:
 ### Other diagnostics
 
 Undefined globals (respecting `if someAddon and ...` guards, since that's how
-you depend on an optional addon), unused locals, deprecated API use, argument
-counts and types against documented signatures — including overloads like
+you depend on an optional addon), unused locals, functions nothing in the
+workspace ever calls (off by default — a library is full of those on purpose),
+deprecated API use, argument counts and types against documented signatures — including overloads like
 `surface.SetDrawColor(r, g, b, a)` vs `surface.SetDrawColor(color)`.
 
 ### Everything else
 
 Hover, signature help with overloads, go-to-definition, find references, rename,
-document highlights, document and workspace symbols, semantic highlighting,
-inlay parameter hints, and code actions:
+document highlights, document and workspace symbols, call hierarchy over the
+whole workspace, semantic highlighting, inlay parameter hints, and code actions:
 
 - rewrite `x += 1` as `x = x + 1` (GLua has no compound assignment)
 - convert C-style operators (`!=`, `&&`, `||`, `!`) to Lua, whole document
@@ -264,11 +296,15 @@ pnpm add -D glua-cli
 
 ```bash
 glua lint lua/ --format github
+glua lint lua/ --format sarif > glua.sarif
 glua fmt lua/ --check
 ```
 
 `--format github` emits workflow annotations, so findings land on the diff of a
-pull request. [Full reference](https://glua.bluejutzu.dev/reference/cli).
+pull request. `--format sarif` writes SARIF 2.1.0 for GitHub code scanning,
+which gives findings a history and somewhere to be dismissed rather than a log
+line that disappears with the run.
+[Full reference](https://glua.bluejutzu.dev/reference/cli).
 
 ## Configuration
 
@@ -402,7 +438,7 @@ workflow refuses to build if the tag and the manifest version disagree.
 ```
 packages/glua-lsp/
   src/parser/     lexer, AST, error-tolerant parser
-  src/analyze/    scopes, type inference, realm rules, workspace index
+  src/analyze/    scopes, type inference, realm rules, workspace index, call graph
   src/format/     the formatter
   src/config/     config file loading and precedence
   src/api/        the wiki dataset and lookups over it

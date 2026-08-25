@@ -18,6 +18,12 @@ const { hover } = await import(OUT('server/features/hover.js'));
 const { signatureHelp } = await import(OUT('server/features/signature.js'));
 const { diagnose } = await import(OUT('server/features/diagnostics.js'));
 const { definition } = await import(OUT('server/features/navigation.js'));
+const { codeActions } = await import(OUT('server/features/codeActions.js'));
+const {
+  prepareCallHierarchy,
+  incomingCalls,
+  outgoingCalls,
+} = await import(OUT('server/features/callHierarchy.js'));
 const { DEFAULT_SETTINGS } = await import(OUT('server/settings.js'));
 
 const api = GmodApi.load(API_DATA);
@@ -1341,6 +1347,483 @@ test('unused locals are reported, underscore-prefixed ones are not', () => {
   const unused = found.filter((d) => d.code === 'unused-local');
   assert.equal(unused.length, 1);
   assert.match(unused[0].message, /unused/);
+});
+
+/* ------------------------------------------------------------- hot paths */
+
+/** Just the perf findings for one file of a fixture workspace. */
+function hotFindings(files, target) {
+  const { workspace, analyses } = makeWorkspace(files);
+  return diagnose(analyses[target], api, workspace, DEFAULT_SETTINGS, {}).filter(
+    (d) => d.code === 'perf-hot-path',
+  );
+}
+
+test('reports expensive calls written directly in a render hook', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/client/cl_hot.lua': `
+hook.Add("HUDPaint", "x", function()
+  surface.SetMaterial(Material("icon16/cog.png"))
+end)
+`,
+    },
+    'lua/autorun/client/cl_hot.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /Material/);
+  assert.match(found[0].message, /every frame/);
+  assert.match(found[0].message, /HUDPaint/);
+});
+
+test('follows the call graph across files and names the chain', () => {
+  const found = hotFindings(
+    {
+      'lua/myaddon/sh_lib.lua': `
+MyAddon = MyAddon or {}
+function MyAddon.Sweep()
+  return ents.FindByClass("prop_physics")
+end
+`,
+      'lua/autorun/server/sv_hot.lua': `
+hook.Add("Think", "x", function()
+  MyAddon.Sweep()
+end)
+`,
+    },
+    'lua/myaddon/sh_lib.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /ents\.FindByClass/);
+  assert.match(found[0].message, /every tick/);
+  assert.match(found[0].message, /Think hook via MyAddon\.Sweep/);
+});
+
+test('a hook that does not run every frame is not a hot path', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_cold.lua': `
+hook.Add("PlayerSay", "x", function()
+  ents.FindByClass("prop_physics")
+end)
+`,
+    },
+    'lua/autorun/server/sv_cold.lua',
+  );
+  assert.deepEqual(found, []);
+});
+
+test('an ENT:Think that rate-limits itself is left alone', () => {
+  const found = hotFindings(
+    {
+      'lua/entities/my_turret/init.lua': `
+function ENT:Think()
+  if CurTime() < (self.NextScan or 0) then return end
+  self.NextScan = CurTime() + 1
+  ents.FindInSphere(self:GetPos(), 256)
+end
+`,
+    },
+    'lua/entities/my_turret/init.lua',
+  );
+  assert.deepEqual(found, []);
+});
+
+test('an ENT:Think without a guard reports, and reaches its own methods', () => {
+  const found = hotFindings(
+    {
+      'lua/entities/my_turret/init.lua': `
+function ENT:Think()
+  self:Scan()
+end
+
+function ENT:Scan()
+  util.TableToJSON({})
+end
+`,
+    },
+    'lua/entities/my_turret/init.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /ENT:Think via ENT:Scan/);
+});
+
+test('a function registered by name is a hot entry too', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/client/cl_named.lua': `
+MyAddon = MyAddon or {}
+function MyAddon.Paint()
+  surface.CreateFont("MyFont", {})
+end
+
+hook.Add("HUDPaint", "x", MyAddon.Paint)
+`,
+    },
+    'lua/autorun/client/cl_named.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /surface\.CreateFont/);
+});
+
+test('a short timer counts as hot and says how often it runs', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_timer.lua': `
+timer.Create("myaddon.tick", 0.1, 0, function()
+  file.Read("data/x.txt")
+end)
+`,
+    },
+    'lua/autorun/server/sv_timer.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /every 0\.1s/);
+});
+
+test('a guard around a registration does not excuse the callback', () => {
+  // The condition decides whether the hook is added, not how often it runs.
+  const found = hotFindings(
+    {
+      'lua/autorun/client/cl_guarded.lua': `
+if not MyAddon.Registered then
+  MyAddon.Registered = true
+  hook.Add("HUDPaint", "x", function()
+    surface.SetMaterial(Material("a.png"))
+  end)
+end
+`,
+    },
+    'lua/autorun/client/cl_guarded.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /Material/);
+});
+
+test('an IsValid early return does not exempt the rest of the callback', () => {
+  // A validity guard skips a frame where the object is gone. It says nothing
+  // about how often the rest runs.
+  const found = hotFindings(
+    {
+      'lua/autorun/client/cl_valid.lua': `
+hook.Add("HUDPaint", "x", function()
+  if not IsValid(LocalPlayer()) then return end
+  surface.SetMaterial(Material("a.png"))
+end)
+`,
+    },
+    'lua/autorun/client/cl_valid.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /Material/);
+});
+
+test('two single-file entities in one directory stay separate classes', () => {
+  const found = hotFindings(
+    {
+      // Both are single-file classes sitting in lua/entities/.
+      'lua/entities/turret_a.lua': `
+function ENT:Think()
+  self:Scan()
+end
+`,
+      'lua/entities/turret_b.lua': `
+function ENT:Scan()
+  util.TableToJSON({})
+end
+`,
+    },
+    'lua/entities/turret_b.lua',
+  );
+  assert.deepEqual(found, [], 'b:Scan is not reachable from a:Think');
+});
+
+test('a client hot path does not walk into a serverside definition', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_impl.lua': `
+MyAddon = MyAddon or {}
+function MyAddon.Refresh()
+  ents.FindByClass("prop_physics")
+end
+`,
+      'lua/autorun/client/cl_hud.lua': `
+hook.Add("HUDPaint", "x", function()
+  MyAddon.Refresh()
+end)
+`,
+    },
+    'lua/autorun/server/sv_impl.lua',
+  );
+  assert.deepEqual(found, [], 'the client cannot reach the serverside body');
+});
+
+test('a timer that fires a fixed number of times is not a hot path', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_once.lua': `
+timer.Create("myaddon.once", 0.1, 1, function()
+  file.Read("data/x.txt")
+end)
+`,
+    },
+    'lua/autorun/server/sv_once.lua',
+  );
+  assert.deepEqual(found, []);
+});
+
+test('a timer slow enough not to matter is not a hot path', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_slow.lua': `
+timer.Create("myaddon.slow", 60, 0, function()
+  file.Read("data/x.txt")
+end)
+`,
+    },
+    'lua/autorun/server/sv_slow.lua',
+  );
+  assert.deepEqual(found, []);
+});
+
+test('the hot path rule can be switched off', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/autorun/client/cl_off.lua': `hook.Add("HUDPaint", "x", function() Material("a.png") end)`,
+  });
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    diagnostics: { ...DEFAULT_SETTINGS.diagnostics, perfHotPath: 'off' },
+  };
+  const found = diagnose(analyses['lua/autorun/client/cl_off.lua'], api, workspace, settings, {});
+  assert.deepEqual(found.filter((d) => d.code === 'perf-hot-path'), []);
+});
+
+/** The hoist quick fix for the first perf finding in a single-file fixture. */
+function hoistFix(source, name = 'lua/autorun/client/cl_fix.lua') {
+  const { workspace, analyses } = makeWorkspace({ [name]: source });
+  const analysis = analyses[name];
+  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {}).filter(
+    (d) => d.code === 'perf-hot-path',
+  );
+  if (!found.length) return { analysis, found, action: undefined };
+  const actions = codeActions(analysis, found[0].range, found, { api, workspace });
+  return { analysis, found, action: actions.find((a) => a.title.startsWith('Hoist')) };
+}
+
+/** A range covering the whole file, the way `glua lint --fix` asks. */
+function wholeFile(analysis) {
+  return {
+    start: { line: 0, character: 0 },
+    end: analysis.lines.positionAt(analysis.text.length),
+  };
+}
+
+/** Applies a code action's edits to the source it came from. */
+function applyEdits(source, edits) {
+  const lines = source.split('\n');
+  const at = (position) =>
+    lines.slice(0, position.line).reduce((sum, line) => sum + line.length + 1, 0) +
+    position.character;
+  return [...edits]
+    .sort((a, b) => at(b.range.start) - at(a.range.start))
+    .reduce(
+      (text, edit) => text.slice(0, at(edit.range.start)) + edit.newText + text.slice(at(edit.range.end)),
+      source,
+    );
+}
+
+test('a hoistable hot path call offers to move it out of the frame', () => {
+  const source = `-- header
+local a = 1
+
+hook.Add("HUDPaint", "x", function()
+  surface.SetMaterial(Material("materials/icons/cog.png"))
+end)
+`;
+  const { analysis, action } = hoistFix(source);
+
+  assert.ok(action, 'expected a hoist action');
+  const edits = action.edit.changes[analysis.uri];
+  assert.equal(edits.length, 2);
+  assert.match(edits[0].newText, /^local mat_cog = Material\("materials\/icons\/cog\.png"\)\n$/);
+  assert.equal(edits[1].newText, 'mat_cog');
+  // The declaration has to land above the use for the closure to capture it.
+  assert.ok(edits[0].range.start.line < edits[1].range.start.line);
+});
+
+test('a hoist stays below a realm guard and inside its own block', () => {
+  const source = `if SERVER then return end
+
+if CLIENT then
+  hook.Add("HUDPaint", "x", function()
+    surface.SetTexture(surface.GetTextureID("icon"))
+  end)
+end
+`;
+  const { analysis, action } = hoistFix(source, 'lua/autorun/sh_guarded.lua');
+  assert.ok(action, 'expected a hoist action');
+
+  const applied = applyEdits(source, action.edit.changes[analysis.uri]);
+  const lines = applied.split('\n');
+  const declaration = lines.findIndex((line) => line.includes('local tex_icon ='));
+
+  assert.ok(declaration > lines.indexOf('if SERVER then return end'), 'must stay below the guard');
+  assert.ok(declaration > lines.indexOf('if CLIENT then'), 'must stay inside the CLIENT branch');
+  assert.match(lines[declaration], /^ {2}local tex_icon = surface\.GetTextureID\("icon"\)$/);
+  assert.match(applied, /surface\.SetTexture\(tex_icon\)/);
+});
+
+test('two hoists in one batch get names that do not collide', () => {
+  // `glua lint --fix` applies every preferred action from one call together.
+  const source = `hook.Add("HUDPaint", "x", function()
+  surface.SetMaterial(Material("foo/icon.png"))
+  surface.SetMaterial(Material("bar/icon.png"))
+end)
+`;
+  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/client/cl_two.lua': source });
+  const analysis = analyses['lua/autorun/client/cl_two.lua'];
+  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {}).filter(
+    (d) => d.code === 'perf-hot-path',
+  );
+  assert.equal(found.length, 2);
+
+  const hoists = codeActions(analysis, wholeFile(analysis), found, { api, workspace }).filter(
+    (action) => action.title.startsWith('Hoist'),
+  );
+  assert.equal(hoists.length, 2);
+
+  const names = hoists.map((action) => action.edit.changes[analysis.uri][1].newText);
+  assert.equal(new Set(names).size, 2, `both hoists picked ${names[0]}`);
+
+  // And applying both together keeps each call site pointed at its own material.
+  const applied = applyEdits(source, hoists.flatMap((a) => a.edit.changes[analysis.uri]));
+  assert.match(applied, new RegExp(`local ${names[0]} = Material\\("foo/icon\\.png"\\)`));
+  assert.match(applied, new RegExp(`local ${names[1]} = Material\\("bar/icon\\.png"\\)`));
+});
+
+test('a hoist is not offered when there is nothing to hoist out of', () => {
+  // The call is already at file scope, so a "hoist" would move nothing.
+  const { found } = hoistFix('local mat = Material("a.png")\n', 'lua/autorun/client/cl_top.lua');
+  assert.deepEqual(found, []);
+});
+
+/* ------------------------------------------------------------- dead code */
+
+test('a function nothing calls is reported once the rule is on', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/myaddon/sh_dead.lua': `
+MyAddon = MyAddon or {}
+function MyAddon.Used() end
+function MyAddon.Never() end
+MyAddon.Used()
+`,
+  });
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    diagnostics: { ...DEFAULT_SETTINGS.diagnostics, unusedFunction: 'hint' },
+  };
+  const found = diagnose(analyses['lua/myaddon/sh_dead.lua'], api, workspace, settings, {})
+    .filter((d) => d.code === 'unused-function');
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /MyAddon\.Never/);
+});
+
+test('a table reached through an alias is not called dead', () => {
+  const { workspace, analyses } = makeWorkspace({
+    'lua/myaddon/sh_alias.lua': `
+MyAddon = MyAddon or {}
+MyAddon.Config = MyAddon.Config or {}
+function MyAddon.Config.Reload() end
+`,
+    'lua/autorun/server/sv_alias.lua': `
+local cfg = MyAddon.Config
+cfg.Reload()
+`,
+  });
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    diagnostics: { ...DEFAULT_SETTINGS.diagnostics, unusedFunction: 'hint' },
+  };
+  const found = diagnose(analyses['lua/myaddon/sh_alias.lua'], api, workspace, settings, {})
+    .filter((d) => d.code === 'unused-function');
+  assert.deepEqual(found, []);
+});
+
+test('dead code says nothing about methods, class hooks or off-by-default', () => {
+  const files = {
+    'lua/entities/my_turret/init.lua': `
+function ENT:Think() end
+function ENT:Helper() end
+`,
+    'lua/myaddon/sh_meta.lua': `
+MyAddon = MyAddon or {}
+function MyAddon:Method() end
+`,
+  };
+  const { workspace, analyses } = makeWorkspace(files);
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    diagnostics: { ...DEFAULT_SETTINGS.diagnostics, unusedFunction: 'hint' },
+  };
+  for (const name of Object.keys(files)) {
+    const found = diagnose(analyses[name], api, workspace, settings, {})
+      .filter((d) => d.code === 'unused-function');
+    assert.deepEqual(found, [], name);
+  }
+  // And nothing at all with the default settings.
+  assert.deepEqual(
+    diagnose(analyses['lua/myaddon/sh_meta.lua'], api, workspace, DEFAULT_SETTINGS, {})
+      .filter((d) => d.code === 'unused-function'),
+    [],
+  );
+});
+
+/* -------------------------------------------------------- call hierarchy */
+
+test('call hierarchy answers who calls a function and what it calls', () => {
+  const lib = `MyAddon = MyAddon or {}
+function MyAddon.Draw()
+  MyAddon.Inner()
+end
+function MyAddon.Inner() end
+`;
+  const { workspace, analyses } = makeWorkspace({
+    'lua/myaddon/sh_lib.lua': lib,
+    'lua/autorun/client/cl_use.lua': `hook.Add("HUDPaint", "x", function()
+  MyAddon.Draw()
+end)
+`,
+  });
+  const analysis = analyses['lua/myaddon/sh_lib.lua'];
+  const position = analysis.lines.positionAt(lib.indexOf('MyAddon.Draw()') + 3);
+
+  const items = prepareCallHierarchy(analysis, position, workspace);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].name, 'MyAddon.Draw');
+
+  const incoming = incomingCalls(items[0], workspace);
+  assert.deepEqual(incoming.map((call) => call.from.name), ['HUDPaint']);
+  assert.equal(incoming[0].from.detail, 'the HUDPaint hook');
+  assert.equal(incoming[0].fromRanges.length, 1);
+
+  const outgoing = outgoingCalls(items[0], workspace);
+  assert.deepEqual(outgoing.map((call) => call.to.name), ['MyAddon.Inner']);
+});
+
+test('call hierarchy on a call site starts at the function it reaches', () => {
+  const use = `hook.Add("Think", "x", function()
+  MyAddon.Work()
+end)
+`;
+  const { workspace, analyses } = makeWorkspace({
+    'lua/myaddon/sh_work.lua': 'MyAddon = MyAddon or {}\nfunction MyAddon.Work() end\n',
+    'lua/autorun/server/sv_use.lua': use,
+  });
+  const analysis = analyses['lua/autorun/server/sv_use.lua'];
+  const position = analysis.lines.positionAt(use.indexOf('MyAddon.Work()') + 3);
+
+  const items = prepareCallHierarchy(analysis, position, workspace);
+  assert.deepEqual(items.map((item) => item.name), ['MyAddon.Work']);
 });
 
 void file;

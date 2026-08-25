@@ -8,6 +8,7 @@ import { GmodApi } from '../../api/index.js';
 import type { ApiFunction, ApiParam, Realm } from '../../api/types.js';
 import type { FileAnalysis, Span } from '../../analyze/binder.js';
 import { realmAt } from '../../analyze/realm.js';
+import { cadenceOf, entryLabel } from '../../analyze/hotpath.js';
 import { Suppressions } from '../../analyze/suppressions.js';
 import { isAssignable, fromApiType, typeToString } from '../../analyze/types.js';
 import type { Workspace } from '../../analyze/workspace.js';
@@ -50,6 +51,8 @@ export const enum Code {
   DuplicateHookIdentifier = 'duplicate-hook-identifier',
   DuplicateTimerName = 'duplicate-timer-name',
   MissingAsset = 'missing-asset',
+  PerfHotPath = 'perf-hot-path',
+  UnusedFunction = 'unused-function',
 }
 
 export interface DiagnoseContext {
@@ -518,6 +521,41 @@ export function diagnose(
           `A timer named '${name}' is created in ${n} other place${n === 1 ? '' : 's'}. ` +
           `timer.Create replaces an existing timer with the same name.`,
         Code.DuplicateTimerName,
+      );
+    }
+  }
+
+  /* ---------------------------------------------------------- hot paths */
+
+  if (d.perfHotPath !== 'off') {
+    const severity = severityOf(d.perfHotPath);
+    for (const finding of workspace.hotPathsIn(analysis.uri)) {
+      const where = finding.chain.length
+        ? `reached from ${entryLabel(finding.entry)} via ${finding.chain.join(' → ')}`
+        : `in ${entryLabel(finding.entry)}`;
+      push(
+        finding.span,
+        `'${finding.callee}' ${finding.rule.why}, and this runs ` +
+          `${cadenceOf(finding.entry)} — ${where}. ${finding.rule.advice}`,
+        severity,
+        Code.PerfHotPath,
+        { data: { callee: finding.callee, hoistable: finding.rule.hoistable === true } },
+      );
+    }
+  }
+
+  /* --------------------------------------------------------- dead code */
+
+  if (d.unusedFunction !== 'off') {
+    const severity = severityOf(d.unusedFunction);
+    for (const dead of workspace.deadFunctionsIn(analysis.uri)) {
+      push(
+        dead.nameSpan,
+        `'${dead.path}' is never called, referenced or registered anywhere in this ` +
+          `workspace. Expected if another addon calls it.`,
+        severity,
+        Code.UnusedFunction,
+        { data: { name: dead.path } },
       );
     }
   }

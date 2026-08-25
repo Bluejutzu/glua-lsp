@@ -4,9 +4,10 @@ import { DiagnosticSeverity, type Diagnostic } from 'vscode-languageserver-types
 import { diagnose } from '@glua/server/features/diagnostics.js';
 import { bold, c, heading, pad, plain, symbols } from './palette.js';
 import { loadProject, uriOf } from './project.js';
+import { RULES } from './rules.js';
 import { createProgress } from './progress.js';
 
-export type LintFormat = 'pretty' | 'json' | 'github' | 'compact';
+export type LintFormat = 'pretty' | 'json' | 'github' | 'compact' | 'sarif';
 
 export interface LintOptions {
   format: LintFormat;
@@ -98,6 +99,7 @@ export function lint(targets: string[], options: LintOptions): LintResult {
     compact: () => renderCompact(visible, root),
     github: () => renderGithub(visible, root),
     json: () => renderJson(visible, root),
+    sarif: () => renderSarif(visible, root),
   }[options.format];
 
   return { findings, errors, warnings, filesChecked: files.length, output: render() };
@@ -195,6 +197,89 @@ function renderGithub(findings: Finding[], root: string): string {
       );
     })
     .join('\n');
+}
+
+/* ----------------------------------------------------------------- sarif */
+
+declare const __GLUA_VERSION__: string | undefined;
+
+const DOCS = 'https://glua.bluejutzu.dev';
+
+/**
+ * SARIF 2.1.0, which is what GitHub code scanning ingests.
+ *
+ * Worth having over `--format github`: annotations live and die with one
+ * workflow run, whereas an uploaded SARIF file gives findings a history, a
+ * place to be dismissed, and a diff between the pull request and the base
+ * branch. Paths are relative to the project root, which is what the upload
+ * action expects.
+ */
+function renderSarif(findings: Finding[], root: string): string {
+  const index = new Map(RULES.map((rule, i) => [rule.code, i]));
+
+  const level = (severity: DiagnosticSeverity | undefined): string => {
+    switch (severity) {
+      case DiagnosticSeverity.Error:
+        return 'error';
+      case DiagnosticSeverity.Warning:
+        return 'warning';
+      default:
+        return 'note';
+    }
+  };
+
+  return `${JSON.stringify(
+    {
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      version: '2.1.0',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'glua',
+              informationUri: DOCS,
+              version: typeof __GLUA_VERSION__ === 'string' ? __GLUA_VERSION__ : '0.0.0-dev',
+              rules: RULES.map((rule) => ({
+                id: rule.code,
+                name: rule.code,
+                shortDescription: { text: rule.summary },
+                helpUri: `${DOCS}/reference/rules`,
+                properties: { settingsKey: rule.settingsKey },
+              })),
+            },
+          },
+          results: findings.map(({ file, diagnostic }) => {
+            const code = String(diagnostic.code ?? 'unknown');
+            const ruleIndex = index.get(code);
+            return {
+              ruleId: code,
+              ...(ruleIndex === undefined ? {} : { ruleIndex }),
+              level: level(diagnostic.severity),
+              message: { text: messageOf(diagnostic) },
+              locations: [
+                {
+                  physicalLocation: {
+                    artifactLocation: {
+                      uri: path.relative(root, file).replace(/\\/g, '/'),
+                    },
+                    // SARIF counts lines and columns from one; LSP from zero.
+                    region: {
+                      startLine: diagnostic.range.start.line + 1,
+                      startColumn: diagnostic.range.start.character + 1,
+                      endLine: diagnostic.range.end.line + 1,
+                      endColumn: diagnostic.range.end.character + 1,
+                    },
+                  },
+                },
+              ],
+            };
+          }),
+        },
+      ],
+    },
+    null,
+    2,
+  )}`;
 }
 
 /* ------------------------------------------------------------------ json */

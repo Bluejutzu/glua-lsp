@@ -39,6 +39,14 @@
           "$ref": "#/definitions/severity",
           "description": "A material, model or sound path that does not exist. Off by default: it needs glua.workspace.gamePath, and only suits projects where every asset ships in the repository, since Workshop and content-pack assets cannot be seen from here."
         },
+        "perfHotPath": {
+          "$ref": "#/definitions/severity",
+          "description": "Expensive work reached from something the engine runs every frame or tick — a render hook, ENT:Think, a timer that repeats forever at 0.5s or less. Calls behind a guard that limits how often they run are left alone."
+        },
+        "unusedFunction": {
+          "$ref": "#/definitions/severity",
+          "description": "Functions this workspace defines and never calls, references or registers. Off by default: an addon meant to be extended by other addons is full of them on purpose."
+        },
         "scope": {
           "enum": ["open", "workspace"],
           "description": "Whether to report problems only in open files, or in every indexed file."

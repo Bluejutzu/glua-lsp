@@ -21,6 +21,8 @@ All numbers on this page were measured on a real-world gamemode: 932 files and 2
 
 - **Lazy indexing**: The initial scan is batched and non-blocking. The server indexes files in chunks so the editor UI stays responsive while the workspace loads.
 - **Syntax tree eviction**: Syntax trees for closed files are released from memory. Only open files and their dependencies are retained, which keeps the heap bounded even in large workspaces.
+- **Facts, not trees**: Everything cross-file — the workspace symbol index, net message pairing, the call graph behind [hot paths](/features/hot-paths) and call hierarchy — is extracted once while a tree is in hand and kept as plain data. Re-parsing a file with identical contents leaves those indexes alone, so a scan that reads the whole project does not rebuild them once per file.
+- **Resolution on demand**: Call edges are resolved when something asks for them rather than when the index is built. In a workspace where hundreds of files define the same path, indexing every edge up front would cost the square of that, and almost none of those edges are ever looked at.
 
 ## Running your own benchmark
 
