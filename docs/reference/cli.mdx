@@ -71,6 +71,9 @@ glua lint . --quiet --max-warnings 0
 | `--root <dir>` | Project root for config files and relative paths |
 | `--max-warnings <n>` | Exit non-zero above this many warnings |
 | `-q, --quiet` | Only report errors |
+| `--suppress-all` | Accept every current finding into `.glua-baseline.json` |
+| `--prune-suppressions` | Rewrite the baseline so it claims no more than still happens |
+| `--ignore-baseline` | Report everything, as though the project had no baseline |
 | `--fix` | Apply the fixes that have one sensible outcome |
 | `--fix-dry-run` | Show what `--fix` would change, writing nothing |
 
@@ -230,6 +233,49 @@ jobs:
       - run: pnpm exec glua lint lua/ --format github
       - run: pnpm exec glua fmt lua/ --check
 ```
+
+### Adopting on a codebase you inherited
+
+Most Garry's Mod code is code somebody else wrote. Running a linter over it for
+the first time produces hundreds of findings, none of which are the change you
+were making — and that is how a linter gets switched back off.
+
+A baseline draws a line under what already exists:
+
+```bash
+glua lint lua/ --suppress-all     # writes .glua-baseline.json, reports nothing
+```
+
+Commit that file. From then on the rules are enforced on everything written
+after it, and the backlog waits until you want it:
+
+```bash
+glua lint lua/                    # only findings the baseline does not cover
+glua lint lua/ --ignore-baseline  # the whole backlog again, when you want to chip at it
+```
+
+The baseline counts findings per file and rule rather than recording line
+numbers, so moving code around does not invalidate it. A file with two unused
+locals accepts two; add a third and the third is reported.
+
+When you fix something the baseline was covering, it says so:
+
+```
+2 accepted by .glua-baseline.json
+1 baseline entry claims findings that no longer happen — run --prune-suppressions
+```
+
+```bash
+glua lint lua/ --prune-suppressions    # rewrite it to match what still happens
+```
+
+<Note>
+  Pruning is a deliberate act, not an automatic one: a baseline quietly rewriting itself downward would let a rule silently stop being enforced. It is also worth running in CI as a check — a drifted baseline is a sign the code improved and nobody noticed.
+</Note>
+
+<Warning>
+  `--suppress-all` and `--prune-suppressions` cannot be combined with `--fix`. Fixing the code and accepting the code are opposite decisions, and doing both in one pass makes it impossible to see which happened.
+</Warning>
 
 ### Code scanning
 
