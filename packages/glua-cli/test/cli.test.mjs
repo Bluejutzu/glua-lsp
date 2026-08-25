@@ -82,6 +82,45 @@ test('--max-warnings fails once the limit is passed', { skip: !built }, () => {
   assert.equal(run(['lint', root, '--root', root, '--max-warnings', '0']).code, 1);
 });
 
+test('pretty output shows the offending line with the span underlined', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_bad.lua': 'local x = 1\nx += 1\nprint(x)\n' });
+  const stdout = run(['lint', root, '--root', root]).stdout;
+
+  assert.match(stdout, /2 \u2502 x \+= 1/, `no source line in:\n${stdout}`);
+  assert.match(stdout, /\u2502\s+\u2500+/, 'the span should be underlined');
+  assert.match(stdout, /1 \u2502 local x = 1/, 'one line of context above');
+});
+
+test('--no-code-frames goes back to one line per finding', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_bad.lua': 'local x = 1\nx += 1\nprint(x)\n' });
+  const stdout = run(['lint', root, '--root', root, '--no-code-frames']).stdout;
+
+  assert.match(stdout, /compound-assignment/);
+  assert.doesNotMatch(stdout, /\u2502/, `a frame slipped through:\n${stdout}`);
+});
+
+test('a run of nothing but hints does not claim there are no problems', { skip: !built }, () => {
+  // unused-local is a hint by default. Reporting it and then saying "no
+  // problems" in the same breath is the summary contradicting the findings.
+  const root = addon({ 'lua/autorun/sh_hint.lua': 'local unused = 1\nprint("hi")\n' });
+  const result = run(['lint', root, '--root', root]);
+
+  assert.match(result.stdout, /unused-local/);
+  assert.doesNotMatch(result.stdout, /no problems/, result.stdout);
+  assert.match(result.stdout, /1 suggestion\b/);
+  assert.equal(result.code, 0, 'a hint is still not a failure');
+});
+
+test('--timing reports the phases and the slowest files', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_ok.lua': 'print("hi")\n' });
+  const stdout = run(['lint', root, '--root', root, '--timing']).stdout;
+
+  assert.match(stdout, /Timing/);
+  assert.match(stdout, /index\s+\d+ms/);
+  assert.match(stdout, /check\s+\d+ms/);
+  assert.match(stdout, /total\s+\d+ms/);
+});
+
 test('json output is machine readable', { skip: !built }, () => {
   const root = addon({ 'lua/autorun/sh_bad.lua': 'local x = 1\nx += 1\nprint(x)\n' });
   const result = run(['lint', root, '--root', root, '--format', 'json']);

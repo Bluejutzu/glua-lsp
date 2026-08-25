@@ -6,7 +6,22 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **Code frames in `glua lint`.** Findings now come with the line they are about
+  and the part they are about underlined. A line number is a lookup instruction,
+  and in a CI log there is no file to open. `--no-code-frames` goes back to one
+  line per finding; the machine formats are unchanged.
+
+- **`--timing`**, reporting how long indexing the project took against how long
+  checking the files took, and the five slowest files. Linting one file in a
+  large addon still indexes everything, and this is what says so.
+
+### Fixed
+
+- A run reporting nothing but hints printed "✓ no problems" directly under the
+  hints it had just listed. The summary now counts suggestions alongside errors
+  and warnings. Exit codes are unchanged: a hint is still not a failure.
 
 ## 0.4.2
 
