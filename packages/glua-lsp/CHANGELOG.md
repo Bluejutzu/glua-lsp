@@ -19,8 +19,10 @@ commit; this file covers what actually changed for you.
   a finding four functions and two files away from its hook explains itself. A
   function that rate-limits itself — a `CurTime()` guard, a `nextThink` field, a
   one-time `if not x then` gate — is not a hot path, and neither is anything it
-  reaches — though a guard around a *registration* says nothing about the
-  callback it registers, which still runs every frame. `Material("...")` with a
+  reaches. Two things are deliberately not guards: one around a *registration*
+  says nothing about the callback it registers, and a validity check like
+  `if not IsValid(ent) then return end` skips a frame rather than limiting how
+  often the rest runs. `Material("...")` with a
   literal argument gets a quick fix that hoists it out of the frame, placed
   inside whatever guard the call site was already under so a shared file's realm
   checks still hold. Rule `perf-hot-path`, keyed `perfHotPath`, on as a

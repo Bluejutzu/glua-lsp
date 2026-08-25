@@ -145,12 +145,25 @@ end)
 
 Anything mentioning `CurTime`, `RealTime`, `SysTime`, `UnPredictedCurTime`,
 `FrameNumber`, `engine.TickCount` or `os.clock` counts as a time guard, as does
-a name beginning `next`, `last`, `cooldown` or `delay`. A `not x` or `x == nil`
-condition counts as a one-time gate. Calls behind any of those are skipped, and
-so is anything they reach.
+a name beginning `next`, `last`, `cooldown` or `delay`. Calls behind one are
+skipped, and so is anything they reach.
 
-A guard only covers what it actually gates, though. Registering a hook behind
-one says nothing about the callback:
+A `not x` or `x == nil` condition counts as a one-time gate, but only where it
+*wraps* a block — the third example above. As an early return it is a validity
+check rather than a rate limit, and the rest of the body still runs every frame:
+
+```lua
+hook.Add("HUDPaint", "x", function()
+    if not IsValid(ply) then return end          -- skips a frame, not a throttle
+    surface.SetMaterial(Material("a.png"))       -- still reported
+end)
+```
+
+Nor does a call inside the condition make one: `IsValid(ply)` is re-evaluated
+every run, so nothing behind it happens only once.
+
+A guard also only covers what it actually gates. Registering a hook behind one
+says nothing about the callback:
 
 ```lua
 if not registered then

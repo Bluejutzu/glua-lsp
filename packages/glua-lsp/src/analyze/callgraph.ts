@@ -353,23 +353,33 @@ const pathOf = (expr: Expression): string | null => {
 /**
  * Does this condition plausibly stop the block from running every frame?
  *
- * Deliberately generous. A missed finding costs nothing; a finding on code that
- * already rate-limits itself is the kind of noise that gets a rule switched off.
+ * Deliberately generous about time guards: a missed finding costs nothing, and a
+ * finding on code that already rate-limits itself is the kind of noise that gets
+ * a rule switched off.
+ *
+ * @param allowGate Also accept a one-time gate — `if not registered then`. Only
+ * true for a condition wrapping a block, where the gate really does mean "once".
+ * An early return reading `if not IsValid(ent) then return end` is a validity
+ * check: it skips a frame where the object is gone, and says nothing at all
+ * about how often the rest runs.
  */
-function isThrottleCondition(condition: Expression): boolean {
+function isThrottleCondition(condition: Expression, allowGate: boolean): boolean {
   let found = false;
   walk(condition, (node) => {
     if (found) return false;
     if (node.type === 'CallExpression') {
       const path = pathOf(node.base);
       if (path && TIME_CALLS.has(path)) found = true;
-      return;
+      // Anything else called here is re-evaluated every run, so whatever it
+      // guards is not gated to happening once: `not IsValid(x)` is not a gate.
+      return false;
     }
-    // `if not ready then ... end` — a one-time gate.
-    if (node.type === 'UnaryExpression' && node.operator === 'not') found = true;
-    if (node.type === 'BinaryExpression' && node.operator === '==' &&
-        (node.left.type === 'NilLiteral' || node.right.type === 'NilLiteral')) {
-      found = true;
+    if (allowGate) {
+      if (node.type === 'UnaryExpression' && node.operator === 'not') found = true;
+      if (node.type === 'BinaryExpression' && node.operator === '==' &&
+          (node.left.type === 'NilLiteral' || node.right.type === 'NilLiteral')) {
+        found = true;
+      }
     }
     if (node.type === 'Identifier' && THROTTLE_NAME.test(node.name)) found = true;
     return;
@@ -390,7 +400,9 @@ function bodyIsRateLimited(body: Statement[]): boolean {
     const onlyReturns =
       clause.body.length === 1 && clause.body[0]!.type === 'ReturnStatement';
     if (!onlyReturns) return false;
-    if (isThrottleCondition(clause.condition)) return true;
+    // Time-based only: an early return is how you skip an invalid frame as
+    // well as how you rate-limit, and only the latter is a throttle.
+    if (isThrottleCondition(clause.condition, false)) return true;
   }
   return false;
 }
@@ -568,7 +580,7 @@ export function buildCallGraph(chunk: Chunk): CallGraph {
       case 'IfClause': {
         // Pushed per clause rather than per statement: an `elseif` that
         // rate-limits says nothing about the branch beside it.
-        if (node.condition && isThrottleCondition(node.condition)) {
+        if (node.condition && isThrottleCondition(node.condition, true)) {
           throttleStack.push(node.end);
         }
         break;

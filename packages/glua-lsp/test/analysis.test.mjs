@@ -1500,6 +1500,64 @@ end
   assert.match(found[0].message, /Material/);
 });
 
+test('an IsValid early return does not exempt the rest of the callback', () => {
+  // A validity guard skips a frame where the object is gone. It says nothing
+  // about how often the rest runs.
+  const found = hotFindings(
+    {
+      'lua/autorun/client/cl_valid.lua': `
+hook.Add("HUDPaint", "x", function()
+  if not IsValid(LocalPlayer()) then return end
+  surface.SetMaterial(Material("a.png"))
+end)
+`,
+    },
+    'lua/autorun/client/cl_valid.lua',
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /Material/);
+});
+
+test('two single-file entities in one directory stay separate classes', () => {
+  const found = hotFindings(
+    {
+      // Both are single-file classes sitting in lua/entities/.
+      'lua/entities/turret_a.lua': `
+function ENT:Think()
+  self:Scan()
+end
+`,
+      'lua/entities/turret_b.lua': `
+function ENT:Scan()
+  util.TableToJSON({})
+end
+`,
+    },
+    'lua/entities/turret_b.lua',
+  );
+  assert.deepEqual(found, [], 'b:Scan is not reachable from a:Think');
+});
+
+test('a client hot path does not walk into a serverside definition', () => {
+  const found = hotFindings(
+    {
+      'lua/autorun/server/sv_impl.lua': `
+MyAddon = MyAddon or {}
+function MyAddon.Refresh()
+  ents.FindByClass("prop_physics")
+end
+`,
+      'lua/autorun/client/cl_hud.lua': `
+hook.Add("HUDPaint", "x", function()
+  MyAddon.Refresh()
+end)
+`,
+    },
+    'lua/autorun/server/sv_impl.lua',
+  );
+  assert.deepEqual(found, [], 'the client cannot reach the serverside body');
+});
+
 test('a timer that fires a fixed number of times is not a hot path', () => {
   const found = hotFindings(
     {
@@ -1550,6 +1608,14 @@ function hoistFix(source, name = 'lua/autorun/client/cl_fix.lua') {
   if (!found.length) return { analysis, found, action: undefined };
   const actions = codeActions(analysis, found[0].range, found, { api, workspace });
   return { analysis, found, action: actions.find((a) => a.title.startsWith('Hoist')) };
+}
+
+/** A range covering the whole file, the way `glua lint --fix` asks. */
+function wholeFile(analysis) {
+  return {
+    start: { line: 0, character: 0 },
+    end: analysis.lines.positionAt(analysis.text.length),
+  };
 }
 
 /** Applies a code action's edits to the source it came from. */
@@ -1605,6 +1671,34 @@ end
   assert.ok(declaration > lines.indexOf('if CLIENT then'), 'must stay inside the CLIENT branch');
   assert.match(lines[declaration], /^ {2}local tex_icon = surface\.GetTextureID\("icon"\)$/);
   assert.match(applied, /surface\.SetTexture\(tex_icon\)/);
+});
+
+test('two hoists in one batch get names that do not collide', () => {
+  // `glua lint --fix` applies every preferred action from one call together.
+  const source = `hook.Add("HUDPaint", "x", function()
+  surface.SetMaterial(Material("foo/icon.png"))
+  surface.SetMaterial(Material("bar/icon.png"))
+end)
+`;
+  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/client/cl_two.lua': source });
+  const analysis = analyses['lua/autorun/client/cl_two.lua'];
+  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {}).filter(
+    (d) => d.code === 'perf-hot-path',
+  );
+  assert.equal(found.length, 2);
+
+  const hoists = codeActions(analysis, wholeFile(analysis), found, { api, workspace }).filter(
+    (action) => action.title.startsWith('Hoist'),
+  );
+  assert.equal(hoists.length, 2);
+
+  const names = hoists.map((action) => action.edit.changes[analysis.uri][1].newText);
+  assert.equal(new Set(names).size, 2, `both hoists picked ${names[0]}`);
+
+  // And applying both together keeps each call site pointed at its own material.
+  const applied = applyEdits(source, hoists.flatMap((a) => a.edit.changes[analysis.uri]));
+  assert.match(applied, new RegExp(`local ${names[0]} = Material\\("foo/icon\\.png"\\)`));
+  assert.match(applied, new RegExp(`local ${names[1]} = Material\\("bar/icon\\.png"\\)`));
 });
 
 test('a hoist is not offered when there is nothing to hoist out of', () => {

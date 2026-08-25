@@ -333,7 +333,7 @@
             "off"
           ],
           "default": "warning",
-          "markdownDescription": "Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` that repeats forever at 0.5s or less. The call is reported where it is written, with the chain of functions that reaches it.\n\nCalls behind a guard that plainly limits how often they run — a `CurTime()` comparison, a `nextThink` field, a one-time `if not x then` gate — are left alone."
+          "markdownDescription": "Expensive work reached from something the engine runs every frame or tick — a render hook, `ENT:Think`, a `timer.Create` that repeats forever at 0.5s or less. The call is reported where it is written, with the chain of functions that reaches it.\n\nCalls behind a guard that plainly limits how often they run — a `CurTime()` comparison, a `nextThink` field, a one-time `if not x then` gate wrapping a block — are left alone. A validity check like `if not IsValid(ent) then return end` is not one of those, and neither is a guard around the registration rather than the callback."
         },
         "glua.diagnostics.unusedFunction": {
           "type": "string",

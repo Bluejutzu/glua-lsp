@@ -24,6 +24,14 @@ export function codeActions(
 ): CodeAction[] {
   const actions: CodeAction[] = [];
   const edit = (edits: TextEdit[]): CodeAction['edit'] => ({ changes: { [analysis.uri]: edits } });
+  /**
+   * Names already handed out by an action in this batch. `glua lint --fix`
+   * applies every preferred action from one call together, so two hoists that
+   * would both pick `mat_icon` have to be told about each other — otherwise the
+   * file ends up with two declarations of that name and one call site reading
+   * the wrong one.
+   */
+  const claimed = new Set<string>();
 
   for (const diagnostic of diagnostics) {
     switch (diagnostic.code) {
@@ -123,7 +131,7 @@ export function codeActions(
       case Code.PerfHotPath: {
         const data = diagnostic.data as { callee?: string; hoistable?: boolean } | undefined;
         if (!data?.hoistable || !data.callee) break;
-        pushHoistAction(analysis, diagnostic, data.callee, actions, edit);
+        pushHoistAction(analysis, diagnostic, data.callee, actions, edit, claimed);
         break;
       }
 
@@ -182,6 +190,7 @@ function pushHoistAction(
   callee: string,
   actions: CodeAction[],
   edit: (edits: TextEdit[]) => CodeAction['edit'],
+  claimed: Set<string>,
 ): void {
   const offset = analysis.lines.offsetAt(diagnostic.range.start);
   const call = callAt(analysis, offset);
@@ -207,7 +216,8 @@ function pushHoistAction(
   // not a hoist.
   if (anchorLine >= site.start.line) return;
 
-  const name = freeName(analysis, `${HOIST_PREFIX[callee] ?? 'cached'}_${slug(first.value)}`);
+  const name = freeName(analysis, `${HOIST_PREFIX[callee] ?? 'cached'}_${slug(first.value)}`, claimed);
+  claimed.add(name);
   const source = analysis.text.slice(call.start, call.end);
   const indent = analysis.lines.lineText(anchorLine).match(/^[ \t]*/)?.[0] ?? '';
 
@@ -264,9 +274,10 @@ function slug(value: string): string {
   return /^[A-Za-z_]/.test(trimmed) ? trimmed : `_${trimmed}`;
 }
 
-/** A name the file is not already using, since the edit declares it. */
-function freeName(analysis: FileAnalysis, base: string): string {
+/** A name neither the file nor another action in this batch is using. */
+function freeName(analysis: FileAnalysis, base: string, claimed: Set<string>): string {
   const taken = (name: string) =>
+    claimed.has(name) ||
     new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(analysis.text);
   if (!taken(base)) return base;
   for (let i = 2; i < 100; i++) {
