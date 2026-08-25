@@ -4,7 +4,7 @@ sidebarTitle: "Overview"
 description: "GLua adds IntelliSense, realm checks, net message analysis, and a formatter to VS Code for Garry's Mod Lua development."
 ---
 
-GLua for Garry's Mod is a VS Code extension for GMod Lua. It ships with 5,586 API entries from the Garry's Mod wiki, so completions, type tracking, and diagnostics work without an internet connection. It also covers GMod-specific concepts other Lua tooling misses: server/client/shared realms, net message payloads, and hook signatures.
+A VS Code extension for GMod Lua. The Garry's Mod wiki is bundled — 5,586 entries — so completion, type tracking and diagnostics work offline, and cover the things generic Lua tooling has no idea about: server, client and shared realms, net message payloads, and hook signatures.
 
 <Info>
   This is an unofficial, community-maintained project. It is not affiliated with, endorsed by, or supported by Facepunch Studios.
@@ -12,43 +12,43 @@ GLua for Garry's Mod is a VS Code extension for GMod Lua. It ships with 5,586 AP
 
 <CardGroup cols={2}>
   <Card title="Installation" icon="download" href="/installation">
-    Install from a .vsix package or build from source in minutes.
+    Install from a `.vsix`, from a registry, or build from source.
   </Card>
 
   <Card title="Quickstart" icon="play" href="/quickstart">
-    Take a five-minute tour of completions, realms, and net messages.
+    A five-minute tour of completion, realms and net messages.
   </Card>
 
-  <Card title="Configuration" icon="settings" href="/configuration/overview">
-    Tune diagnostics, formatting, and inline suppressions to match your project.
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Committed config files, editor settings, and inline suppressions.
   </Card>
 
   <Card title="Rules Reference" icon="book-open" href="/reference/rules">
-    Browse every diagnostic rule the language server can enforce.
+    Every diagnostic the linter reports, what it catches, and why.
   </Card>
 </CardGroup>
 
-## Feature highlights
+## What it does
 
 <AccordionGroup>
   <Accordion title="IntelliSense and type tracking" icon="sparkles">
-    The extension resolves types as you type, so completions include the right methods for your variables. It tracks 331 globals, 1,257 library functions, 2,376 class methods, 1,069 panel methods, 100 enums, and 72 structures from the bundled wiki dataset.
+    Types propagate through calls, string literals, loops and metatables, so the completion list on any variable is the methods that variable actually has. The dataset behind it: 331 globals, 1,257 library functions, 2,376 class methods, 1,069 panel methods, 100 enums and 72 structures.
   </Accordion>
 
   <Accordion title="Realm awareness" icon="globe">
-    GLua files run on the server, the client, or both. The extension flags code that calls a server-only API inside a client file, or vice versa, so you catch realm mismatches before you test in-game.
+    A file's realm is read from its path and narrowed inside `if SERVER then` blocks. Calling `Player:Kick` from a clientside file is reported where you write it, not left for someone to find in-game.
   </Accordion>
 
-  <Accordion title="Net message analysis" icon="message-square">
-    When you send a net message on the server, the extension checks that the client reads the same payload types in the same order. Mismatched WriteString / ReadUInt pairs are caught early.
+  <Accordion title="Net message analysis" icon="server">
+    Each `net.Start` is paired with its `net.Receive` across files and their write/read sequences compared. Writing an `Entity` and reading a `UInt` on the other end is caught before the message runs.
   </Accordion>
 
   <Accordion title="Hook intelligence" icon="zap">
-    With 551 hook signatures in the dataset, the extension validates hook names and argument counts. You get completions for hook parameters and warnings for incorrect signatures.
+    551 hook signatures. Names complete, typos are flagged with a quick-fix suggestion, and callback parameters take their types from the signature without you annotating anything.
   </Accordion>
 
   <Accordion title="Formatter" icon="align-left">
-    Format GLua with a dedicated formatter that understands GMod conventions. Configure it through `.gluafmtrc.json`, `.editorconfig`, or `.prettierrc`.
+    Reprints from the syntax tree. It refuses to touch a file that does not parse, never drops a comment, and leaves idiomatic one-liners like `if not IsValid(ent) then return end` alone. Configured with `.gluafmtrc.json`, `.editorconfig` or `.prettierrc`.
   </Accordion>
 </AccordionGroup>
 
@@ -67,7 +67,7 @@ Measured on a 932-file, 232,000-line gamemode:
 
 ## Activation
 
-GLua does not claim every `.lua` file on your machine. It activates only on Garry's Mod workspaces, or when you explicitly enable it. The status bar shows the current mode:
+GLua does not claim every `.lua` file on your machine. It attaches to Garry's Mod workspaces, and to anything else only when you ask it to. The status bar shows the current mode:
 
 - `GLua · Server`
 - `GLua · Client`

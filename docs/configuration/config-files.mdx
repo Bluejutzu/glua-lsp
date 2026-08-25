@@ -5,20 +5,20 @@ icon: "file-code"
 sidebarTitle: "Config Files"
 ---
 
-Committed config files let you store linter and formatter settings in version control. When a teammate opens the project, the language server reads these files automatically. No one has to manually import UI settings or keep personal configs in sync.
+A project's linter and formatter settings belong in the project, not in each contributor's editor. `.glua.json` and `.gluafmtrc.json` are read from the workspace root as soon as they exist, so a checkout has the same rules the last person to touch them did.
 
 ## Creating config files
 
-You can seed a config file from your current VS Code UI settings with one command. Open the Command Palette and run either of the following:
+Both files can be seeded from the settings currently in your editor. Open the Command Palette and run one of:
 
 - `GLua: Create Linter Config File` (creates `.glua.json`)
 - `GLua: Create Formatter Config File` (creates `.gluafmtrc.json`)
 
-These commands write the file at the workspace root using whatever settings are active in your editor at that moment.
+The file is written at the workspace root with whatever settings the editor has at that moment. From then on the file is the source of truth.
 
 ## Linter config (`.glua.json`)
 
-Use `.glua.json` to define globals, diagnostic severity, and per-path overrides.
+Declared globals, diagnostic severity, and per-path overrides.
 
 ```json
 {
@@ -44,7 +44,7 @@ Use `.glua.json` to define globals, diagnostic severity, and per-path overrides.
 
 ## Formatter config (`.gluafmtrc.json`)
 
-Use `.gluafmtrc.json` to control indentation, line width, quotes, and block collapsing.
+Indentation, line width, quote style, block collapsing.
 
 ```json
 {

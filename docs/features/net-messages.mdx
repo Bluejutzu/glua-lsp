@@ -5,20 +5,20 @@ icon: "tower-broadcast"
 sidebarTitle: "Net Messages"
 ---
 
-Every `net.Start`, `net.Receive`, and `util.AddNetworkString` call in your workspace is checked against its counterpart, so registration errors, orphaned handlers, and mismatched payloads show up before you test in-game.
+A net message is only correct when its two halves agree, and the two halves live in different files. Every `net.Start`, `net.Receive` and `util.AddNetworkString` in the workspace is paired with its counterpart, so a message that fails only at runtime shows up while you are writing it.
 
 ## What is checked
 
-The server validates net messages against four categories of problems:
+Four ways the two halves fail to line up:
 
-- **Unregistered strings** — `net.Start` is called with a string that was never passed to `util.AddNetworkString`.
-- **Missing sends** — `net.Start` is called but the message is never followed by `Send`, `Broadcast`, or `SendToServer`.
-- **Orphaned receivers** — `net.Receive` is registered for a message name that nothing in the workspace ever sends.
-- **Payload mismatches** — The sequence of `net.Write*` calls on the sender does not match the `net.Read*` calls on the receiver.
+- **Unregistered strings.** `net.Start` on a name never passed to `util.AddNetworkString`. Fails on the first send.
+- **Missing sends.** A `net.Start` block that never reaches `Send`, `Broadcast` or `SendToServer` — the message is built and thrown away.
+- **Orphaned receivers.** A `net.Receive` for a name nothing ever sends. Usually a rename that only happened on one side.
+- **Payload mismatches.** The `net.Write*` sequence on the sender does not match the `net.Read*` sequence on the handler.
 
 ## Payload mismatch example
 
-When the server and client read and write data in different orders or with different types, it surfaces a diagnostic.
+Read an `Entity` as a `UInt` and no error is raised — you just get nonsense. The rule catches that before you send the message.
 
 <CodeGroup>
 
@@ -40,22 +40,22 @@ end)
 
 </CodeGroup>
 
-The server flags the mismatch because the server writes an `Entity` at position 2, but the client expects a `UInt`.
+Diagnostic on the second read, because that is where the sequences diverge.
 
 ## Completion and rename
 
 ### Message name completion
 
-Inside `net.Start` and `net.Receive`, the server suggests message names that are already registered with `util.AddNetworkString` anywhere in the workspace.
+Inside a `net.Start` or `net.Receive` string, completion offers every name registered with `util.AddNetworkString` anywhere in the workspace.
 
 ### Rename support
 
-When you rename a network string in `util.AddNetworkString`, the change propagates to every `net.Start` and `net.Receive` that uses the same name.
+Rename a network string on its `util.AddNetworkString` and every `net.Start` and `net.Receive` that uses the same name is renamed with it.
 
-## Net Message Graph
+## Net message graph
 
-Use the **GLua: Show Net Message Graph** command to open a visual overview of every net message in your workspace. The graph shows senders, receivers, and payload shapes in one view.
+**GLua: Show Net Message Graph** opens a view of every net message in the workspace: which files send each one, which handle it, and what the payload looks like on either side.
 
 <Tip>
-  Open the Command Palette (Ctrl\+Shift\+P or Cmd\+Shift\+P) and run `GLua: Show Net Message Graph` to explore your net message topology.
+  Open the Command Palette (Ctrl\+Shift\+P or Cmd\+Shift\+P) and run `GLua: Show Net Message Graph`.
 </Tip>

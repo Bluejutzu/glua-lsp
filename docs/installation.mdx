@@ -5,36 +5,24 @@ icon: "download"
 sidebarTitle: "Installation"
 ---
 
-Pick whichever matches your editor. All three carry the same build.
+Same build, three ways to get it. Pick whichever your editor installs from.
 
 <CardGroup cols={3}>
-  <Card
-    title="GitHub Releases"
-    icon="github"
-    href="https://github.com/Bluejutzu/glua-lsp/releases/latest"
-  >
+  <Card title="GitHub Releases" icon="github" href="https://github.com/Bluejutzu/glua-lsp/releases/latest">
     **Available now.** Download the `.vsix` and install it in any editor.
   </Card>
 
-  <Card
-    title="Open VSX"
-    icon="box"
-    href="https://open-vsx.org/extension/bluejutzu/glua-lsp"
-  >
+  <Card title="Open VSX" icon="box" href="https://open-vsx.org/extension/bluejutzu/glua-lsp">
     For **Cursor**, VSCodium, Gitpod and Theia.
   </Card>
 
-  <Card
-    title="VS Code Marketplace"
-    icon="microsoft"
-    href="https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp"
-  >
+  <Card title="VS Code Marketplace" icon="microsoft" href="https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp">
     For **VS Code**.
   </Card>
 </CardGroup>
 
 <Note>
-  Registry publishing is wired into the release pipeline but the listings may not be live yet. If a link above 404s, that registry has not been published to — use the `.vsix` from GitHub Releases in the meantime; it is the same artefact.
+  Registry publishing is wired into the release pipeline but the listings may not be live yet. If a link above 404s, that registry has not been published to — use the `.vsix` from [GitHub Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest) in the meantime; it is the same artefact.
 </Note>
 
 ## Quick install
@@ -50,7 +38,7 @@ cursor --install-extension bluejutzu.glua-lsp
 ```
 
 ```bash From a .vsix
-code --install-extension glua-lsp-<version>.vsix
+code --install-extension glua-lsp-<version>.vsix 
 ```
 
 </CodeGroup>
@@ -61,7 +49,6 @@ code --install-extension glua-lsp-<version>.vsix
   <Step title="Download the VSIX">
     Grab `glua-lsp-<version>.vsix` from the [latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest).
   </Step>
-
   <Step title="Install it">
     Run this from the folder you saved the file in.
 
@@ -79,7 +66,6 @@ code --install-extension glua-lsp-<version>.vsix
 
     Or from inside the editor: **Extensions** → the `···` menu → **Install from VSIX…**
   </Step>
-
   <Step title="Open a GLua file">
     The extension activates when you open a `.lua` file in a Garry's Mod workspace.
   </Step>
@@ -97,7 +83,7 @@ To hear about new versions, watch the repository: **Watch** → **Custom** → *
 
 ### Unreleased builds
 
-Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pick up a fix before it is tagged. Open the [latest CI run](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml), scroll to **Artifacts**, and download `glua-lsp-vsix-<sha>`.
+Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pick up a fix before it is tagged. Open the [latest CI run](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml), scroll to **Artifacts**, and download `glua-lsp-vsix-<sha>`. And follow the instructions at [Quick Install](https://glua.bluejutzu.dev/installation#quick-install).
 
 <Note>
   GitHub wraps workflow artifacts in a `.zip`. Unzip it to get the `.vsix` inside.
@@ -115,7 +101,6 @@ Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pic
     pnpm install
     ```
   </Step>
-
   <Step title="Build and package">
     Compile the extension and produce a `.vsix`.
 
@@ -126,7 +111,6 @@ Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pic
 
     That writes `packages/glua-lsp/glua-lsp-<version>.vsix`.
   </Step>
-
   <Step title="Run or install">
     Press **F5** to launch the extension in a new Extension Development Host window, or install the package you just built.
 
@@ -138,15 +122,15 @@ Every push to `main` builds and attaches a `.vsix` to its CI run, so you can pic
 
 ## Verify the installation
 
-Open any `.lua` file inside a Garry's Mod addon folder. The VS Code status bar should show a realm label such as `GLua · Server`. If you see that label, the language server is active and indexing your workspace.
+Open a `.lua` file inside a Garry's Mod addon folder. The status bar shows a realm — `GLua · Server`, `GLua · Client` or `GLua · Shared` — once the language server has attached and started indexing.
 
 <Warning>
-  If the status bar shows `Plain Lua`, the workspace was not recognised as a Garry's Mod project. Click the status bar item to switch the mode manually, or set `glua.activation` to `always` in your VS Code settings.
+  `Plain Lua` in the status bar means the workspace did not look like a Garry's Mod project. Click the status bar item to switch, or set `glua.activation` to `always`.
 </Warning>
 
 ## Setting it as your formatter
 
-To format GLua files with the extension, register it as the default formatter for the `glua` language in your user or workspace `settings.json`:
+Register it as the default formatter for the `glua` language in your user or workspace `settings.json`:
 
 ```json
 {

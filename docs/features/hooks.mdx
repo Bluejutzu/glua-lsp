@@ -5,11 +5,11 @@ icon: "anchor"
 sidebarTitle: "Hooks"
 ---
 
-Hook names complete from the bundled wiki dataset, typos get flagged with a quick fix, callback parameters are typed automatically, and `ENT`/`SWEP`/`PANEL` stubs are generated for you.
+Hook names complete from the wiki, typos are flagged with a quick fix, callback parameters take their type from the signature, and `ENT`/`SWEP`/`PANEL` stubs write themselves.
 
 ## Hook name completion
 
-When you type `hook.Add("`, the server suggests hook names from the 551 hooks in the bundled wiki dataset. It also includes custom hooks that your workspace fires with `hook.Run`.
+Inside a `hook.Add("` string, completion offers the 551 hooks in the bundled wiki dataset — plus any custom hook your workspace fires with `hook.Run`.
 
 ```lua
 hook.Add("PlayerSay", "MyAddon", function(sender, text, teamChat)
@@ -19,7 +19,7 @@ end)
 
 ## Typo detection
 
-If you enter a hook name that does not exist, the server flags it and offers a quick fix based on edit distance.
+A hook name that is neither documented nor fired anywhere in the workspace is flagged, with the closest known name offered as a quick fix.
 
 ```lua
 hook.Add("PlayerSpawned", "MyAddon", function(ply)
@@ -30,7 +30,7 @@ end)
 
 ## Typed callback parameters
 
-The server reads hook signatures from the wiki and applies them to your callback parameters automatically. You do not need to annotate them yourself.
+Callback parameters take their type from the hook's wiki signature. No annotation required.
 
 ```lua
 hook.Add("PlayerSay", "ChatFilter", function(sender, text, teamChat)
@@ -41,9 +41,7 @@ end)
 
 ## Hooks of your own
 
-A hook you invented is documented nowhere, so its `hook.Run` call sites are the
-only description of it that exists. Those are read as its signature, and the
-callbacks you register for it are typed from them.
+A hook you invented is documented nowhere, so its `hook.Run` call sites are the only description of it that exists. Those are read as its signature, and the callbacks you register for it are typed from them.
 
 ```lua
 -- somewhere in your addon
@@ -56,12 +54,9 @@ hook.Add("MyAddon.TurretPlaced", "log", function(ply, turret)
 end)
 ```
 
-Where call sites disagree about a position, it stays `any` rather than picking
-one. A site passing `nil` is ignored for the same reason — it says nothing about
-what the parameter is for.
+Where call sites disagree about a position, it stays `any` rather than picking one. A site passing `nil` is ignored for the same reason — it says nothing about what the parameter is for.
 
-Declaring more parameters than anything passes is reported, since those extras
-are always `nil`:
+Declaring more parameters than anything passes is reported, since those extras are always `nil`:
 
 ```lua
 hook.Run("MyAddon.Ping", count)
@@ -73,11 +68,11 @@ end)
 
 ## ENT / SWEP / PANEL stubs
 
-When you define a scripted entity, weapon, or panel, the server can generate the full hook table for you.
+The full hook table of a scripted entity, weapon or panel can be generated in one completion.
 
 ### Scripted entity stub
 
-Typing `function ENT:` triggers completion of the entity hook table. The server inserts a full stub with the most common hooks.
+Typing `function ENT:` opens a completion for the entity hook table. Accept it and the server inserts a stub of the common hooks:
 
 ```lua
 ENT.Type = "anim"
@@ -95,11 +90,11 @@ function ENT:Use(activator, caller)
 end
 ```
 
-The same applies to `SWEP` for scripted weapons and `PANEL` for VGUI panels.
+The same works for `SWEP` and `PANEL`.
 
 ## gameevent.Listen
 
-The server also recognises `gameevent.Listen` as a valid hook source. Events registered this way are included in hook name completion and typo detection.
+`gameevent.Listen` counts as a hook source. Events registered this way appear in completion and are checked by the typo rule.
 
 ```lua
 gameevent.Listen("player_connect")
@@ -109,5 +104,5 @@ end)
 ```
 
 <Tip>
-  Use the quick fix (Ctrl\+.) on an unknown hook name to see the closest match from the wiki. This catches common mistakes like "PlayerDeath" vs "PlayerDeathThink" instantly.
+  Ctrl\+. on an unknown hook name pulls up the closest documented match. `PlayerDeath` vs `PlayerDeathThink` is the usual example.
 </Tip>

@@ -5,11 +5,11 @@ icon: "rocket"
 sidebarTitle: "Quickstart"
 ---
 
-This quickstart walks you through the core features of GLua in about five minutes. You will see how completions follow your values, how realms protect you from runtime errors, how net messages are validated end to end, and how to silence a diagnostic inline.
+Five minutes, six things: what completion looks like when it knows the type of a value, how realms catch cross-realm calls before you run the game, how net messages are checked end to end, and how to silence a false positive inline.
 
-## 1) Completion follows your values
+## 1) Completion follows the value
 
-When you assign a known type, the extension suggests the right members. Type a player reference, a panel, or a loop variable, and the completion list updates automatically.
+Assign something the extension recognises and completion offers the methods that thing actually has. A player, a panel, a loop variable — the list changes with the type, not the name.
 
 ```lua
 local ply = player.GetByID(1)
@@ -25,7 +25,7 @@ end
 
 ## 2) Your own functions
 
-You can add type annotations so the extension understands your code, or let it infer types from usage.
+Annotate them if you want, or don't and let the extension read the type from how the parameters are used.
 
 <CodeGroup>
 
@@ -50,11 +50,11 @@ end
 
 </CodeGroup>
 
-With annotations, callers get completions and diagnostics for every parameter. Without them, the extension still infers types from how the function is used in your codebase.
+With annotations, callers get completion and diagnostics on every parameter. Without them, inference reads the type from the methods called on each parameter — enough for most helpers.
 
 ## 3) Realms are not a suggestion
 
-GLua runs on the server, the client, or both. The extension reads the file path and flags API calls that do not belong in the current realm.
+GLua code runs on the server, the client, or both. The file's path decides which, and a call to an API that does not exist in that realm is reported where you write it:
 
 ```lua
 -- File: lua/autorun/client/my_addon.lua (clientside file)
@@ -63,11 +63,11 @@ local ply = LocalPlayer()
 ply:Kick("Reason") -- realm error: Kick is server-only
 ```
 
-The diagnostic appears immediately, so you know to move that code to a server file or use a net message instead.
+Move the code to a server file, or send a net message from here — the diagnostic tells you which realm the API belongs to.
 
 ## 4) Net messages checked end to end
 
-When you define a net message sender and receiver, the extension compares the write and read signatures. If the payload types or order do not match, it reports a diagnostic.
+`net.Start` on one side and `net.Receive` on the other are paired across files and their write/read sequences compared. Mismatch the payload and it is flagged before the message runs.
 
 ```lua
 -- Server: lua/autorun/server/net.lua
@@ -86,22 +86,20 @@ net.Receive("MyMessage", function()
 end)
 ```
 
-The mismatch between `WriteEntity` and `ReadUInt` is flagged before you run the game.
-
 ## 5) Silencing a finding
 
-If a diagnostic is a false positive for your project, you can suppress it inline with a comment:
+When a diagnostic is wrong for a specific line, suppress that line rather than turning the rule off:
 
 ```lua
 -- glua-ignore
 local x = SomeAmbiguousCall()
 ```
 
-Place the suppression comment on the line before the statement you want to ignore. The extension stops reporting the finding without affecting other diagnostics.
+The comment goes on the line above the statement it covers. Every other diagnostic on that line still fires.
 
 ## 6) Commands worth knowing
 
-Open the Command Palette (**Ctrl\+Shift\+P** or **Cmd\+Shift\+P**) and type `GLua:` to find these commands:
+Open the Command Palette (**Ctrl\+Shift\+P** or **Cmd\+Shift\+P**) and type `GLua:` to find these:
 
 | Command | What it does |
 | --- | --- |
@@ -111,4 +109,4 @@ Open the Command Palette (**Ctrl\+Shift\+P** or **Cmd\+Shift\+P**) and type `GLu
 | `GLua: Re-index Workspace` | Force a full re-index after large changes or dataset updates |
 | `GLua: Open Settings` | Jump to the GLua settings panel |
 
-Try running `GLua: Show Net Message Graph` on your project to see the net message analysis in action.
+Run `GLua: Show Net Message Graph` on your project to see every sender and receiver, and how their payloads line up, in one view.

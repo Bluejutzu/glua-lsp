@@ -5,11 +5,11 @@ icon: "server"
 sidebarTitle: "Realms"
 ---
 
-Every file in your workspace gets a realm — Client, Server, or Shared — based on its path, narrowed further inside `if SERVER` / `if CLIENT` blocks. Call an API that doesn't exist in the current realm and you get a warning for it.
+Every file has a realm — Client, Server or Shared — decided by its path and narrowed further inside `if SERVER` / `if CLIENT` blocks. Calling an API that does not exist in that realm is reported where you write it.
 
 ## How realms are assigned
 
-The server determines a file's realm from its path and filename conventions.
+Path first, filename prefix as a hint.
 
 ### Path-based assignment
 
@@ -29,11 +29,11 @@ The server determines a file's realm from its path and filename conventions.
 | `cl_` | Client |
 | `sv_` | Server |
 
-These prefixes are treated as informational hints. The server still respects the directory first, because many projects break the prefix convention.
+The prefix is informational — the directory decides, because plenty of projects break the convention.
 
 ### Narrowing with conditionals
 
-Inside an `if SERVER then` block, the server narrows the realm to Server for everything in that branch. The same applies to `if CLIENT then`.
+Inside `if SERVER then`, everything on that branch is treated as serverside. `if CLIENT then` does the same for the client.
 
 ```lua
 if SERVER then
@@ -46,7 +46,7 @@ end
 
 ### Cross-realm API misuse
 
-The server flags when you call a serverside-only function from a clientside context:
+A serverside-only function called from a clientside file is reported where the call is written:
 
 ```lua
 -- File: lua/autorun/client/my_addon.lua
@@ -56,14 +56,14 @@ ply:Kick("Reason") -- Error: Kick is not available on the client
 
 ### Completion filtering
 
-When you work in a clientside file, serverside-only functions are hidden from completion. You will not see `Player:Kick` suggested in a `cl_` file or anything under `lua/autorun/client/`.
+Serverside-only functions are hidden from completion in a clientside file, and the reverse. `Player:Kick` will not turn up in a `cl_` file or under `lua/autorun/client/`.
 
 ## Realm certainty
 
-Path-based detection is considered **certain**. If a file lives in `lua/autorun/server/`, the server treats it as strictly serverside.
+A directory realm is **certain** — `lua/autorun/server/` is serverside, and no filename prefix changes that.
 
-Filename prefixes (`cl_`, `sv_`) are **informational**. They guide the initial assignment but do not override a conflicting directory. This protects you from false positives when a `cl_` file is included from a shared context.
+A filename prefix (`cl_`, `sv_`) is **informational**. It sets the initial guess but never overrides a conflicting directory, which is what stops false positives when a `cl_` file is included from a shared context.
 
 <Note>
-  A `cl_` file that is included serverside (for example, through `AddCSLuaFile` and `include` in a shared file) is not detectable from the path alone. The server will still treat it as clientside based on its location. If you intentionally share a prefixed file, add an explicit `---@realm shared` annotation at the top.
+  A `cl_` file `include`d serverside from a shared file looks clientside by its path, and there is no way to tell otherwise. If you share a prefixed file on purpose, put `---@realm shared` at the top of it.
 </Note>
