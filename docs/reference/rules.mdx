@@ -206,6 +206,33 @@ default on purpose**: content mounted from the Workshop or a separate content
 pack is invisible from here, so on a typical server most findings would be
 wrong. Turn it on only if every asset you reference ships in this repository.
 
+## Suppressions
+
+### `unused-suppression`
+
+`unusedSuppression` · default `hint`
+
+A `-- glua-ignore` or `-- glua-disable` comment that never silenced anything.
+
+A suppression outlives the finding it was written for: the code gets fixed, the
+comment stays, and from then on it silently covers whatever appears on that line
+next. A misspelled rule name looks exactly like working protection, and so does
+one for a rule that has since been turned off.
+
+Only reported for files that parse. A parse error stops most rules from running,
+so every directive in the file would read as dead.
+
+```lua
+-- glua-ignore unused-local
+local count = 1
+print(count)
+```
+
+The local is read, so nothing is being suppressed and the comment is dead — it
+outlived the finding it was written for. A misspelled rule name produces the
+same report, which is the point: `unusedLocal` where `unused-local` belonged
+silences nothing and looks like it does.
+
 ## Syntax
 
 Always reported as errors, and not configurable.
@@ -243,7 +270,8 @@ above. Each accepts `error`, `warning`, `information`, `hint` or `off`.
     "globalWrite": "off",
     "perfHotPath": "warning",
     "unusedFunction": "off",
-    "missingAsset": "off"
+    "missingAsset": "off",
+    "unusedSuppression": "hint"
   }
 }
 ```

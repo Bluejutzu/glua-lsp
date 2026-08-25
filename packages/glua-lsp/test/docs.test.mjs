@@ -168,8 +168,6 @@ test('documented diagnostic codes all exist', () => {
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     // Codes appear in suppression examples: `-- glua-ignore some-code`
-    // Deliberately matches camelCase too, so a settings key used where a code
-    // belongs is reported rather than silently truncated to its first word.
     // Only same-line whitespace: a bare `-- glua-ignore` must not swallow the
     // first word of the line it applies to.
     for (const match of text.matchAll(
@@ -177,6 +175,12 @@ test('documented diagnostic codes all exist', () => {
     )) {
       const code = match[1];
       if (codes.has(code)) continue;
+      // A plain lowercase word is prose, which a bare directive supports:
+      // `-- glua-ignore because this stub is filled in later`. A hyphen or an
+      // inner capital means someone was aiming at a rule name — the same test
+      // parseRules applies — so a settings key written where a code belongs is
+      // still reported rather than read as an explanation.
+      if (!/[-A-Z]/.test(code.slice(1))) continue;
       const line = text.slice(0, match.index).split('\n').length;
       failures.push(`${path.relative(DOCS, file)}:${line} — unknown diagnostic code '${code}'`);
     }

@@ -46,6 +46,31 @@ end
 -- glua-disable-file net-payload-mismatch
 ```
 
+## Suppressions that do nothing
+
+A suppression outlives the finding it was written for: the code gets fixed, the
+comment stays, and from then on it silently covers whatever appears on that line
+next. [`unused-suppression`](/reference/rules#unused-suppression) reports the
+ones that never silenced anything.
+
+<Warning>
+  Write the **code**, not the settings key: `unusedLocal` where `unused-local`
+  belonged is not a rule name, so it silences nothing. It is reported rather
+  than quietly ignored, because a mistake here used to look like working
+  protection.
+</Warning>
+
+A bare `-- glua-ignore` followed by prose still means "everything on the next
+line", so an explanation after the directive is fine:
+
+```lua
+-- glua-ignore because this stub is filled in by the loader
+local placeholder = nil
+
+-- glua-ignore unused-local it gets read by the include below
+local shared = {}
+```
+
 ## When to use suppressions
 
 <Tip>
