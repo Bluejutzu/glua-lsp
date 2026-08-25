@@ -8,6 +8,24 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **A fact cache for the CLI.** Every run indexes the whole project, because
+  cross-file rules are only correct once the index has seen everything — so
+  linting one file means parsing the addon around it, and almost none of that
+  work needed doing again. What each file contributes is now written to
+  `.glua-cache`, keyed by a hash of its contents, and read back instead of
+  reparsed. On a 300-file addon, `glua lint .` goes from 917ms to 622ms and
+  `glua lint one-file.lua` from 385ms to 124ms.
+
+  Facts are cached; findings never are. `net-never-received` depends on every
+  other file in the project, so a cached finding would be wrong as soon as an
+  unrelated file gained a `net.Receive`. Everything is recomputed from the whole
+  set on every run.
+
+  Keyed by content rather than modification time, so a checkout or a branch
+  switch invalidates nothing. The directory gitignores itself, an upgrade
+  discards it, and anything that goes wrong with it is a miss rather than an
+  error. `--no-cache` opts out.
+
 - **Code frames in `glua lint`.** Findings now come with the line they are about
   and the part they are about underlined. A line number is a lookup instruction,
   and in a CI log there is no file to open. `--no-code-frames` goes back to one

@@ -338,6 +338,97 @@ test('init refuses to clobber an existing config unless forced', { skip: !built 
   assert.ok(!fs.readFileSync(path.join(root, '.glua.json'), 'utf8').includes('ULib'));
 });
 
+/* ----------------------------------------------------------------- cache */
+
+/** A project big enough that indexing it is the bulk of a run. */
+function cacheAddon() {
+  const files = {
+    'lua/autorun/server/sv_net.lua':
+      'util.AddNetworkString("sync")\nnet.Start("sync")\nnet.Send(ply)\n',
+    'lua/autorun/client/cl_net.lua': 'net.Receive("sync", function() end)\n',
+    'lua/autorun/sh_lib.lua': 'MyAddon = MyAddon or {}\n\nfunction MyAddon.Go()\n\tprint("go")\nend\n',
+    'lua/autorun/sh_use.lua': 'MyAddon.Go()\nUnknownThing()\n',
+  };
+  return { root: addon(files), files };
+}
+
+test('a second run reads the facts back instead of parsing again', { skip: !built }, () => {
+  const { root } = cacheAddon();
+
+  const cold = run(['lint', root, '--root', root, '--timing', '--no-code-frames']);
+  assert.match(cold.stdout, /cache\s+0\/\d+/, cold.stdout);
+  assert.ok(fs.existsSync(path.join(root, '.glua-cache', 'facts.json')), 'nothing was written');
+
+  const warm = run(['lint', root, '--root', root, '--timing', '--no-code-frames']);
+  assert.match(warm.stdout, /cache\s+(\d+)\/\1\b/, `not every file hit:\n${warm.stdout}`);
+});
+
+test('a warm run reports exactly what a cold run reported', { skip: !built }, () => {
+  // The whole idea rests on this. Facts are cached; findings are recomputed
+  // from all of them, including the cross-file ones that depend on files other
+  // than the one they are reported against.
+  const { root } = cacheAddon();
+
+  const cold = run(['lint', root, '--root', root, '--format', 'json']);
+  const warm = run(['lint', root, '--root', root, '--format', 'json']);
+
+  assert.deepEqual(JSON.parse(warm.stdout), JSON.parse(cold.stdout));
+  assert.ok(JSON.parse(cold.stdout).length > 0, 'the fixture should find something');
+});
+
+test('editing a file invalidates that file and nothing else', { skip: !built }, () => {
+  const { root } = cacheAddon();
+  run(['lint', root, '--root', root]);
+
+  // Removing the registration is a change one file makes and another file's
+  // finding depends on, so a stale cache would keep reporting the old answer.
+  fs.writeFileSync(path.join(root, 'lua/autorun/server/sv_net.lua'),
+    'net.Start("sync")\nnet.Send(ply)\n');
+
+  const after = run(['lint', root, '--root', root, '--timing', '--no-code-frames']);
+  assert.match(after.stdout, /net-unregistered/, 'the new finding must appear');
+  assert.match(after.stdout, /cache\s+3\/4/, `wrong files were reused:\n${after.stdout}`);
+});
+
+test('--no-cache neither reads nor writes', { skip: !built }, () => {
+  const { root } = cacheAddon();
+  const result = run(['lint', root, '--root', root, '--no-cache', '--timing', '--no-code-frames']);
+
+  assert.doesNotMatch(result.stdout, /cache\s+[1-9]/, result.stdout);
+  assert.ok(!fs.existsSync(path.join(root, '.glua-cache')), 'it wrote a cache anyway');
+});
+
+test('the cache directory keeps itself out of the repository', { skip: !built }, () => {
+  const { root } = cacheAddon();
+  run(['lint', root, '--root', root]);
+  assert.equal(fs.readFileSync(path.join(root, '.glua-cache', '.gitignore'), 'utf8'), '*\n');
+});
+
+test('formatting does not empty the cache linting filled', { skip: !built }, () => {
+  // `glua fmt` indexes nothing, and saving prunes what a run did not look at.
+  const { root } = cacheAddon();
+  run(['lint', root, '--root', root]);
+  const before = fs.readFileSync(path.join(root, '.glua-cache', 'facts.json'), 'utf8');
+
+  run(['fmt', root, '--root', root]);
+
+  assert.equal(fs.readFileSync(path.join(root, '.glua-cache', 'facts.json'), 'utf8'), before);
+  assert.match(
+    run(['lint', root, '--root', root, '--timing', '--no-code-frames']).stdout,
+    /cache\s+(\d+)\/\1\b/,
+  );
+});
+
+test('a corrupt cache is a miss, not a failure', { skip: !built }, () => {
+  const { root } = cacheAddon();
+  run(['lint', root, '--root', root]);
+  fs.writeFileSync(path.join(root, '.glua-cache', 'facts.json'), '{ not json');
+
+  const result = run(['lint', root, '--root', root, '--timing', '--no-code-frames']);
+  assert.match(result.stdout, /cache\s+0\/\d+/, 'it should have started over');
+  assert.match(result.stdout, /Summary/, result.stdout);
+});
+
 /* ------------------------------------------------------------------- fix */
 
 test('lint --fix applies the unambiguous fixes and leaves the rest', { skip: !built }, () => {

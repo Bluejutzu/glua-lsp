@@ -35,6 +35,8 @@ export interface LintOptions {
   codeFrames?: boolean;
   /** Report where the time went. */
   timing?: boolean;
+  /** Read and write the fact cache. On unless asked otherwise. */
+  cache?: boolean;
 }
 
 interface Finding {
@@ -99,14 +101,17 @@ export interface Timing {
   total: number;
   /** The files that took longest to check, slowest first. */
   slowest: { file: string; ms: number }[];
+  /** How much of the index was read back rather than parsed again. */
+  cache: { hits: number; misses: number };
 }
 
 export function lint(targets: string[], options: LintOptions): LintResult {
   const progress = createProgress(options.progress ?? false);
   const started = Date.now();
 
-  const { api, workspace, config, files, root } = loadProject(targets, {
+  const { api, workspace, config, files, root, cache } = loadProject(targets, {
     root: options.root,
+    ...(options.cache === false ? { cache: false } : {}),
     onIndex: (done, total, file) => progress.update(done, total, `indexing ${path.basename(file)}`),
   });
 
@@ -205,7 +210,7 @@ export function lint(targets: string[], options: LintOptions): LintResult {
   }[options.format];
 
   const output = render();
-  const timing = options.timing ? timingOf(started, indexed, diagnosed, perFile) : null;
+  const timing = options.timing ? timingOf(started, indexed, diagnosed, perFile, cache) : null;
 
   return {
     findings: kept,
@@ -223,12 +228,14 @@ function timingOf(
   indexed: number,
   diagnosed: number,
   perFile: { file: string; ms: number }[],
+  cache: { hits: number; misses: number },
 ): Timing {
   return {
     index: indexed - started,
     diagnose: diagnosed - indexed,
     total: Date.now() - started,
     slowest: [...perFile].sort((a, b) => b.ms - a.ms).slice(0, 5).filter((entry) => entry.ms > 0),
+    cache,
   };
 }
 
@@ -246,6 +253,15 @@ function renderTiming(timing: Timing): string {
   lines.push(`  ${c.faint(pad('index', 10))}${ms(timing.index)}   ${c.faint('the whole project')}`);
   lines.push(`  ${c.faint(pad('check', 10))}${ms(timing.diagnose)}   ${c.faint('the files asked for')}`);
   lines.push(`  ${c.faint(pad('total', 10))}${bold(c.text(`${timing.total}ms`))}`);
+
+  const seen = timing.cache.hits + timing.cache.misses;
+  if (seen) {
+    lines.push('');
+    lines.push(
+      `  ${c.faint(pad('cache', 10))}${c.text(`${timing.cache.hits}/${seen}`)}   ` +
+        c.faint(timing.cache.hits ? 'read back rather than parsed' : 'cold — nothing to read back'),
+    );
+  }
 
   if (timing.slowest.length) {
     lines.push('');
