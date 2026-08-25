@@ -47,6 +47,10 @@
           "$ref": "#/definitions/severity",
           "description": "Functions this workspace defines and never calls, references or registers. Off by default: an addon meant to be extended by other addons is full of them on purpose."
         },
+        "unusedSuppression": {
+          "$ref": "#/definitions/severity",
+          "description": "A glua-ignore or glua-disable comment that never silenced anything — the finding was fixed and the comment stayed, or the rule name is misspelled. Only reported for files that parse."
+        },
         "scope": {
           "enum": ["open", "workspace"],
           "description": "Whether to report problems only in open files, or in every indexed file."

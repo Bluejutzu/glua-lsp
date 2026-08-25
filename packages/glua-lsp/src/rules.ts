@@ -138,6 +138,11 @@ export const RULES: RuleInfo[] = [
     summary: 'A function nothing in the workspace calls or registers. Off by default.',
   },
   {
+    code: 'unused-suppression',
+    settingsKey: 'unusedSuppression',
+    summary: 'A glua-ignore or glua-disable that never silenced anything.',
+  },
+  {
     code: 'missing-addcsluafile',
     settingsKey: 'missingAddCSLuaFile',
     summary: 'A clientside file that is included but never sent with AddCSLuaFile.',

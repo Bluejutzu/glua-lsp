@@ -54,6 +54,7 @@ export const enum Code {
   MissingAsset = 'missing-asset',
   PerfHotPath = 'perf-hot-path',
   UnusedFunction = 'unused-function',
+  UnusedSuppression = 'unused-suppression',
 }
 
 export interface DiagnoseContext {
@@ -587,6 +588,30 @@ export function diagnose(
         severity,
         Code.MissingAddCSLuaFile,
         { data: { path: include.path } },
+      );
+    }
+  }
+
+  /* ------------------------------------------------ unused suppressions */
+
+  // Last, once every rule above has had its chance to be silenced. A directive
+  // that never silenced anything is either a finding someone already fixed or a
+  // rule name they got wrong, and both look exactly like protection until you
+  // check. Deliberately not run when the file does not parse: most rules never
+  // get to fire, so every directive in the file would read as dead.
+  if (d.unusedSuppression !== 'off' && !suppressions.empty && !analysis.parseErrors.length) {
+    const severity = severityOf(d.unusedSuppression);
+    for (const directive of suppressions.unused()) {
+      const named = directive.rules.filter((rule) => rule !== '*');
+      push(
+        directive.span,
+        named.length
+          ? `Nothing here reports ${named.map((rule) => `'${rule}'`).join(' or ')}, so this ` +
+            `glua-${directive.kind} does nothing.`
+          : `Nothing here is being reported, so this glua-${directive.kind} does nothing.`,
+        severity,
+        Code.UnusedSuppression,
+        { tags: [DiagnosticTag.Unnecessary], data: { rules: named } },
       );
     }
   }

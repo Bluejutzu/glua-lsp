@@ -52,6 +52,7 @@ export interface Settings {
      * is meant to be extended by other addons is full of them on purpose.
      */
     unusedFunction: SeveritySetting;
+    unusedSuppression: SeveritySetting;
     /** `open` reports only files you have open; `workspace` reports everything. */
     scope: 'open' | 'workspace';
   };
@@ -104,6 +105,7 @@ export const DEFAULT_SETTINGS: Settings = {
     missingAsset: 'off',
     perfHotPath: 'warning',
     unusedFunction: 'off',
+    unusedSuppression: 'hint',
     scope: 'open',
   },
   inlayHints: {

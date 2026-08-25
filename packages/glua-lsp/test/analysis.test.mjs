@@ -1898,3 +1898,66 @@ test('the C-style rewrite is offered, but never applied on save', () => {
     'nothing here is a fix, so there is nothing to fix on save',
   );
 });
+
+/* ------------------------------------------------------- suppressions */
+
+/** Codes reported for a single-file fixture. */
+function codesFor(source, name = 'lua/autorun/sh_sup.lua') {
+  const { workspace, analyses } = makeWorkspace({ [name]: source });
+  return diagnose(analyses[name], api, workspace, DEFAULT_SETTINGS, {}).map((d) => d.code);
+}
+
+test('a suppression that silenced nothing is reported', () => {
+  const codes = codesFor('-- glua-ignore unused-local\nlocal count = 1\nprint(count)\n');
+  assert.ok(codes.includes('unused-suppression'), codes.join(', '));
+});
+
+test('a suppression that silenced something is not reported', () => {
+  const codes = codesFor('-- glua-ignore unused-local\nlocal spare = 1\n');
+  assert.ok(!codes.includes('unused-local'), 'it should still be silenced');
+  assert.ok(!codes.includes('unused-suppression'), codes.join(', '));
+});
+
+test('a settings key where a code belongs silences nothing, and says so', () => {
+  // This used to fall through to "no rules named", which means *every* rule on
+  // the line — so a mistake that looks specific silenced everything.
+  const codes = codesFor('-- glua-ignore unusedLocal\nlocal spare = 1\n');
+  assert.ok(codes.includes('unused-local'), `the finding must come back: ${codes.join(', ')}`);
+  assert.ok(codes.includes('unused-suppression'), codes.join(', '));
+});
+
+test('prose after a bare glua-ignore still silences the line', () => {
+  const codes = codesFor('-- glua-ignore because this is a deliberate stub\nlocal spare = 1\n');
+  assert.deepEqual(codes, [], `nothing should be reported: ${codes.join(', ')}`);
+});
+
+test('a rule code with no hyphen in it works like any other', () => {
+  const source = 'hook.Add("PlayerInitialSpawn", "x", function(ply)\n\t-- glua-ignore deprecated\n\tprint(ply:Name())\nend)\n';
+  assert.ok(codesFor(source).length === 0, 'deprecated should be silenced and the directive used');
+
+  const without = codesFor(
+    'hook.Add("PlayerInitialSpawn", "x", function(ply)\n\tprint(ply:Name())\nend)\n',
+  );
+  assert.ok(without.includes('deprecated'), 'the fixture has to produce one to silence');
+});
+
+test('a file that does not parse reports no dead suppressions', () => {
+  // A parse error stops most rules from running, so every directive in the file
+  // would look dead when the truth is that nothing got to fire.
+  const codes = codesFor('-- glua-ignore unused-local\nlocal spare = \n');
+  assert.ok(codes.includes('syntax'), codes.join(', '));
+  assert.ok(!codes.includes('unused-suppression'), codes.join(', '));
+});
+
+test('the unused-suppression rule can be switched off', () => {
+  const name = 'lua/autorun/sh_off.lua';
+  const { workspace, analyses } = makeWorkspace({
+    [name]: '-- glua-ignore unused-local\nlocal count = 1\nprint(count)\n',
+  });
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    diagnostics: { ...DEFAULT_SETTINGS.diagnostics, unusedSuppression: 'off' },
+  };
+  const codes = diagnose(analyses[name], api, workspace, settings, {}).map((d) => d.code);
+  assert.deepEqual(codes, []);
+});

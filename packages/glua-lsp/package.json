@@ -347,6 +347,18 @@
           "default": "off",
           "markdownDescription": "Functions this workspace defines and never calls, references or registers anywhere.\n\n**Off by default**: a library meant to be used by other addons is full of these on purpose, and nothing here can see the addon that calls them. Turn it on for a self-contained gamemode, where the workspace really is the whole program. `glua doctor` lists them either way."
         },
+        "glua.diagnostics.unusedSuppression": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "information",
+            "hint",
+            "off"
+          ],
+          "default": "hint",
+          "markdownDescription": "A `-- glua-ignore` or `-- glua-disable` comment that never silenced anything.\n\nA suppression outlives the finding it was written for: the code gets fixed, the comment stays, and from then on it silently covers whatever appears on that line next. A misspelled rule name looks identical to working protection.\n\nOnly reported for files that parse, since a parse error stops most rules from running and every directive in the file would read as dead."
+        },
         "glua.diagnostics.scope": {
           "type": "string",
           "enum": [
