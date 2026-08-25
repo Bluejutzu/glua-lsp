@@ -8,6 +8,10 @@ commit; this file covers what actually changed for you.
 
 _Nothing yet._
 
+## 0.5.1
+
+_Nothing yet._
+
 ## 0.5.0
 
 ### Added
