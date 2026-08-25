@@ -8,7 +8,68 @@ sidebarTitle: "Changelog"
 Each GitHub release lists every commit. This page covers what actually
 changed for you — see the [full history on GitHub](https://github.com/Bluejutzu/glua-lsp/releases).
 
-<Update label="0.4.0 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.4.0">View release on GitHub ↗</a>}>
+<Update label="0.4.1 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.4.1">View release on GitHub ↗</a>}>
+**Added**
+
+- **Safe and unsafe fixes.** `glua lint --fix` now applies only the fixes that
+  leave the code doing the same thing. Hoisting a `Material` call out of
+  `HUDPaint` is almost always the right change, but it moves the lookup from
+  every frame to the moment the file loads — not something to do to a file
+  while nobody is watching, which is exactly how `--fix` runs in a hook or a CI
+  job. Those fixes are counted and offered instead: `1 unsafe fix available —
+  run with --unsafe-fixes to apply them`. Adding `util.AddNetworkString` counts
+  as unsafe outside a server file, since the line goes to the top, above any
+  realm guard. Every fix is still offered normally in the editor.
+
+  `--fix` also counts fixes rather than the edits they are made of, so a hoist
+  reads as one fix, not two.
+
+- **A lint baseline**, so a project you inherited can adopt this without a wall
+  of findings. `glua lint --suppress-all` writes `.glua-baseline.json` accepting
+  everything that exists today; from then on the rules are enforced on new code
+  only, and `--ignore-baseline` still shows the whole backlog. It counts findings
+  per file and rule rather than recording line numbers, so ordinary edits do not
+  invalidate it — a file with two unused locals accepts two, and a third is
+  reported. When a covered finding is fixed the run says so, and
+  `--prune-suppressions` rewrites the file to match.
+
+- **Hot path analysis.** The workspace index now builds a call graph, walks it
+  from everything the engine runs on a schedule — the per-frame and per-tick
+  hooks, `ENT:Think`, `SWEP:DrawHUD`, `PANEL:Paint`, a `timer.Create` that
+  repeats forever at 0.5s or less — and reports expensive work anywhere along
+  it. About forty calls count:
+  registration that should happen once, disk and database and HTTP,
+  serialisation, map-wide entity sweeps, string lookups like `Material`, and
+  `net.Start` / `SetNW*`. The message names the chain that reaches the call, so
+  a finding four functions and two files away from its hook explains itself. A
+  function that rate-limits itself — a `CurTime()` guard, a `nextThink` field, a
+  one-time `if not x then` gate — is not a hot path, and neither is anything it
+  reaches. Two things are deliberately not guards: one around a *registration*
+  says nothing about the callback it registers, and a validity check like
+  `if not IsValid(ent) then return end` skips a frame rather than limiting how
+  often the rest runs. `Material("...")` with a
+  literal argument gets a quick fix that hoists it out of the frame, placed
+  inside whatever guard the call site was already under so a shared file's realm
+  checks still hold. Rule `perf-hot-path`, keyed `perfHotPath`, on as a
+  warning.
+- **Call hierarchy**, over the same graph: who calls this function across the
+  workspace, and what it calls. Callbacks are named after what registers them,
+  so a chain ending in a render hook says so. Calls made through a value rather
+  than a name are left out rather than guessed at.
+- **Dead code detection.** `unused-function` reports functions this workspace
+  defines and never calls, references or registers. Methods defined with a
+  colon, scripted class hooks and anything extending an API library are exempt,
+  since those are reached through a value. Off by default — an addon meant to be
+  extended by other addons is full of them on purpose — but `glua doctor` lists
+  them either way.
+- **`glua lint --format sarif`**, writing SARIF 2.1.0 for GitHub code scanning.
+  Findings get a history, somewhere to be dismissed, and a diff against the base
+  branch, rather than an annotation that disappears with the workflow run.
+- The project report gained **Hot paths** and **Never called** sections, in the
+  editor, the HTML file and the terminal.
+</Update>
+
+<Update label="0.4.0" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.4.0">View release on GitHub ↗</a>}>
 **Added**
 
 - **Project report.** `glua doctor`, or `GLua: Project Report` in the editor,
