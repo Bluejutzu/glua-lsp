@@ -480,3 +480,9 @@ host. That's the structural difference, and most of what's above follows from it
 
 MIT. The API documentation content belongs to Facepunch and the wiki
 contributors.
+
+## A note on how this was built
+
+AI assistance was used throughout this project, from the parser to these docs.
+It isn't meant to be a big, load-bearing tool — it's a project built to
+understand how language servers and CLIs actually work, from the inside.
