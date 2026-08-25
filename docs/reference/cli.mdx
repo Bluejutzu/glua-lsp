@@ -77,8 +77,50 @@ glua lint . --quiet --max-warnings 0
 | `--fix` | Apply the fixes that have one sensible outcome |
 | `--fix-dry-run` | Show what `--fix` would change, writing nothing |
 | `--unsafe-fixes` | Let `--fix` also apply fixes that change what the code does |
+| `--no-code-frames` | One line per finding, without the source |
+| `--timing` | Report where the time went |
 
 Exits `1` when there are errors, or when `--max-warnings` is exceeded. Otherwise `0`.
+
+### What it prints
+
+Each finding comes with the line it is about and the part it is about
+underlined, because a line number alone is a lookup instruction and in a CI log
+there is no file to open:
+
+```
+lua/autorun/sh_mistakes.lua
+  36:12  warning  Net message 'nobody_registered_this' is never registered with util.AddNetworkString.  net-unregistered
+     35 │ -- A net message that is never registered.
+     36 │ net.Start("nobody_registered_this")
+        │            ──────────────────────
+     37 │ net.Broadcast()
+```
+
+`--no-code-frames` goes back to one line per finding. The machine formats
+(`compact`, `github`, `json`, `sarif`) are unaffected either way.
+
+### Where the time goes
+
+```bash
+glua lint lua/ --timing
+```
+
+```
+Timing
+──────────────────
+
+  index     412ms   the whole project
+  check      38ms   the files asked for
+  total     455ms
+
+  slowest files
+    lua/darkrp_modules/big.lua  22ms
+```
+
+Indexing covers the whole project even when you lint one file, since cross-file
+rules are only correct once the index has seen everything. When those two
+numbers are far apart, that is what you are paying for.
 
 ### Fixing
 

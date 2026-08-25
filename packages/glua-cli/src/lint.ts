@@ -12,6 +12,7 @@ import {
   tally,
   writeBaseline,
 } from './baseline.js';
+import { codeFrame, SourceCache } from './frame.js';
 import { loadProject, uriOf } from './project.js';
 import { DOCS_BASE, RULES, ruleDocUrl } from '@glua/rules.js';
 import { createProgress } from './progress.js';
@@ -30,6 +31,10 @@ export interface LintOptions {
   prune?: boolean;
   /** Report everything, as though the project had no baseline. */
   ignoreBaseline?: boolean;
+  /** Print the offending source line under each finding. `pretty` only. */
+  codeFrames?: boolean;
+  /** Report where the time went. */
+  timing?: boolean;
 }
 
 interface Finding {
@@ -84,19 +89,34 @@ export interface LintResult {
   suppressed: number;
   /** Set when the run wrote or rewrote the baseline instead of reporting. */
   wrote?: { path: string; entries: number; findings: number };
+  /** Milliseconds per phase, when `--timing` asked for them. */
+  timing?: Timing;
+}
+
+export interface Timing {
+  index: number;
+  diagnose: number;
+  total: number;
+  /** The files that took longest to check, slowest first. */
+  slowest: { file: string; ms: number }[];
 }
 
 export function lint(targets: string[], options: LintOptions): LintResult {
   const progress = createProgress(options.progress ?? false);
+  const started = Date.now();
 
   const { api, workspace, config, files, root } = loadProject(targets, {
     root: options.root,
     onIndex: (done, total, file) => progress.update(done, total, `indexing ${path.basename(file)}`),
   });
 
+  const indexed = Date.now();
+  const perFile: { file: string; ms: number }[] = [];
+
   const findings: Finding[] = [];
   files.forEach((file, i) => {
     progress.update(i + 1, files.length, `linting ${path.relative(root, file).replace(/\\/g, '/')}`);
+    const fileStarted = options.timing ? Date.now() : 0;
     const analysis = workspace.full(uriOf(file));
     if (!analysis || workspace.isLibrary(analysis.uri)) return;
     const diagnostics = diagnose(
@@ -108,8 +128,13 @@ export function lint(targets: string[], options: LintOptions): LintResult {
     );
     for (const diagnostic of diagnostics) findings.push({ file, diagnostic });
     workspace.releaseAst(analysis.uri);
+    if (options.timing) {
+      perFile.push({ file: path.relative(root, file).replace(/\\/g, '/'), ms: Date.now() - fileStarted });
+    }
   });
   progress.done();
+
+  const diagnosed = Date.now();
 
   /* ------------------------------------------------------------ baseline */
 
@@ -162,12 +187,25 @@ export function lint(targets: string[], options: LintOptions): LintResult {
   ).length;
 
   const render = {
-    pretty: () => renderPretty(visible, files.length, root, errors, warnings, suppressed, stale),
+    pretty: () =>
+      renderPretty({
+        findings: visible,
+        filesChecked: files.length,
+        root,
+        errors,
+        warnings,
+        suppressed,
+        stale,
+        frames: options.codeFrames ?? true,
+      }),
     compact: () => renderCompact(visible, root),
     github: () => renderGithub(visible, root),
     json: () => renderJson(visible, root),
     sarif: () => renderSarif(visible, root),
   }[options.format];
+
+  const output = render();
+  const timing = options.timing ? timingOf(started, indexed, diagnosed, perFile) : null;
 
   return {
     findings: kept,
@@ -175,8 +213,51 @@ export function lint(targets: string[], options: LintOptions): LintResult {
     warnings,
     suppressed,
     filesChecked: files.length,
-    output: render(),
+    output: timing ? output + renderTiming(timing) : output,
+    ...(timing ? { timing } : {}),
   };
+}
+
+function timingOf(
+  started: number,
+  indexed: number,
+  diagnosed: number,
+  perFile: { file: string; ms: number }[],
+): Timing {
+  return {
+    index: indexed - started,
+    diagnose: diagnosed - indexed,
+    total: Date.now() - started,
+    slowest: [...perFile].sort((a, b) => b.ms - a.ms).slice(0, 5).filter((entry) => entry.ms > 0),
+  };
+}
+
+/**
+ * Where the time went.
+ *
+ * Indexing is the whole project; checking is only the files asked for. When
+ * those two are far apart, linting one file in a large addon is paying for the
+ * index, which is the thing worth knowing before trying to make it faster.
+ */
+function renderTiming(timing: Timing): string {
+  const lines = [heading('Timing'), ''];
+  const ms = (value: number) => c.text(`${value}ms`);
+
+  lines.push(`  ${c.faint(pad('index', 10))}${ms(timing.index)}   ${c.faint('the whole project')}`);
+  lines.push(`  ${c.faint(pad('check', 10))}${ms(timing.diagnose)}   ${c.faint('the files asked for')}`);
+  lines.push(`  ${c.faint(pad('total', 10))}${bold(c.text(`${timing.total}ms`))}`);
+
+  if (timing.slowest.length) {
+    lines.push('');
+    lines.push(`  ${c.faint('slowest files')}`);
+    const width = Math.max(...timing.slowest.map((entry) => entry.file.length));
+    for (const entry of timing.slowest) {
+      lines.push(`    ${c.faint(pad(entry.file, width))}  ${c.muted(`${entry.ms}ms`)}`);
+    }
+  }
+
+  lines.push('');
+  return lines.join('\n');
 }
 
 /** What `--suppress-all` and `--prune-suppressions` print instead of findings. */
@@ -196,16 +277,29 @@ function renderWrote(kind: 'suppress' | 'prune', entries: number, count: number,
 
 /* ---------------------------------------------------------------- pretty */
 
-function renderPretty(
-  findings: Finding[],
-  filesChecked: number,
-  root: string,
-  errors: number,
-  warnings: number,
-  suppressed = 0,
-  stale = 0,
-): string {
+interface Pretty {
+  findings: Finding[];
+  filesChecked: number;
+  root: string;
+  errors: number;
+  warnings: number;
+  suppressed: number;
+  stale: number;
+  frames: boolean;
+}
+
+function renderPretty({
+  findings,
+  filesChecked,
+  root,
+  errors,
+  warnings,
+  suppressed,
+  stale,
+  frames,
+}: Pretty): string {
   const lines: string[] = [];
+  const sources = new SourceCache();
 
   const byFile = new Map<string, Finding[]>();
   for (const finding of findings) {
@@ -222,6 +316,7 @@ function renderPretty(
       ...group.map((f) => `${f.diagnostic.range.start.line + 1}:${f.diagnostic.range.start.character + 1}`.length),
     );
 
+    let lastFrame = '';
     for (const { diagnostic } of group.sort(
       (a, b) => a.diagnostic.range.start.line - b.diagnostic.range.start.line,
     )) {
@@ -231,15 +326,39 @@ function renderPretty(
         `  ${c.faint(pad(at, width))}  ${paintSeverity(diagnostic.severity, pad(level, 7))}  ` +
           `${c.text(messageOf(diagnostic))}  ${c.faint(String(diagnostic.code ?? ''))}`,
       );
+
+      if (!frames) continue;
+      const source = sources.linesOf(file);
+      if (!source) continue;
+
+      const frame = codeFrame(source, diagnostic.range, (text) =>
+        paintSeverity(diagnostic.severity, text),
+      );
+      // Two rules firing on the same span — an unregistered net message is
+      // usually also an unhandled one — would otherwise print the same three
+      // lines twice in a row.
+      const rendered = frame.join('\n');
+      if (rendered && rendered !== lastFrame) lines.push(...frame);
+      lastFrame = rendered;
     }
   }
 
   lines.push(heading('Summary'));
   lines.push('');
 
+  // Everything shown has to be counted here. A run that prints a screen of
+  // hints and then says "no problems" is telling you the opposite of what it
+  // just showed you.
+  const notes = findings.filter(
+    (f) =>
+      f.diagnostic.severity !== DiagnosticSeverity.Error &&
+      f.diagnostic.severity !== DiagnosticSeverity.Warning,
+  ).length;
+
   const parts = [
     errors ? c.failure(bold(`${errors} error${errors === 1 ? '' : 's'}`)) : null,
     warnings ? c.warning(`${warnings} warning${warnings === 1 ? '' : 's'}`) : null,
+    notes ? c.muted(`${notes} suggestion${notes === 1 ? '' : 's'}`) : null,
   ].filter(Boolean) as string[];
 
   if (!parts.length) {

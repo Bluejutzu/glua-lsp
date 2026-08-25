@@ -81,6 +81,8 @@ program
     'let --fix also apply fixes that change what the code does, not only how it reads',
     false,
   )
+  .option('--no-code-frames', 'do not print the offending source line under each finding')
+  .option('--timing', 'report where the time went', false)
   .option('--no-progress', 'do not print progress while linting')
   .action(
     async (
@@ -97,6 +99,8 @@ program
         suppressAll: boolean;
         pruneSuppressions: boolean;
         ignoreBaseline: boolean;
+        codeFrames: boolean;
+        timing: boolean;
       },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
@@ -150,6 +154,8 @@ program
         suppressAll: options.suppressAll,
         prune: options.pruneSuppressions,
         ignoreBaseline: options.ignoreBaseline,
+        codeFrames: options.codeFrames,
+        timing: options.timing,
         ...(options.root ? { root: options.root } : {}),
       });
 
