@@ -67,6 +67,13 @@ program
     -1,
   )
   .option('-q, --quiet', 'only report errors', false)
+  .option(
+    '--suppress-all',
+    'accept every current finding into .glua-baseline.json and report nothing; new findings are reported from then on',
+    false,
+  )
+  .option('--prune-suppressions', 'rewrite the baseline so it claims no more than still happens', false)
+  .option('--ignore-baseline', 'report everything, as though the project had no baseline', false)
   .option('--fix', 'apply the fixes that have one sensible outcome, then report the rest', false)
   .option('--fix-dry-run', 'show what --fix would change without writing', false)
   .option('--no-progress', 'do not print progress while linting')
@@ -81,10 +88,22 @@ program
         fixDryRun: boolean;
         root?: string;
         progress: boolean;
+        suppressAll: boolean;
+        pruneSuppressions: boolean;
+        ignoreBaseline: boolean;
       },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
       if (options.format !== 'pretty' && options.format !== 'compact') setColourEnabled(false);
+
+      if ((options.suppressAll || options.pruneSuppressions) && (options.fix || options.fixDryRun)) {
+        process.stderr.write(
+          `${c.failure(symbols.error)} --fix cannot be combined with --suppress-all or --prune-suppressions: ` +
+            `fix the code, or accept it, not both in one pass.\n`,
+        );
+        process.exitCode = 2;
+        return;
+      }
 
       if (options.fix || options.fixDryRun) {
         const { fix } = await import('./fix.js');
@@ -113,10 +132,16 @@ program
         maxWarnings: options.maxWarnings,
         quiet: options.quiet,
         progress: options.progress && supportsProgress(),
+        suppressAll: options.suppressAll,
+        prune: options.pruneSuppressions,
+        ignoreBaseline: options.ignoreBaseline,
         ...(options.root ? { root: options.root } : {}),
       });
 
       if (result.output.trim()) process.stdout.write(`${result.output}\n`);
+
+      // Writing a baseline is a bookkeeping action, not a verdict on the code.
+      if (result.wrote) return;
 
       if (result.errors > 0) process.exitCode = 1;
       else if (options.maxWarnings >= 0 && result.warnings > options.maxWarnings) {

@@ -96,6 +96,55 @@ test('json output is machine readable', { skip: !built }, () => {
   }
 });
 
+test('a baseline accepts today\'s findings and still reports new ones', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/sh_legacy.lua': 'local a = 1\nlocal b = 2\nprint("hi")\n',
+  });
+
+  // Before: two unused locals.
+  assert.match(run(['lint', root, '--root', root]).stdout, /unused-local/);
+
+  const wrote = run(['lint', root, '--root', root, '--suppress-all']);
+  assert.equal(wrote.code, 0, 'writing a baseline is bookkeeping, not a verdict');
+  assert.match(wrote.stdout, /\.glua-baseline\.json/);
+
+  const baseline = JSON.parse(fs.readFileSync(path.join(root, '.glua-baseline.json'), 'utf8'));
+  assert.equal(baseline.files['lua/autorun/sh_legacy.lua']['unused-local'], 2);
+
+  // After: silence.
+  const quiet = run(['lint', root, '--root', root]);
+  assert.doesNotMatch(quiet.stdout, /unused-local/);
+  assert.match(quiet.stdout, /accepted by \.glua-baseline\.json/);
+
+  // A third one is new code, and is reported.
+  fs.appendFileSync(path.join(root, 'lua/autorun/sh_legacy.lua'), 'local c = 3\n');
+  assert.match(run(['lint', root, '--root', root]).stdout, /'c' is never read/);
+
+  // And the backlog is still visible on demand.
+  assert.match(run(['lint', root, '--root', root, '--ignore-baseline']).stdout, /'a' is never read/);
+});
+
+test('a baseline that has drifted is reported and pruned', { skip: !built }, () => {
+  const file = 'lua/autorun/sh_drift.lua';
+  const root = addon({ [file]: 'local a = 1\nlocal b = 2\nprint("hi")\n' });
+  run(['lint', root, '--root', root, '--suppress-all']);
+
+  // Fix one of the two.
+  fs.writeFileSync(path.join(root, file), 'local a = 1\nprint("hi")\n');
+  assert.match(run(['lint', root, '--root', root]).stdout, /--prune-suppressions/);
+
+  assert.equal(run(['lint', root, '--root', root, '--prune-suppressions']).code, 0);
+  const pruned = JSON.parse(fs.readFileSync(path.join(root, '.glua-baseline.json'), 'utf8'));
+  assert.equal(pruned.files[file]['unused-local'], 1);
+  assert.doesNotMatch(run(['lint', root, '--root', root]).stdout, /--prune-suppressions/);
+});
+
+test('a baseline cannot be written and applied in the same pass', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_x.lua': 'local x = 1\nx += 1\nprint(x)\n' });
+  const result = run(['lint', root, '--root', root, '--suppress-all', '--fix']);
+  assert.equal(result.code, 2);
+});
+
 test('sarif output is valid enough for code scanning to ingest', { skip: !built }, () => {
   const root = addon({
     'lua/autorun/client/cl_hot.lua':

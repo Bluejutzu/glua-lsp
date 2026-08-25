@@ -3,6 +3,15 @@ import { DiagnosticSeverity, type Diagnostic } from 'vscode-languageserver-types
 
 import { diagnose } from '@glua/server/features/diagnostics.js';
 import { bold, c, heading, pad, plain, symbols } from './palette.js';
+import {
+  applyBaseline,
+  BASELINE_NAME,
+  countsOf,
+  readBaseline,
+  staleEntries,
+  tally,
+  writeBaseline,
+} from './baseline.js';
 import { loadProject, uriOf } from './project.js';
 import { RULES } from './rules.js';
 import { createProgress } from './progress.js';
@@ -15,12 +24,25 @@ export interface LintOptions {
   quiet: boolean;
   root?: string;
   progress?: boolean;
+  /** Record every current finding as accepted, and report nothing. */
+  suppressAll?: boolean;
+  /** Rewrite the baseline so it claims no more than actually happens. */
+  prune?: boolean;
+  /** Report everything, as though the project had no baseline. */
+  ignoreBaseline?: boolean;
 }
 
 interface Finding {
   file: string;
   diagnostic: Diagnostic;
 }
+
+/** Baseline keys: a path the file can be recognised by, and a rule code. */
+const keyed = (finding: Finding, root: string) => ({
+  ...finding,
+  rule: String(finding.diagnostic.code ?? 'unknown'),
+  relative: path.relative(root, finding.file).replace(/\\/g, '/'),
+});
 
 /** The protocol allows a MarkupContent message; the server only ever sends strings. */
 const messageOf = (diagnostic: Diagnostic): string =>
@@ -58,6 +80,10 @@ export interface LintResult {
   warnings: number;
   filesChecked: number;
   output: string;
+  /** Findings a baseline accepted, and so are absent from `findings`. */
+  suppressed: number;
+  /** Set when the run wrote or rewrote the baseline instead of reporting. */
+  wrote?: { path: string; entries: number; findings: number };
 }
 
 export function lint(targets: string[], options: LintOptions): LintResult {
@@ -85,24 +111,87 @@ export function lint(targets: string[], options: LintOptions): LintResult {
   });
   progress.done();
 
-  const visible = options.quiet
-    ? findings.filter((f) => f.diagnostic.severity === DiagnosticSeverity.Error)
-    : findings;
+  /* ------------------------------------------------------------ baseline */
 
-  const errors = findings.filter((f) => f.diagnostic.severity === DiagnosticSeverity.Error).length;
-  const warnings = findings.filter(
+  const all = findings.map((finding) => keyed(finding, root));
+
+  if (options.suppressAll || options.prune) {
+    const counts = tally(all.map((f) => ({ file: f.relative, rule: f.rule })));
+    writeBaseline(root, counts);
+    const entries = [...counts.values()].reduce((sum, rules) => sum + rules.size, 0);
+    return {
+      findings: [],
+      errors: 0,
+      warnings: 0,
+      suppressed: all.length,
+      filesChecked: files.length,
+      wrote: { path: BASELINE_NAME, entries, findings: all.length },
+      output: renderWrote(options.prune ? 'prune' : 'suppress', entries, all.length, files.length),
+    };
+  }
+
+  let kept = findings;
+  let suppressed = 0;
+  let stale = 0;
+
+  if (!options.ignoreBaseline) {
+    const baseline = readBaseline(root);
+    if (baseline) {
+      const counts = countsOf(baseline);
+      const split = applyBaseline(
+        all.map((f) => ({ ...f, file: f.relative })),
+        counts,
+      );
+      const accepted = new Set(split.suppressed.map((f) => f.diagnostic));
+      kept = findings.filter((finding) => !accepted.has(finding.diagnostic));
+      suppressed = split.suppressed.length;
+      stale = staleEntries(
+        all.map((f) => ({ file: f.relative, rule: f.rule })),
+        counts,
+      ).length;
+    }
+  }
+
+  const visible = options.quiet
+    ? kept.filter((f) => f.diagnostic.severity === DiagnosticSeverity.Error)
+    : kept;
+
+  const errors = kept.filter((f) => f.diagnostic.severity === DiagnosticSeverity.Error).length;
+  const warnings = kept.filter(
     (f) => f.diagnostic.severity === DiagnosticSeverity.Warning,
   ).length;
 
   const render = {
-    pretty: () => renderPretty(visible, files.length, root, errors, warnings),
+    pretty: () => renderPretty(visible, files.length, root, errors, warnings, suppressed, stale),
     compact: () => renderCompact(visible, root),
     github: () => renderGithub(visible, root),
     json: () => renderJson(visible, root),
     sarif: () => renderSarif(visible, root),
   }[options.format];
 
-  return { findings, errors, warnings, filesChecked: files.length, output: render() };
+  return {
+    findings: kept,
+    errors,
+    warnings,
+    suppressed,
+    filesChecked: files.length,
+    output: render(),
+  };
+}
+
+/** What `--suppress-all` and `--prune-suppressions` print instead of findings. */
+function renderWrote(kind: 'suppress' | 'prune', entries: number, count: number, files: number): string {
+  const lines = ['', `  ${c.success(symbols.pass)} ${bold(c.text(BASELINE_NAME))} ${
+    kind === 'prune' ? c.faint('rewritten') : c.faint('written')
+  }`, ''];
+  lines.push(
+    `  ${c.text(String(count))} ${c.faint(`findings accepted across ${entries} file/rule entries, in ${files} files.`)}`,
+  );
+  lines.push('');
+  lines.push(`  ${c.faint('Commit it. New findings are reported from here on;')}`);
+  lines.push(`  ${c.faint('run with --ignore-baseline to see the whole backlog again.')}`);
+  lines.push('');
+  return lines.join('\n');
 }
 
 /* ---------------------------------------------------------------- pretty */
@@ -113,6 +202,8 @@ function renderPretty(
   root: string,
   errors: number,
   warnings: number,
+  suppressed = 0,
+  stale = 0,
 ): string {
   const lines: string[] = [];
 
@@ -155,6 +246,15 @@ function renderPretty(
     lines.push(`  ${c.success(symbols.pass)} ${c.success('no problems')} ${c.faint(`in ${filesChecked} files`)}`);
   } else {
     lines.push(`  ${parts.join(c.faint('  ' + symbols.bullet + '  '))}  ${c.faint(`in ${filesChecked} files`)}`);
+  }
+
+  if (suppressed) {
+    lines.push(`  ${c.faint(`${suppressed} accepted by ${BASELINE_NAME}`)}`);
+  }
+  if (stale) {
+    lines.push(
+      `  ${c.faint(`${stale} baseline ${stale === 1 ? 'entry claims' : 'entries claim'} findings that no longer happen — run --prune-suppressions`)}`,
+    );
   }
 
   lines.push('');

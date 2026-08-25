@@ -8,6 +8,15 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **A lint baseline**, so a project you inherited can adopt this without a wall
+  of findings. `glua lint --suppress-all` writes `.glua-baseline.json` accepting
+  everything that exists today; from then on the rules are enforced on new code
+  only, and `--ignore-baseline` still shows the whole backlog. It counts findings
+  per file and rule rather than recording line numbers, so ordinary edits do not
+  invalidate it — a file with two unused locals accepts two, and a third is
+  reported. When a covered finding is fixed the run says so, and
+  `--prune-suppressions` rewrites the file to match.
+
 - **Hot path analysis.** The workspace index now builds a call graph, walks it
   from everything the engine runs on a schedule — the per-frame and per-tick
   hooks, `ENT:Think`, `SWEP:DrawHUD`, `PANEL:Paint`, a `timer.Create` that
