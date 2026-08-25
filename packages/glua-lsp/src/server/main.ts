@@ -1,4 +1,5 @@
 import {
+  CodeActionKind,
   createConnection,
   DidChangeConfigurationNotification,
   ProposedFeatures,
@@ -110,7 +111,16 @@ connection.onInitialize((params): InitializeResult => {
       renameProvider: { prepareProvider: true },
       documentSymbolProvider: true,
       workspaceSymbolProvider: true,
-      codeActionProvider: true,
+      // Named rather than a bare `true` so an editor knows `source.fixAll` is
+      // on offer — that is what "fix on save" asks for by kind.
+      codeActionProvider: {
+        codeActionKinds: [
+          CodeActionKind.QuickFix,
+          CodeActionKind.RefactorExtract,
+          CodeActionKind.RefactorRewrite,
+          CodeActionKind.SourceFixAll,
+        ],
+      },
       inlayHintProvider: true,
       documentFormattingProvider: true,
       documentRangeFormattingProvider: true,

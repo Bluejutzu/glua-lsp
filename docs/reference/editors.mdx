@@ -113,6 +113,27 @@ If your client does not send configuration, the server falls back to its
 defaults, and a committed [`.glua.json`](/configuration/config-files) still
 works — it is read from disk rather than from the editor.
 
+## Fixing on save
+
+The server offers a `source.fixAll` code action that applies every safe fix in
+the file at once — the same set `glua lint --fix` writes, so an editor and a
+pre-commit hook cannot disagree about what "fix it" means.
+
+```json title="VS Code settings.json"
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  }
+}
+```
+
+Fixes that change what the code does are deliberately not included. Hoisting a
+`Material` call out of `HUDPaint` is offered from the lightbulb, where you can
+see the result, and by `glua lint --fix --unsafe-fixes` where you asked for it —
+never silently on save. The same goes for rewriting `!=` to `~=`: `!=` is valid
+GLua, so that is a preference rather than a fix, and it stays a refactor you
+invoke.
+
 ## What you do not get
 
 Two things are VS Code commands rather than language server features, so they

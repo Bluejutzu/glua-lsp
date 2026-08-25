@@ -7,6 +7,13 @@
 //   2. It never drops a comment. Comments are placed at statement and table-field
 //      boundaries; anything sitting somewhere it cannot be placed makes that one
 //      statement fall back to its original text, verbatim.
+//
+// The same escape hatch is available deliberately. A hand-aligned lookup table
+// or a block of generated data reads worse after any formatter touches it, and
+// the answer everyone converged on is a comment that says so:
+//
+//   -- glua-format-ignore        leave the next statement exactly as written
+//   -- glua-format-ignore-file   leave the whole file alone
 
 import type {
   Chunk,
@@ -41,13 +48,17 @@ class Printer {
   private commentIndex = 0;
   /** Ranges that a nested block will print, so comments inside are not orphans. */
   private readonly blockRanges: Span[] = [];
+  /** Lines whose statement a `-- glua-format-ignore` above it protects. */
+  private readonly ignoredLines: Set<number>;
 
   constructor(
     private readonly text: string,
     private readonly comments: Comment[],
     private readonly lineIndex: LineIndex,
     private readonly options: FormatOptions,
-  ) {}
+  ) {
+    this.ignoredLines = ignoredLines(comments, lineIndex, text);
+  }
 
   /* -------------------------------------------------------------- output */
 
@@ -614,6 +625,19 @@ class Printer {
       }
     }
 
+    // Asked for, in as many words.
+    if (this.ignoredLines.has(this.lineIndex.lineOf(statement.start))) {
+      this.writeVerbatim(statement);
+      // The statement's own comments came out with it.
+      while (
+        this.commentIndex < this.comments.length &&
+        this.comments[this.commentIndex]!.start < statement.end
+      ) {
+        this.commentIndex++;
+      }
+      return;
+    }
+
     // A comment somewhere we cannot place it: keep the original text instead of
     // silently dropping it.
     if (this.hasOrphanCommentIn(statement) && !this.handlesCommentsItself(statement)) {
@@ -853,9 +877,36 @@ export function formatDocument(
   options: FormatOptions,
 ): string | null {
   if (parsed.errors.length) return null;
+  if (hasFormatIgnoreFile(parsed.comments)) return null;
   const lineIndex = new LineIndex(text);
   const printer = new Printer(text, parsed.comments, lineIndex, options);
   return printer.print(parsed.chunk);
+}
+
+/**
+ * `-- glua-format-ignore` protects the statement on the line below it.
+ *
+ * Anchored to a line rather than an offset because that is the only thing the
+ * author can see: the comment sits above the thing it protects, and a statement
+ * whose first line is the line after such a comment is the thing they meant.
+ * A directive trailing real code is not one — `x = 1 -- glua-format-ignore`
+ * would otherwise silently protect whatever came next.
+ */
+function ignoredLines(comments: Comment[], lines: LineIndex, text: string): Set<number> {
+  const out = new Set<number>();
+  for (const comment of comments) {
+    if (!/\bglua-format-ignore\b(?!-file)/.test(comment.text)) continue;
+    const line = lines.lineOf(comment.start);
+    // Only whitespace before it: the directive sits above what it protects.
+    if (text.slice(lines.lineStart(line), comment.start).trim() !== '') continue;
+    out.add(line + 1);
+  }
+  return out;
+}
+
+/** True when the file asks not to be formatted at all. */
+export function hasFormatIgnoreFile(comments: Comment[]): boolean {
+  return comments.some((comment) => /\bglua-format-ignore-file\b/.test(comment.text));
 }
 
 /** Picks the line ending already used by the document. */

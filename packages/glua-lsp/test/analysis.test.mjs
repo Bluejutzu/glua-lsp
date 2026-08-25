@@ -1849,3 +1849,52 @@ end)
 });
 
 void file;
+
+/* --------------------------------------------------------------- fix all */
+
+test('source.fixAll batches every safe fix and leaves the unsafe ones out', () => {
+  const source = [
+    'net.Start("msg")',
+    'net.Send(ply)',
+    '',
+    'local n = 0',
+    'n += 1',
+    '',
+    'hook.Add("HUDPaint", "demo", function()',
+    '\tsurface.SetMaterial(Material("icon16/heart.png"))',
+    'end)',
+    '',
+  ].join('\n');
+
+  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/server/sv_all.lua': source });
+  const analysis = analyses['lua/autorun/server/sv_all.lua'];
+  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {});
+  const actions = codeActions(analysis, wholeFile(analysis), found, { api, workspace });
+
+  const fixAll = actions.filter((action) => action.kind === 'source.fixAll');
+  assert.equal(fixAll.length, 1, 'exactly one action may claim the whole document on save');
+
+  const applied = applyEdits(source, fixAll[0].edit.changes[analysis.uri]);
+  assert.match(applied, /util\.AddNetworkString\("msg"\)/, 'the registration is safe');
+  assert.match(applied, /n = n \+ 1/, 'the compound assignment is safe');
+  assert.doesNotMatch(applied, /^local mat_/m, 'hoisting changes when the call runs');
+});
+
+test('the C-style rewrite is offered, but never applied on save', () => {
+  const source = 'local n = 1\nif n != 0 && true then print(n) end\n';
+  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/sh_c.lua': source });
+  const analysis = analyses['lua/autorun/sh_c.lua'];
+  const found = diagnose(analysis, api, workspace, DEFAULT_SETTINGS, {});
+  const actions = codeActions(analysis, wholeFile(analysis), found, { api, workspace });
+
+  // `!=` is valid GLua. Rewriting it is a preference, so it stays a refactor
+  // someone asks for rather than something save-on-format does to their file.
+  const rewrite = actions.find((action) => action.title.includes('C-style'));
+  assert.ok(rewrite, 'the rewrite should still be offered');
+  assert.equal(rewrite.kind, 'refactor.rewrite');
+  assert.equal(
+    actions.filter((action) => action.kind === 'source.fixAll').length,
+    0,
+    'nothing here is a fix, so there is nothing to fix on save',
+  );
+});
