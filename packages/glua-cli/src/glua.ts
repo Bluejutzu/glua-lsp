@@ -76,6 +76,11 @@ program
   .option('--ignore-baseline', 'report everything, as though the project had no baseline', false)
   .option('--fix', 'apply the fixes that have one sensible outcome, then report the rest', false)
   .option('--fix-dry-run', 'show what --fix would change without writing', false)
+  .option(
+    '--unsafe-fixes',
+    'let --fix also apply fixes that change what the code does, not only how it reads',
+    false,
+  )
   .option('--no-progress', 'do not print progress while linting')
   .action(
     async (
@@ -86,6 +91,7 @@ program
         quiet: boolean;
         fix: boolean;
         fixDryRun: boolean;
+        unsafeFixes: boolean;
         root?: string;
         progress: boolean;
         suppressAll: boolean;
@@ -105,10 +111,19 @@ program
         return;
       }
 
+      if (options.unsafeFixes && !options.fix && !options.fixDryRun) {
+        process.stderr.write(
+          `${c.failure(symbols.error)} --unsafe-fixes only means something alongside --fix or --fix-dry-run.\n`,
+        );
+        process.exitCode = 2;
+        return;
+      }
+
       if (options.fix || options.fixDryRun) {
         const { fix } = await import('./fix.js');
         const result = fix(paths, {
           dryRun: options.fixDryRun,
+          unsafe: options.unsafeFixes,
           progress: options.progress && supportsProgress(),
           ...(options.root ? { root: options.root } : {}),
         });

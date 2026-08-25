@@ -8,6 +8,19 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **Safe and unsafe fixes.** `glua lint --fix` now applies only the fixes that
+  leave the code doing the same thing. Hoisting a `Material` call out of
+  `HUDPaint` is almost always the right change, but it moves the lookup from
+  every frame to the moment the file loads — not something to do to a file
+  while nobody is watching, which is exactly how `--fix` runs in a hook or a CI
+  job. Those fixes are counted and offered instead: `1 unsafe fix available —
+  run with --unsafe-fixes to apply them`. Adding `util.AddNetworkString` counts
+  as unsafe outside a server file, since the line goes to the top, above any
+  realm guard. Every fix is still offered normally in the editor.
+
+  `--fix` also counts fixes rather than the edits they are made of, so a hoist
+  reads as one fix, not two.
+
 - **A lint baseline**, so a project you inherited can adopt this without a wall
   of findings. `glua lint --suppress-all` writes `.glua-baseline.json` accepting
   everything that exists today; from then on the rules are enforced on new code

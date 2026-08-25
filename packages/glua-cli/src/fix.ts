@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DiagnosticSeverity, type CodeAction, type TextEdit } from 'vscode-languageserver-types';
 
-import { codeActions } from '@glua/server/features/codeActions.js';
+import { codeActions, isAutoApplicable, safetyOf } from '@glua/server/features/codeActions.js';
 import { diagnose } from '@glua/server/features/diagnostics.js';
 import { bold, c, heading, symbols } from './palette.js';
 import { loadProject, uriOf } from './project.js';
@@ -13,6 +13,11 @@ export interface FixOptions {
   progress?: boolean;
   /** Report what would change without touching anything. */
   dryRun?: boolean;
+  /**
+   * Also apply fixes that change what the code does. Off by default: see
+   * `FixSafety` in the server for what the line is drawn on.
+   */
+  unsafe?: boolean;
 }
 
 export interface FixResult {
@@ -25,6 +30,11 @@ export interface FixResult {
    */
   remainingErrors: number;
   remainingWarnings: number;
+  /**
+   * Preferred fixes left on the table because they are unsafe. Zero when
+   * `unsafe` was asked for, since then there is nothing being held back.
+   */
+  unsafeAvailable: number;
   filesChecked: number;
   output: string;
 }
@@ -39,10 +49,15 @@ const MAX_PASSES = 5;
 /**
  * Applies the quick fixes that have exactly one sensible outcome.
  *
- * Only `isPreferred` actions are used. The rest either guess (a hook name
- * suggested from an edit distance), insert a stub for you to fill in, or change
- * control flow by wrapping a call in a realm guard — none of which should
- * happen without someone looking at it.
+ * Only `isPreferred` actions are considered at all. The rest either guess (a
+ * hook name suggested from an edit distance), insert a stub for you to fill in,
+ * or change control flow by wrapping a call in a realm guard — none of which
+ * should happen without someone looking at it.
+ *
+ * Of those, only the `safe` ones are applied unless `unsafe` is asked for. A
+ * preferred fix can still move when a call runs, and `--fix` writes to files
+ * nobody is watching — often in a pre-commit hook or CI job. The unsafe ones
+ * are counted and offered rather than taken.
  */
 export function fix(targets: string[], options: FixOptions): FixResult {
   const progress = createProgress(options.progress ?? false);
@@ -56,6 +71,7 @@ export function fix(targets: string[], options: FixOptions): FixResult {
   let remaining = 0;
   let remainingErrors = 0;
   let remainingWarnings = 0;
+  let unsafeAvailable = 0;
 
   files.forEach((file, i) => {
     const relative = path.relative(root, file).replace(/\\/g, '/');
@@ -76,17 +92,17 @@ export function fix(targets: string[], options: FixOptions): FixResult {
       if (!diagnostics.length) break;
 
       const actions = codeActions(analysis, wholeFile(analysis), diagnostics, { api, workspace })
-        .filter((action) => action.isPreferred);
+        .filter((action) => (options.unsafe ? action.isPreferred === true : isAutoApplicable(action)));
 
-      const edits = editsFor(actions, analysis.uri);
-      if (!edits.length) break;
+      const applying = editsFor(actions, analysis.uri);
+      if (!applying.edits.length) break;
 
-      const next = applyEdits(text, edits, analysis);
+      const next = applyEdits(text, applying.edits, analysis);
       if (next === text) break;
 
       text = next;
-      applied += edits.length;
-      for (const action of actions) {
+      applied += applying.actions.length;
+      for (const action of applying.actions) {
         if (titles.length < 12) titles.push(action.title);
       }
     }
@@ -100,6 +116,13 @@ export function fix(targets: string[], options: FixOptions): FixResult {
     for (const diagnostic of left) {
       if (diagnostic.severity === DiagnosticSeverity.Error) remainingErrors++;
       else if (diagnostic.severity === DiagnosticSeverity.Warning) remainingWarnings++;
+    }
+
+    // What is still on the table, counted against the file as it now stands so
+    // the number is one `--unsafe-fixes` would actually apply.
+    if (!options.unsafe && left.length) {
+      unsafeAvailable += codeActions(finalAnalysis, wholeFile(finalAnalysis), left, { api, workspace })
+        .filter((action) => action.isPreferred === true && safetyOf(action) === 'unsafe').length;
     }
 
     if (applied) {
@@ -116,8 +139,17 @@ export function fix(targets: string[], options: FixOptions): FixResult {
     remaining,
     remainingErrors,
     remainingWarnings,
+    unsafeAvailable,
     filesChecked: files.length,
-    output: render(fixed, remaining, remainingErrors, files.length, root, options.dryRun ?? false),
+    output: render({
+      fixed,
+      remaining,
+      remainingErrors,
+      unsafeAvailable,
+      filesChecked: files.length,
+      root,
+      dryRun: options.dryRun ?? false,
+    }),
   };
 }
 
@@ -134,12 +166,34 @@ const wholeFile = (analysis: { lines: { positionAt(offset: number): { line: numb
   end: analysis.lines.positionAt(analysis.text.length),
 });
 
-function editsFor(actions: CodeAction[], uri: string): TextEdit[] {
-  const out: TextEdit[] = [];
+/**
+ * The edits to apply, and the actions they came from.
+ *
+ * Two diagnostics for the same net message each ask for the same insertion at
+ * the top of the file: the second one is dropped, and so is the action, so the
+ * count reported is fixes made rather than edits attempted. An action worth one
+ * line of output should not be reported as two because it moves a call and
+ * leaves a local behind.
+ */
+function editsFor(actions: CodeAction[], uri: string): { edits: TextEdit[]; actions: CodeAction[] } {
+  const seen = new Set<string>();
+  const edits: TextEdit[] = [];
+  const kept: CodeAction[] = [];
+
   for (const action of actions) {
-    for (const edit of action.edit?.changes?.[uri] ?? []) out.push(edit);
+    let contributed = false;
+    for (const edit of action.edit?.changes?.[uri] ?? []) {
+      const { start, end } = edit.range;
+      const key = `${start.line}:${start.character}:${end.line}:${end.character}:${edit.newText}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edits.push(edit);
+      contributed = true;
+    }
+    if (contributed) kept.push(action);
   }
-  return out;
+
+  return { edits, actions: kept };
 }
 
 /**
@@ -152,19 +206,11 @@ function applyEdits(
   edits: TextEdit[],
   analysis: { lines: { offsetAt(position: { line: number; character: number }): number } },
 ): string {
-  const seen = new Set<string>();
-  const resolved: { start: number; end: number; newText: string }[] = [];
-
-  for (const edit of edits) {
-    const start = analysis.lines.offsetAt(edit.range.start);
-    const end = analysis.lines.offsetAt(edit.range.end);
-    // Two diagnostics for the same message each ask for the same insertion at
-    // the top of the file, and applying both writes the line twice.
-    const key = `${start}:${end}:${edit.newText}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    resolved.push({ start, end, newText: edit.newText });
-  }
+  const resolved = edits.map((edit) => ({
+    start: analysis.lines.offsetAt(edit.range.start),
+    end: analysis.lines.offsetAt(edit.range.end),
+    newText: edit.newText,
+  }));
 
   resolved.sort((a, b) => b.start - a.start);
 
@@ -181,14 +227,25 @@ function applyEdits(
   return out;
 }
 
-function render(
-  fixed: FixResult['fixed'],
-  remaining: number,
-  remainingErrors: number,
-  filesChecked: number,
-  root: string,
-  dryRun: boolean,
-): string {
+interface Render {
+  fixed: FixResult['fixed'];
+  remaining: number;
+  remainingErrors: number;
+  unsafeAvailable: number;
+  filesChecked: number;
+  root: string;
+  dryRun: boolean;
+}
+
+function render({
+  fixed,
+  remaining,
+  remainingErrors,
+  unsafeAvailable,
+  filesChecked,
+  root,
+  dryRun,
+}: Render): string {
   const lines: string[] = [];
 
   for (const entry of fixed) {
@@ -221,6 +278,14 @@ function render(
     lines.push(
       `  ${errors}${c.warning(String(remaining))} ` +
         c.faint('left, which need a look — run `glua lint` to see them'),
+    );
+  }
+
+  if (unsafeAvailable) {
+    lines.push(
+      `  ${c.faint(symbols.arrow)} ${c.text(
+        `${unsafeAvailable} unsafe fix${unsafeAvailable === 1 ? '' : 'es'} available`,
+      )} ${c.faint('— run with `--unsafe-fixes` to apply them')}`,
     );
   }
 
