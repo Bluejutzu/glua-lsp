@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.4.2
+
 ### Added
 
 - **Every diagnostic links to its rule.** The code in the Problems panel is now
