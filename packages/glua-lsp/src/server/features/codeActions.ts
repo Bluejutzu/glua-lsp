@@ -16,13 +16,41 @@ export interface CodeActionDeps {
   workspace: Workspace;
 }
 
+/**
+ * Whether a fix can be applied without someone looking at the result.
+ *
+ * `safe` means the code does the same thing afterwards. `unsafe` means it very
+ * probably does what you wanted but the tool cannot promise it — the value now
+ * evaluates at a different moment, or lands somewhere the tool had to guess.
+ * Ruff's split, for the same reason: `glua lint --fix` writes files nobody is
+ * watching, and the difference between "reformat this" and "change when this
+ * runs" should not be invisible at that moment.
+ */
+export type FixSafety = 'safe' | 'unsafe';
+
+/** Our own actions carry a safety marker; the protocol has nowhere for one. */
+export interface GluaCodeAction extends CodeAction {
+  data?: { safety?: FixSafety };
+}
+
+/** Reads the marker back off an action, defaulting to the cautious answer. */
+export function safetyOf(action: CodeAction): FixSafety {
+  const data = (action as GluaCodeAction).data;
+  return data?.safety === 'safe' ? 'safe' : 'unsafe';
+}
+
+/** True for actions `--fix` may apply on its own. */
+export function isAutoApplicable(action: CodeAction): boolean {
+  return action.isPreferred === true && safetyOf(action) === 'safe';
+}
+
 export function codeActions(
   analysis: FileAnalysis,
   range: Range,
   diagnostics: Diagnostic[],
   deps: CodeActionDeps,
-): CodeAction[] {
-  const actions: CodeAction[] = [];
+): GluaCodeAction[] {
+  const actions: GluaCodeAction[] = [];
   const edit = (edits: TextEdit[]): CodeAction['edit'] => ({ changes: { [analysis.uri]: edits } });
   /**
    * Names already handed out by an action in this batch. `glua lint --fix`
@@ -54,11 +82,16 @@ export function codeActions(
       case Code.NetUnregistered: {
         const name = (diagnostic.data as { name?: string })?.name;
         if (!name) break;
+        // The insert goes to the top of the file, above any realm guard. In a
+        // server file that is where it belongs; anywhere else it may end up
+        // running clientside, where util.AddNetworkString does not exist.
+        const serverside = analysis.realm.file === 'server';
         actions.push({
           title: `Add util.AddNetworkString("${name}")`,
           kind: CodeActionKind.QuickFix,
           isPreferred: true,
           diagnostics: [diagnostic],
+          data: { safety: serverside ? 'safe' : 'unsafe' },
           edit: edit([insertAtTop(analysis, `util.AddNetworkString("${name}")\n`)]),
         });
         break;
@@ -90,6 +123,8 @@ export function codeActions(
           title: `Add AddCSLuaFile("${path}") above this include`,
           kind: CodeActionKind.QuickFix,
           isPreferred: true,
+          // Shared, idempotent, and a no-op clientside: nothing to get wrong.
+          data: { safety: 'safe' },
           diagnostics: [diagnostic],
           edit: edit([
             {
@@ -225,6 +260,10 @@ function pushHoistAction(
     title: `Hoist into a local '${name}'`,
     kind: CodeActionKind.QuickFix,
     isPreferred: true,
+    // Unsafe by definition: the call now runs when the file loads rather than
+    // when the frame draws. Almost always what you want, and not something to
+    // do to someone's file while they are not looking.
+    data: { safety: 'unsafe' },
     diagnostics: [diagnostic],
     edit: edit([
       {
@@ -367,6 +406,8 @@ function pushCompoundFix(
       title: `Rewrite as '${targetText} = ${targetText} ${operator} ...'`,
       kind: CodeActionKind.QuickFix,
       isPreferred: true,
+      // The file does not parse as written, so this changes nothing that ran.
+      data: { safety: 'safe' },
       diagnostics: [diagnostic],
       edit: {
         changes: {
@@ -449,6 +490,8 @@ function pushCStyleRewrite(analysis: FileAnalysis, actions: CodeAction[]): void 
   actions.push({
     title: `Convert ${edits.length} C-style operator${edits.length === 1 ? '' : 's'} to Lua (!= && || !)`,
     kind: CodeActionKind.SourceFixAll,
+    // A spelling change, and the file did not parse as written either way.
+    data: { safety: 'safe' },
     edit: { changes: { [analysis.uri]: edits } },
   });
 }

@@ -339,6 +339,37 @@ test('lint --fix does not write a fix twice', { skip: !built }, () => {
   assert.equal(added.length, 1, `wrote it ${added.length} times:\n${after}`);
 });
 
+test('lint --fix leaves the fixes that change behaviour alone', { skip: !built }, () => {
+  // Hoisting the Material call out of HUDPaint is almost certainly right, but it
+  // moves when the call runs, and --fix writes files nobody is watching.
+  const before =
+    'hook.Add("HUDPaint", "demo", function()\n\tlocal mat = Material("icon16/heart.png")\n\tsurface.SetMaterial(mat)\nend)\n';
+  const root = addon({ 'lua/autorun/client/cl_hud.lua': before });
+
+  const result = run(['lint', root, '--fix', '--no-progress']);
+  assert.equal(fs.readFileSync(path.join(root, 'lua/autorun/client/cl_hud.lua'), 'utf8'), before);
+  assert.match(result.stdout, /1 unsafe fix available/);
+});
+
+test('lint --fix --unsafe-fixes applies them', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/client/cl_hud.lua':
+      'hook.Add("HUDPaint", "demo", function()\n\tlocal mat = Material("icon16/heart.png")\n\tsurface.SetMaterial(mat)\nend)\n',
+  });
+
+  const result = run(['lint', root, '--fix', '--unsafe-fixes', '--no-progress']);
+  const after = fs.readFileSync(path.join(root, 'lua/autorun/client/cl_hud.lua'), 'utf8');
+
+  assert.match(after.split('\n')[0], /^local \w+ = Material\("icon16\/heart\.png"\)$/, after);
+  assert.match(result.stdout, /fixed 1/);
+  assert.doesNotMatch(result.stdout, /unsafe fix/, 'nothing is being held back any more');
+});
+
+test('lint --unsafe-fixes without --fix says so rather than doing nothing', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_ok.lua': 'print("hi")\n' });
+  assert.equal(run(['lint', root, '--root', root, '--unsafe-fixes']).code, 2);
+});
+
 test('lint --fix-dry-run changes nothing on disk', { skip: !built }, () => {
   const before = 'local n = 0\nn += 1\nprint(n)\n';
   const root = addon({ 'lua/autorun/sh_b.lua': before });

@@ -76,6 +76,7 @@ glua lint . --quiet --max-warnings 0
 | `--ignore-baseline` | Report everything, as though the project had no baseline |
 | `--fix` | Apply the fixes that have one sensible outcome |
 | `--fix-dry-run` | Show what `--fix` would change, writing nothing |
+| `--unsafe-fixes` | Let `--fix` also apply fixes that change what the code does |
 
 Exits `1` when there are errors, or when `--max-warnings` is exceeded. Otherwise `0`.
 
@@ -97,8 +98,45 @@ lua/autorun/server/sv_net.lua
   2 left, which need a look — run `glua lint` to see them
 ```
 
-What it will fix: a missing `util.AddNetworkString`, a missing `AddCSLuaFile`
-above an include, and a C-style compound assignment.
+What it will fix: a missing `util.AddNetworkString` in a server file, a missing
+`AddCSLuaFile` above an include, and a C-style compound assignment.
+
+### Safe and unsafe fixes
+
+A fix is **safe** when the code does the same thing afterwards. It is **unsafe**
+when it very probably does what you wanted but the tool cannot promise it — the
+value now evaluates at a different moment, or the edit lands somewhere the tool
+had to guess. Hoisting a `Material` call out of `HUDPaint` is the clearest case:
+it is the right change nearly every time, and it moves the lookup from every
+frame to the moment the file loads.
+
+`--fix` applies only the safe ones, and says what it left behind:
+
+```
+  ✓ nothing to fix in 40 files
+  1 left, which need a look — run `glua lint` to see them
+  → 1 unsafe fix available — run with `--unsafe-fixes` to apply them
+```
+
+```bash
+glua lint lua/ --fix --unsafe-fixes
+```
+
+This matters most where `--fix` runs with nobody watching — a pre-commit hook,
+a CI job, format-on-save. In the editor every fix is offered normally; the split
+is about what gets applied unattended.
+
+| Fix | |
+| --- | --- |
+| Add `util.AddNetworkString(...)` | Safe in a server file, unsafe elsewhere — the line goes to the top, above any realm guard |
+| Add `AddCSLuaFile(...)` above an include | Safe |
+| Rewrite `x += 1` as `x = x + 1` | Safe — the file did not parse as written |
+| Hoist a hot call into a local | Unsafe — it changes when the call runs |
+
+<Note>
+  `--unsafe-fixes` on its own exits `2`. It only means something alongside
+  `--fix` or `--fix-dry-run`.
+</Note>
 
 <Note>
   It deliberately will not add a `net.Receive` stub, rename an unused local,
