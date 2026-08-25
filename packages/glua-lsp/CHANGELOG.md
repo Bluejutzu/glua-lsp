@@ -6,7 +6,11 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Changed
+
+- Now published under the `blight` publisher on the VS Code Marketplace and
+  Open VSX. The old `bluejutzu.glua-lsp` listing is deprecated — install
+  `blight.glua-lsp` instead.
 
 ## 0.5.1
 

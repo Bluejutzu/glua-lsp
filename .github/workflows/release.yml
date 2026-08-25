@@ -128,13 +128,13 @@ jobs:
             echo
             echo "| Editor | Command |"
             echo "| --- | --- |"
-            echo "| VS Code | \`code --install-extension bluejutzu.glua-lsp\` |"
-            echo "| Cursor | \`cursor --install-extension bluejutzu.glua-lsp\` |"
-            echo "| VSCodium | \`codium --install-extension bluejutzu.glua-lsp\` |"
-            echo "| Windsurf | \`windsurf --install-extension bluejutzu.glua-lsp\` |"
+            echo "| VS Code | \`code --install-extension blight.glua-lsp\` |"
+            echo "| Cursor | \`cursor --install-extension blight.glua-lsp\` |"
+            echo "| VSCodium | \`codium --install-extension blight.glua-lsp\` |"
+            echo "| Windsurf | \`windsurf --install-extension blight.glua-lsp\` |"
             echo
             echo "Cursor, VSCodium and Windsurf resolve that from"
-            echo "[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp);"
+            echo "[Open VSX](https://open-vsx.org/extension/blight/glua-lsp);"
             echo "VS Code resolves it from the Marketplace."
             echo
             echo "Or install the \`${VSIX}\` attached below, which works in any of them:"

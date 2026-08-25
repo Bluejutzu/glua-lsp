@@ -3,7 +3,7 @@
   "displayName": "GLua for Garry's Mod",
   "description": "Language server for Garry's Mod Lua — AST-based IntelliSense, realm awareness, hook and net message analysis, cross-file diagnostics.",
   "version": "0.5.1",
-  "publisher": "bluejutzu",
+  "publisher": "blight",
   "license": "MIT",
   "homepage": "https://glua.bluejutzu.dev",
   "repository": {
@@ -507,7 +507,7 @@
     ],
     "configurationDefaults": {
       "[glua]": {
-        "editor.defaultFormatter": "bluejutzu.glua-lsp"
+        "editor.defaultFormatter": "blight.glua-lsp"
       }
     },
     "semanticTokenScopes": [

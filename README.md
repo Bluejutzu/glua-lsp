@@ -1,7 +1,7 @@
 # GLua for Garry's Mod
 
-[![VS Marketplace](https://vsmarketplacebadges.dev/version-short/bluejutzu.glua-lsp.svg)](https://marketplace.visualstudio.com/items?itemName=bluejutzu.glua-lsp)
-[![Open VSX](https://img.shields.io/open-vsx/v/bluejutzu/glua-lsp?label=open%20vsx)](https://open-vsx.org/extension/bluejutzu/glua-lsp)
+[![VS Marketplace](https://vsmarketplacebadges.dev/version-short/blight.glua-lsp.svg)](https://marketplace.visualstudio.com/items?itemName=blight.glua-lsp)
+[![Open VSX](https://img.shields.io/open-vsx/v/blight/glua-lsp?label=open%20vsx)](https://open-vsx.org/extension/blight/glua-lsp)
 [![npm](https://img.shields.io/npm/v/glua-cli?label=npm%20glua-cli)](https://www.npmjs.com/package/glua-cli)
 [![CI](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml/badge.svg)](https://github.com/Bluejutzu/glua-lsp/actions/workflows/ci.yml)
 
@@ -19,15 +19,15 @@ your own workspace. Nothing is fetched at runtime.
 ## Install
 
 ```bash
-code --install-extension bluejutzu.glua-lsp
+code --install-extension blight.glua-lsp
 ```
 
 ```bash
-cursor --install-extension bluejutzu.glua-lsp
+cursor --install-extension blight.glua-lsp
 ```
 
 VSCodium, Gitpod, Theia and Windsurf pull from
-[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp), which carries the
+[Open VSX](https://open-vsx.org/extension/blight/glua-lsp), which carries the
 same build. For anything else, grab `glua-lsp-<version>.vsix` from the
 [latest release](https://github.com/Bluejutzu/glua-lsp/releases/latest) and
 install the file directly:
@@ -67,7 +67,7 @@ Two things worth turning on straight away. Format on save, in `settings.json`:
 ```json
 {
   "[glua]": {
-    "editor.defaultFormatter": "bluejutzu.glua-lsp",
+    "editor.defaultFormatter": "blight.glua-lsp",
     "editor.formatOnSave": true
   }
 }
@@ -252,7 +252,7 @@ if not IsValid(ent) then return end   -- not expanded to three lines
 Set it as your formatter for GLua files:
 
 ```json
-"[glua]": { "editor.defaultFormatter": "bluejutzu.glua-lsp" }
+"[glua]": { "editor.defaultFormatter": "blight.glua-lsp" }
 ```
 
 ### Other diagnostics
@@ -311,7 +311,7 @@ line that disappears with the run.
 Everything is configurable three ways, and they layer.
 
 **In the UI.** Every option is a VS Code setting — `GLua: Open Settings`, or
-search `@ext:bluejutzu.glua-lsp` in the settings editor.
+search `@ext:blight.glua-lsp` in the settings editor.
 
 **In a committed config file**, so the whole team gets the same rules. Two
 commands seed one from whatever you've already set in the UI:
