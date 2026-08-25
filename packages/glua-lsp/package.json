@@ -2,7 +2,7 @@
   "name": "glua",
   "displayName": "GLua for Garry's Mod",
   "description": "Language server for Garry's Mod Lua — AST-based IntelliSense, realm awareness, hook and net message analysis, cross-file diagnostics.",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "publisher": "blight",
   "license": "MIT",
   "homepage": "https://glua.bluejutzu.dev",
