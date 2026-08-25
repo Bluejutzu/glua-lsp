@@ -16,7 +16,24 @@ commit; this file covers what actually changed for you.
   own section to land on rather than a row in a wide table. `missing-asset` was
   never documented at all; it is now.
 
+- **`source.fixAll`**, one action that applies every safe fix in the file. Set
+  `editor.codeActionsOnSave` to `source.fixAll` and saving does exactly what
+  `glua lint --fix` does — no more, which is the point: hoisting a call out of a
+  frame is offered from the lightbulb where you can see the result, not applied
+  while you save.
+
+- **`-- glua-format-ignore`**, which leaves the statement below it exactly as
+  written. A hand-aligned lookup table reads worse after any formatter touches
+  it. `-- glua-format-ignore-file` does the same for a whole file, usually a
+  generated one. The directive has to be on its own line, so a trailing comment
+  cannot silently protect whatever follows it.
+
 ### Changed
+
+- Rewriting C-style operators (`!=`, `&&`, `||`, `!`) is now a refactor you
+  invoke rather than a `source.fixAll` action. `!=` is valid GLua, so rewriting
+  it is a preference, and preferences should not be applied to your file while
+  you save. It is still offered from the lightbulb.
 
 - The rule catalogue moved next to the analyser, so the codes on diagnostics,
   the links behind them, the SARIF `rules` array and `glua rules` all read from

@@ -251,3 +251,35 @@ test('leaves already-formatted realistic code untouched', () => {
 
   assert.equal(assertSafe(source), source);
 });
+
+/* -------------------------------------------------------- format ignore */
+
+test('glua-format-ignore leaves the next statement exactly as written', () => {
+  const source = [
+    '-- glua-format-ignore',
+    'local COLOURS = {',
+    '\tred   = 1,',
+    '\tgreen = 22,',
+    '}',
+    '',
+    'local other   =    { a = 1 }',
+    '',
+  ].join('\n');
+
+  const formatted = format(source);
+  assert.match(formatted, /red {3}= 1,/, 'the hand-aligned table survives');
+  assert.match(formatted, /green = 22,/);
+  assert.match(formatted, /^local other = \{ a = 1 \}$/m, 'the next statement is still formatted');
+});
+
+test('a format-ignore trailing real code protects nothing', () => {
+  const source = 'local x = 1 -- glua-format-ignore\nlocal y   =    2\n';
+  assert.match(format(source), /^local y = 2$/m);
+});
+
+test('glua-format-ignore-file leaves the whole file alone', () => {
+  const source = '-- glua-format-ignore-file\nlocal  x   =  1\nlocal  y   =  2\n';
+  // Null is "no edits", the same answer a file that does not parse gets, which
+  // both the server and `glua fmt` already report as unchanged.
+  assert.equal(format(source), null);
+});

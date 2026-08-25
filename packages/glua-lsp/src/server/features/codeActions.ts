@@ -193,7 +193,68 @@ export function codeActions(
   pushLocaliseAction(analysis, range, actions);
   pushCStyleRewrite(analysis, actions);
 
+  pushFixAll(analysis, actions);
+
   return actions;
+}
+
+/**
+ * One action that applies every safe fix in the file.
+ *
+ * This is what an editor runs on save under `source.fixAll`, and it is exactly
+ * the set `glua lint --fix` writes — an editor and a pre-commit hook disagreeing
+ * about what "fix it" means is a diff nobody asked for. Unsafe fixes are left
+ * for someone to choose one at a time, with the result in front of them, and
+ * the C-style rewrite stays out of it: `!=` is valid GLua, so rewriting it is a
+ * preference rather than a fix, and preferences do not get applied on save.
+ */
+function pushFixAll(analysis: FileAnalysis, actions: GluaCodeAction[]): void {
+  const applicable = actions.filter(isAutoApplicable);
+  if (!applicable.length) return;
+
+  const merged = mergeEdits(applicable, analysis.uri);
+  if (!merged.edits.length) return;
+
+  const count = merged.actions.length;
+  actions.push({
+    title: `Fix all ${count} auto-fixable problem${count === 1 ? '' : 's'}`,
+    kind: CodeActionKind.SourceFixAll,
+    data: { safety: 'safe' },
+    edit: { changes: { [analysis.uri]: merged.edits } },
+  });
+}
+
+/**
+ * The edits from a batch of actions, deduplicated, and the actions that
+ * actually contributed one.
+ *
+ * Two findings for the same unregistered net message each ask for the same
+ * insertion at the top of the file; applying both writes the line twice, and
+ * counting both reports two fixes where one line was written. Shared with the
+ * CLI so `--fix` and `source.fixAll` cannot drift apart.
+ */
+export function mergeEdits<T extends CodeAction>(
+  actions: T[],
+  uri: string,
+): { edits: TextEdit[]; actions: T[] } {
+  const seen = new Set<string>();
+  const edits: TextEdit[] = [];
+  const contributing: T[] = [];
+
+  for (const action of actions) {
+    let contributed = false;
+    for (const edit of action.edit?.changes?.[uri] ?? []) {
+      const { start, end } = edit.range;
+      const key = `${start.line}:${start.character}:${end.line}:${end.character}:${edit.newText}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edits.push(edit);
+      contributed = true;
+    }
+    if (contributed) contributing.push(action);
+  }
+
+  return { edits, actions: contributing };
 }
 
 /* ----------------------------------------------------------- hoisting */
@@ -489,8 +550,11 @@ function pushCStyleRewrite(analysis: FileAnalysis, actions: CodeAction[]): void 
 
   actions.push({
     title: `Convert ${edits.length} C-style operator${edits.length === 1 ? '' : 's'} to Lua (!= && || !)`,
-    kind: CodeActionKind.SourceFixAll,
-    // A spelling change, and the file did not parse as written either way.
+    // Offered from the lightbulb, and folded into `source.fixAll` below. Not a
+    // `source.fixAll` action in its own right: two of those both claiming the
+    // whole document is how an editor applies overlapping edits on save.
+    kind: CodeActionKind.RefactorRewrite,
+    // A spelling change: `!=` and `~=` are the same operator to the parser.
     data: { safety: 'safe' },
     edit: { changes: { [analysis.uri]: edits } },
   });

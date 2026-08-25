@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DiagnosticSeverity, type CodeAction, type TextEdit } from 'vscode-languageserver-types';
+import { DiagnosticSeverity, type TextEdit } from 'vscode-languageserver-types';
 
-import { codeActions, isAutoApplicable, safetyOf } from '@glua/server/features/codeActions.js';
+import {
+  codeActions,
+  isAutoApplicable,
+  mergeEdits,
+  safetyOf,
+} from '@glua/server/features/codeActions.js';
 import { diagnose } from '@glua/server/features/diagnostics.js';
 import { bold, c, heading, symbols } from './palette.js';
 import { loadProject, uriOf } from './project.js';
@@ -94,15 +99,15 @@ export function fix(targets: string[], options: FixOptions): FixResult {
       const actions = codeActions(analysis, wholeFile(analysis), diagnostics, { api, workspace })
         .filter((action) => (options.unsafe ? action.isPreferred === true : isAutoApplicable(action)));
 
-      const applying = editsFor(actions, analysis.uri);
-      if (!applying.edits.length) break;
+      const merged = mergeEdits(actions, analysis.uri);
+      if (!merged.edits.length) break;
 
-      const next = applyEdits(text, applying.edits, analysis);
+      const next = applyEdits(text, merged.edits, analysis);
       if (next === text) break;
 
       text = next;
-      applied += applying.actions.length;
-      for (const action of applying.actions) {
+      applied += merged.actions.length;
+      for (const action of merged.actions) {
         if (titles.length < 12) titles.push(action.title);
       }
     }
@@ -165,36 +170,6 @@ const wholeFile = (analysis: { lines: { positionAt(offset: number): { line: numb
   start: { line: 0, character: 0 },
   end: analysis.lines.positionAt(analysis.text.length),
 });
-
-/**
- * The edits to apply, and the actions they came from.
- *
- * Two diagnostics for the same net message each ask for the same insertion at
- * the top of the file: the second one is dropped, and so is the action, so the
- * count reported is fixes made rather than edits attempted. An action worth one
- * line of output should not be reported as two because it moves a call and
- * leaves a local behind.
- */
-function editsFor(actions: CodeAction[], uri: string): { edits: TextEdit[]; actions: CodeAction[] } {
-  const seen = new Set<string>();
-  const edits: TextEdit[] = [];
-  const kept: CodeAction[] = [];
-
-  for (const action of actions) {
-    let contributed = false;
-    for (const edit of action.edit?.changes?.[uri] ?? []) {
-      const { start, end } = edit.range;
-      const key = `${start.line}:${start.character}:${end.line}:${end.character}:${edit.newText}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      edits.push(edit);
-      contributed = true;
-    }
-    if (contributed) kept.push(action);
-  }
-
-  return { edits, actions: kept };
-}
 
 /**
  * Applies edits back to front so earlier offsets stay valid, dropping any that
