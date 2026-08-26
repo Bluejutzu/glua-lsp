@@ -6,7 +6,20 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **A schema reference page** for `.glua.json`, `.gluafmtrc.json` and
+  `.glua-baseline.json`, with the schemas hosted at `glua.bluejutzu.dev/schemas`
+  so editors get autocomplete and validation for them.
+
+### Fixed
+
+- **`.glua.json`'s `workspace.exclude` now works for `glua lint`/`glua fmt`,
+  not just the editor.** Same glob syntax as override `files` patterns (`**`,
+  `*`, `?`, `{a,b}`).
+- **`.glua.json` settings for completion, hover, inlay hints and
+  `workspace.maxFiles`/`exclude` now actually apply in the editor**, instead of
+  only taking effect when the same value was also set in VS Code.
 
 ## 0.5.5
 
