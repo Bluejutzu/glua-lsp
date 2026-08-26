@@ -107,7 +107,6 @@ export function loadProject(
   } = {},
 ): LoadedProject {
   const api = loadApi();
-  const maxFiles = options.maxFiles ?? 20000;
   const root = path.resolve(options.root ?? process.cwd());
   const indexProject = options.indexProject ?? true;
 
@@ -115,6 +114,11 @@ export function loadProject(
   config.reload([root]);
 
   const projectSettings = config.projectSettings();
+  // The raw file, not projectSettings(): that merges onto the server's 6000
+  // default, which would silently shrink the CLI's own higher default the
+  // moment any .glua.json exists, even one that never touched maxFiles.
+  const configuredMaxFiles = config.loaded?.lint?.value.workspace?.maxFiles;
+  const maxFiles = options.maxFiles ?? configuredMaxFiles ?? 20000;
   // An install path belongs to a machine, not a repository, so the flag and the
   // environment come before anything committed.
   const gamePath =

@@ -84,8 +84,8 @@ settings key here is the same one shown under each rule there.
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `maxFiles` | `integer`, minimum `1` | Maximum Lua files to index. |
-| `exclude` | `string[]` | Directory names to skip while indexing. |
+| `maxFiles` | `integer`, minimum `1` | Maximum Lua files to index. The CLI's own `--max-files` flag, when given, wins over this. |
+| `exclude` | `string[]` | Directory names to skip while indexing. Language server only — `glua lint`/`glua fmt` walk the project with their own fixed skip list (`node_modules`, `.git`, and the like) and do not read this yet. |
 | `libraries` | `string[]` | Source trees for frameworks this project uses but does not contain (ULib, DarkRP, Wiremod). Indexed for what they define and never reported on. Absolute, or relative to this file. See [Frameworks and Libraries](/configuration/frameworks). |
 
 <Note>
