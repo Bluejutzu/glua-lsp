@@ -6,7 +6,7 @@ import { URI } from 'vscode-uri';
 
 import { GmodApi } from '@glua/api/index.js';
 import { Workspace } from '@glua/analyze/workspace.js';
-import { ConfigResolver } from '@glua/config/index.js';
+import { ConfigResolver, matchesGlob } from '@glua/config/index.js';
 import { DEFAULT_SETTINGS } from '@glua/server/settings.js';
 import { FactCache, hashOf } from './cache.js';
 
@@ -28,9 +28,25 @@ export function loadApi(): GmodApi {
   );
 }
 
-export function collectLuaFiles(targets: string[], maxFiles: number): string[] {
+export function collectLuaFiles(
+  targets: string[],
+  maxFiles: number,
+  options: {
+    /** `.glua.json`'s `workspace.exclude`, in the same glob syntax as override `files` patterns. */
+    exclude?: string[];
+    /** What exclude patterns are relative to. Without it, only the bare entry name is checked. */
+    root?: string;
+  } = {},
+): string[] {
+  const exclude = options.exclude ?? [];
   const found: string[] = [];
   const seen = new Set<string>();
+
+  const isExcluded = (fsPath: string, name: string): boolean => {
+    if (exclude.length === 0) return false;
+    const relative = options.root ? path.relative(options.root, fsPath).replace(/\\/g, '/') : name;
+    return exclude.some((pattern) => matchesGlob(pattern, name) || matchesGlob(pattern, relative));
+  };
 
   const addFile = (file: string) => {
     const resolved = path.resolve(file);
@@ -52,9 +68,10 @@ export function collectLuaFiles(targets: string[], maxFiles: number): string[] {
       const name = entry.name.toLowerCase();
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (name.startsWith('.') || SKIP_DIRECTORIES.has(name)) continue;
+        if (name.startsWith('.') || SKIP_DIRECTORIES.has(name) || isExcluded(full, entry.name)) continue;
         walkDir(full);
       } else if (name.endsWith('.lua') || name.endsWith('.glua')) {
+        if (isExcluded(full, entry.name)) continue;
         addFile(full);
       }
     }
@@ -123,10 +140,12 @@ export function loadProject(
   // environment come before anything committed.
   const gamePath =
     options.gamePath || process.env.GLUA_GAME_PATH || projectSettings.workspace.gamePath;
+  const exclude = projectSettings.workspace.exclude;
+  const collectOptions = { exclude, root: config.root ?? root };
 
   const workspace = new Workspace(api, {
     maxFiles,
-    exclude: [],
+    exclude,
     ...(gamePath ? { gamePath } : {}),
   });
   // Files are loaded directly here rather than through scanFolder, so the
@@ -137,7 +156,7 @@ export function loadProject(
   // Index the project root so cross-file facts are complete, then make sure
   // every explicitly named target is in there too. Callers that only care
   // about the target files (e.g. formatting) can skip this.
-  const files = collectLuaFiles(targets, maxFiles);
+  const files = collectLuaFiles(targets, maxFiles, collectOptions);
   // A caller that indexes nothing must not touch the cache: saving prunes
   // entries this run did not look at, so `glua fmt` would empty the cache that
   // `glua lint` had just filled.
@@ -151,7 +170,7 @@ export function loadProject(
       workspace.indexLibrary(path.resolve(config.root ?? root, library));
     }
 
-    const indexed = collectLuaFiles([root], maxFiles);
+    const indexed = collectLuaFiles([root], maxFiles, collectOptions);
     indexed.forEach((file, i) => {
       index(workspace, cache, root, file);
       options.onIndex?.(i + 1, indexed.length, file);

@@ -243,6 +243,28 @@ test('a config file changes what is reported', { skip: !built }, () => {
   assert.doesNotMatch(run(['lint', withoutRule, '--root', withoutRule]).stdout, /unused-local/);
 });
 
+test('workspace.exclude in .glua.json keeps matching files out of lint', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/sh_ok.lua': 'print("hi")\n',
+    'lua/vendor/sh_bad.lua': 'local x = 1\nx += 1\nprint(x)\n',
+    '.glua.json': JSON.stringify({ workspace: { exclude: ['vendor'] } }),
+  });
+  const result = run(['lint', root, '--root', root]);
+  assert.equal(result.code, 0, result.stdout);
+  assert.doesNotMatch(result.stdout, /compound-assignment/);
+});
+
+test('workspace.exclude supports glob patterns, not just bare names', { skip: !built }, () => {
+  const root = addon({
+    'lua/autorun/sh_ok.lua': 'print("hi")\n',
+    'lua/generated/sh_bad.generated.lua': 'local x = 1\nx += 1\nprint(x)\n',
+    '.glua.json': JSON.stringify({ workspace: { exclude: ['**/*.generated.lua'] } }),
+  });
+  const result = run(['lint', root, '--root', root]);
+  assert.equal(result.code, 0, result.stdout);
+  assert.doesNotMatch(result.stdout, /compound-assignment/);
+});
+
 test('declared globals suppress undefined-global', { skip: !built }, () => {
   const source = { 'lua/autorun/sh_ext.lua': 'ULib.doThing()\n' };
   const bare = addon(source);
