@@ -54,8 +54,10 @@ glua init --root path/to/addon
 An existing config is left alone and the command exits non-zero, so it is safe
 to run twice. Pass `--force` to replace one deliberately.
 
-Both files carry a `$schema` pointing at the copies shipped inside the package,
-so an editor completes and validates them offline.
+Both files carry a `$schema` pointing at
+[glua.bluejutzu.dev/schemas](https://glua.bluejutzu.dev/schemas), so an editor
+completes and validates them without needing `node_modules` — a GMod addon
+usually has no Node project at all.
 
 ## `glua lint`
 
@@ -418,6 +420,8 @@ A baseline draws a line under what already exists:
 ```bash
 glua lint lua/ --suppress-all     # writes .glua-baseline.json, reports nothing
 ```
+
+See the [`baseline.schema.json` reference](/reference/baseline-schema) for what this file actually contains.
 
 Commit that file. From then on the rules are enforced on everything written
 after it, and the backlog waits until you want it:

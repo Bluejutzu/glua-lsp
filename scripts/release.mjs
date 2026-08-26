@@ -22,6 +22,14 @@ const CHANGELOG = path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md');
 const CHANGELOG_DOCS = path.join(ROOT, 'docs', 'changelog.mdx');
 
 /**
+ * Generated configs point `$schema` at glua.bluejutzu.dev, which Mintlify
+ * serves straight from here. Copied on every release so the hosted schema
+ * never drifts from the one glua-lsp actually ships.
+ */
+const SCHEMAS_SRC = path.join(ROOT, 'packages', 'glua-lsp', 'schemas');
+const SCHEMAS_DOCS = path.join(ROOT, 'docs', 'schemas');
+
+/**
  * The CLI bundles the analyser straight from the extension's source, so any
  * change to one is a change to the other. Versioning them apart would ship a
  * `glua-cli` whose number says nothing about what is inside it.
@@ -168,6 +176,13 @@ cliManifest.version = next;
 fs.writeFileSync(CLI_MANIFEST, `${JSON.stringify(cliManifest, null, 2)}\n`);
 
 const staged = [path.relative(ROOT, MANIFEST), path.relative(ROOT, CLI_MANIFEST)];
+
+fs.mkdirSync(SCHEMAS_DOCS, { recursive: true });
+for (const name of fs.readdirSync(SCHEMAS_SRC)) {
+  fs.copyFileSync(path.join(SCHEMAS_SRC, name), path.join(SCHEMAS_DOCS, name));
+  staged.push(path.relative(ROOT, path.join(SCHEMAS_DOCS, name)));
+}
+
 if (changelog.contents) {
   fs.writeFileSync(CHANGELOG, changelog.contents);
   staged.push(path.relative(ROOT, CHANGELOG));

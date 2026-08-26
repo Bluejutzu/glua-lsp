@@ -60,10 +60,20 @@
         "tab": "Reference",
         "groups": [
           {
-            "group": "Reference",
+            "group": "Language",
+            "pages": ["reference/rules", "reference/annotations"]
+          },
+          {
+            "group": "Config Schemas",
             "pages": [
-              "reference/rules",
-              "reference/annotations",
+              "reference/glua-schema",
+              "reference/gluafmtrc-schema",
+              "reference/baseline-schema"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
               "reference/commands",
               "reference/cli",
               "reference/editors",
@@ -91,6 +101,7 @@
     "links": [
       {
         "label": "GitHub",
+        "icon": "github",
         "href": "https://github.com/Bluejutzu/glua-lsp"
       }
     ]

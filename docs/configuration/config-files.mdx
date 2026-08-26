@@ -42,6 +42,8 @@ Declared globals, diagnostic severity, and per-path overrides.
 - `diagnostics`: set any rule to `"error"`, `"warning"`, `"information"`, `"hint"` or `"off"`. See the [rule reference](/reference/rules) for the key names.
 - `overrides`: an **array** of `{ "files": [...], "diagnostics": {...} }`, applied in order so later entries win. In the example, vendored files under `lua/vendor/**` do not report unused locals.
 
+See the [glua.schema.json reference](/reference/glua-schema) for every property, including `workspace`, `completion`, `inlayHints` and `hover`.
+
 ## Formatter config (`.gluafmtrc.json`)
 
 Indentation, line width, quote style, block collapsing.
@@ -69,6 +71,8 @@ Indentation, line width, quote style, block collapsing.
 - `keepSingleLineBlocks`: preserve one-line `if` blocks instead of forcing expansion.
 - `overrides`: an **array** of `{ "files": [...], "options": {...} }`, applied in order. In the example, files under `lua/config/**` use two-space indentation.
 
+See the [`gluafmtrc.schema.json` reference](/reference/gluafmtrc-schema) for every property, including `operatorStyle`, `commentStyle` and `endOfLine`.
+
 <Info>
-  Both `.glua.json` and `.gluafmtrc.json` ship with bundled JSON schemas, so you get IntelliSense and validation while editing them in VS Code.
+  Both `.glua.json` and `.gluafmtrc.json` are generated with a `$schema` pointing at [glua.bluejutzu.dev/schemas](https://glua.bluejutzu.dev/schemas), so you get IntelliSense and validation while editing them — no `node_modules` required.
 </Info>

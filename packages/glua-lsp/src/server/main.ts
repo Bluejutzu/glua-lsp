@@ -220,7 +220,7 @@ async function indexWorkspace(): Promise<number> {
 
   // Diagnostics for already-open documents now that cross-file facts exist.
   for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
-  if (settings.diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
+  if (config.projectSettings().diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
   return indexed;
 }
 
@@ -280,10 +280,15 @@ async function refreshSettings(): Promise<void> {
   }
   config.setEditorSettings(settings);
   await reloadProjectConfig();
+  // Resolved through the project config, not the raw editor settings, so
+  // .glua.json's workspace.maxFiles/exclude actually take effect. gamePath is
+  // absent from that resolution — the schema does not accept it — so it still
+  // comes from wherever the base settings put it.
+  const projectWorkspace = config.projectSettings().workspace;
   workspace.setOptions({
-    maxFiles: settings.workspace.maxFiles,
-    exclude: settings.workspace.exclude,
-    gamePath: settings.workspace.gamePath || undefined,
+    maxFiles: projectWorkspace.maxFiles,
+    exclude: projectWorkspace.exclude,
+    gamePath: projectWorkspace.gamePath || undefined,
   });
 }
 
@@ -307,7 +312,7 @@ async function reloadProjectConfig(): Promise<void> {
 }
 
 connection.onDidChangeConfiguration(async () => {
-  const wasWorkspaceScope = settings.diagnostics.scope === 'workspace';
+  const wasWorkspaceScope = config.projectSettings().diagnostics.scope === 'workspace';
   await refreshSettings();
 
   // Reindexing republishes everything itself, so do not do it twice.
@@ -315,7 +320,7 @@ connection.onDidChangeConfiguration(async () => {
   if (reindexed) return;
 
   for (const document of documents.all()) scheduleDiagnostics(document.uri, 0);
-  if (settings.diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
+  if (config.projectSettings().diagnostics.scope === 'workspace') await publishWorkspaceDiagnostics();
   else if (wasWorkspaceScope) clearWorkspaceDiagnostics();
 });
 
@@ -434,14 +439,20 @@ connection.onCompletion(
   guarded('completion', { isIncomplete: false, items: [] }, (params) => {
     const analysis = analysisFor(params.textDocument.uri);
     if (!analysis) return { isIncomplete: false, items: [] };
-    return completion(analysis, params.position, { api, workspace, settings });
+    return completion(analysis, params.position, {
+      api,
+      workspace,
+      settings: config.settingsFor(analysis.fsPath),
+    });
   }),
 );
 
 connection.onHover(
   guarded('hover', null, (params) => {
     const analysis = analysisFor(params.textDocument.uri);
-    return analysis ? hover(analysis, params.position, { api, workspace, settings }) : null;
+    return analysis
+      ? hover(analysis, params.position, { api, workspace, settings: config.settingsFor(analysis.fsPath) })
+      : null;
   }),
 );
 
@@ -552,7 +563,7 @@ connection.onCodeLens(
 connection.languages.inlayHint.on(
   guarded('inlayHint', [], (params) => {
     const analysis = analysisFor(params.textDocument.uri);
-    return analysis ? inlayHints(analysis, params.range, settings) : [];
+    return analysis ? inlayHints(analysis, params.range, config.settingsFor(analysis.fsPath)) : [];
   }),
 );
 

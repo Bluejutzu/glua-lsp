@@ -1,0 +1,72 @@
+---
+title: "$schema Reference for .gluafmtrc.json"
+description: "Every property gluafmtrc.schema.json accepts, with its type, range and default — the schema behind .gluafmtrc.json's IntelliSense and validation."
+icon: "ruler"
+sidebarTitle: "gluafmtrc.schema.json"
+---
+
+`.gluafmtrc.json` is validated against
+[glua.bluejutzu.dev/schemas/gluafmtrc.schema.json](https://glua.bluejutzu.dev/schemas/gluafmtrc.schema.json),
+the same schema `glua init` and **GLua: Create Formatter Config File** point
+`$schema` at. This page documents every property it accepts. See the
+[Formatter](/features/formatter) page for what each option actually changes in
+your code, and [Config Files](/configuration/config-files) for a shorter
+overview alongside `.glua.json`.
+
+<Info>
+  The schema sets `additionalProperties: false`, so a typo'd key is flagged in your editor rather than silently ignored.
+</Info>
+
+## Properties
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `$schema` | `string` | — | URL of the JSON schema for this file. Written automatically by `glua init` and the VS Code command. |
+| `useTabs` | `boolean` | `true` | Indent with tabs instead of spaces. |
+| `indentSize` | `integer`, `1`–`16` | `4` | Spaces per indent level — and, when `useTabs` is on, the assumed display width of a tab for measuring line length. |
+| `maxLineWidth` | `integer`, `40`–`400` | `120` | Column at which tables and argument lists wrap. |
+| `quoteStyle` | `"preserve"` \| `"double"` \| `"single"` | `"preserve"` | Preferred string quotes. A string is only rewritten when doing so needs no extra escaping. |
+| `operatorStyle` | `"preserve"` \| `"lua"` | `"preserve"` | `"lua"` rewrites GLua's C-style operators `!= && || !` as `~= and or not`. |
+| `commentStyle` | `"preserve"` \| `"lua"` | `"preserve"` | `"lua"` rewrites `//` and `/* */` comments as `--` and `--[[ ]]`. |
+| `spaceInsideParens` | `boolean` | `false` | Write `func( a, b )` instead of `func(a, b)` — the style used across the Garry's Mod wiki. |
+| `keepSingleLineBlocks` | `boolean` | `true` | Keep blocks written on one line on one line, e.g. `if not IsValid(ent) then return end`. See [idiomatic one-liners](/features/formatter#idiomatic-one-liners). |
+| `maxBlankLines` | `integer`, `0`–`10` | `2` | Consecutive blank lines to keep between statements. |
+| `semicolons` | `"remove"` \| `"preserve"` | `"remove"` | Whether to keep optional trailing semicolons. |
+| `endOfLine` | `"\n"` \| `"\r\n"` | — | Line ending to write. Defaults to whatever the file already uses. |
+| `overrides` | [`Override[]`](#overrides) | — | Per-path formatting overrides, applied in order; later entries win. |
+
+```json
+{
+  "$schema": "https://glua.bluejutzu.dev/schemas/gluafmtrc.schema.json",
+  "useTabs": false,
+  "indentSize": 2,
+  "maxLineWidth": 100,
+  "quoteStyle": "double"
+}
+```
+
+## `overrides`
+
+An array of objects, applied in order — later entries win when two overrides
+match the same file. Unlike `.glua.json`'s overrides, `options` is **required**
+and only accepts formatting keys — no `diagnostics` or `globals` here.
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `files` | `string[]`, required, at least one entry | Glob patterns relative to this file's directory, e.g. `lua/vendor/**`. |
+| `options` | `object`, required | A subset of the [top-level properties](#properties) above (excluding `$schema` and `overrides`) to apply to matching files. |
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["lua/config/**"],
+      "options": { "indentSize": 2 }
+    }
+  ]
+}
+```
+
+<Note>
+  Options not listed in an override keep whatever the top-level config (or the built-in default) says — an override only replaces the keys it names.
+</Note>
