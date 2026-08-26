@@ -23,7 +23,7 @@ example-first walkthrough see [Config Files](/configuration/config-files).
 | `$schema` | `string` | URL of the JSON schema for this file. Written automatically by `glua init` and the VS Code commands. |
 | `globals` | `string[]` | Globals provided by addons outside this workspace, e.g. `["ULib", "ulx", "pac"]`. Declaring them stops [`undefined-global`](/reference/rules#undefined-global) firing on every use. |
 | `diagnostics` | [`Diagnostics`](#diagnostics) | Per-rule severities. Rules can also be suppressed inline with [`-- glua-ignore <rule>`](/configuration/suppressions). |
-| `format` | `object` | Formatting options, same shape as [`.gluafmtrc.json`](/reference/gluafmtrc-schema). A `.gluafmtrc.json` file, if present, wins over this. |
+| `format` | `object` | A **subset** of [`.gluafmtrc.json`](/reference/gluafmtrc-schema)'s options — see [below](#format). A `.gluafmtrc.json` file, if present, wins over this. |
 | `workspace` | [`Workspace`](#workspace) | Indexing limits and dependency source trees. |
 | `completion` | [`Completion`](#completion) | Completion behaviour. |
 | `inlayHints` | [`InlayHints`](#inlayhints) | Inline hints shown alongside your code. |
@@ -44,6 +44,26 @@ example-first walkthrough see [Config Files](/configuration/config-files).
       "diagnostics": { "unusedLocal": "off" }
     }
   ]
+}
+```
+
+## `format`
+
+Only these keys have any effect here: `maxLineWidth`, `quoteStyle`,
+`operatorStyle`, `commentStyle`, `spaceInsideParens`, `keepSingleLineBlocks`,
+`maxBlankLines`, `semicolons`. The schema does not reject the rest of
+[`.gluafmtrc.json`](/reference/gluafmtrc-schema)'s keys here, but
+`useTabs`, `indentSize` and `endOfLine` are silently ignored when written
+inside `.glua.json` — indentation and line endings come from your editor (or
+`.editorconfig`) instead. Put those two in an actual `.gluafmtrc.json` file if
+you need to pin them for the whole team.
+
+```json
+{
+  "format": {
+    "maxLineWidth": 100,
+    "quoteStyle": "double"
+  }
 }
 ```
 
