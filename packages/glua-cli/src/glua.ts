@@ -6,6 +6,7 @@
 // Same parser, analyser and formatter the language server uses, so a finding in
 // CI is the same finding you saw in the editor.
 
+import fs from 'node:fs';
 import { Command, Option } from 'commander';
 
 import type { DoctorFormat } from './doctor.js';
@@ -83,7 +84,11 @@ program
   )
   .option('--no-code-frames', 'do not print the offending source line under each finding')
   .option('--timing', 'report where the time went', false)
-  .option('--no-cache', `do not read or write ${'.glua-cache'}`)
+  .option('--no-cache', 'do not read or write .glua-cache')
+  .option(
+    '--stdin-filepath <file>',
+    'read the file from stdin, treating it as though it lived at this path',
+  )
   .option('--no-progress', 'do not print progress while linting')
   .action(
     async (
@@ -103,6 +108,7 @@ program
         codeFrames: boolean;
         timing: boolean;
         cache: boolean;
+        stdinFilepath?: string;
       },
     ) => {
       // In GitHub Actions the annotations are the output; colour would corrupt them.
@@ -112,6 +118,24 @@ program
         process.stderr.write(
           `${c.failure(symbols.error)} --fix cannot be combined with --suppress-all or --prune-suppressions: ` +
             `fix the code, or accept it, not both in one pass.\n`,
+        );
+        process.exitCode = 2;
+        return;
+      }
+
+      if (options.stdinFilepath && (options.fix || options.fixDryRun)) {
+        process.stderr.write(
+          `${c.failure(symbols.error)} --stdin-filepath cannot be combined with --fix: ` +
+            `there is nothing on disk to write the result back to.\n`,
+        );
+        process.exitCode = 2;
+        return;
+      }
+
+      if (options.stdinFilepath && (options.suppressAll || options.pruneSuppressions)) {
+        process.stderr.write(
+          `${c.failure(symbols.error)} --stdin-filepath cannot be combined with --suppress-all ` +
+            `or --prune-suppressions: a baseline records the project, not one buffer.\n`,
         );
         process.exitCode = 2;
         return;
@@ -149,6 +173,9 @@ program
       }
 
       const result = lint(paths, {
+        ...(options.stdinFilepath
+          ? { stdin: { path: options.stdinFilepath, text: readStdin() } }
+          : {}),
         format: options.format,
         maxWarnings: options.maxWarnings,
         quiet: options.quiet,
@@ -176,6 +203,20 @@ program
       }
     },
   );
+
+/**
+ * Everything on stdin.
+ *
+ * Reading descriptor 0 synchronously keeps this a plain function rather than
+ * pushing the whole command into a promise for the one flag that needs it.
+ */
+function readStdin(): string {
+  try {
+    return fs.readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
+}
 
 /* ------------------------------------------------------------------- fmt */
 
@@ -294,6 +335,37 @@ program
   });
 
 /* ----------------------------------------------------------------- extra */
+
+program
+  .command('explain')
+  .description('What one diagnostic code means, and how to deal with it')
+  .argument('<code>', 'a diagnostic code, as shown in the Problems panel')
+  .action(async (code: string) => {
+    const { RULES, ruleDocUrl, ruleInfo } = await import('@glua/rules.js');
+    const rule = ruleInfo(code);
+
+    if (!rule) {
+      process.stderr.write(`${c.failure(symbols.error)} No rule called ${bold(code)}.\n`);
+      // A settings key is the likeliest thing someone reaches for by mistake,
+      // and saying which code it belongs to is more use than a list.
+      const owner = RULES.find((entry) => entry.settingsKey === code);
+      process.stderr.write(
+        owner
+          ? `  ${c.faint(`${code} is the settings key for ${bold(owner.code)}. Try that.`)}\n`
+          : `  ${c.faint('Run `glua rules` for the whole list.')}\n`,
+      );
+      process.exitCode = 2;
+      return;
+    }
+
+    process.stdout.write(`${heading(rule.code)}\n\n`);
+    process.stdout.write(`  ${c.text(rule.summary)}\n\n`);
+    process.stdout.write(
+      `  ${c.faint('settings key')}  ${c.accent(rule.settingsKey)}\n` +
+        `  ${c.faint('suppress    ')}  ${c.muted(`-- glua-ignore ${rule.code}`)}\n` +
+        `  ${c.faint('read more   ')}  ${c.muted(ruleDocUrl(rule.code))}\n\n`,
+    );
+  });
 
 program
   .command('rules')

@@ -16,6 +16,11 @@ import { c, symbols } from './palette.js';
 export class SourceCache {
   private readonly lines = new Map<string, string[] | null>();
 
+  /** Content the caller already has, for a file that is not on disk as given. */
+  seed(file: string, text: string): void {
+    this.lines.set(file, text.split(/\r?\n/));
+  }
+
   linesOf(file: string): string[] | null {
     let cached = this.lines.get(file);
     if (cached === undefined) {

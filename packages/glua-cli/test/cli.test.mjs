@@ -15,7 +15,7 @@ const CLI = path.join(ROOT, 'dist', 'glua.js');
 
 const built = fs.existsSync(CLI);
 
-/** Runs the CLI and returns stdout plus the exit code, never throwing. */
+/** Runs the CLI and returns stdout, stderr and the exit code, never throwing. */
 function run(args, options = {}) {
   try {
     const stdout = execFileSync(process.execPath, [CLI, ...args], {
@@ -23,9 +23,9 @@ function run(args, options = {}) {
       env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '' },
       ...options,
     });
-    return { stdout, code: 0 };
+    return { stdout, stderr: '', code: 0 };
   } catch (error) {
-    return { stdout: String(error.stdout ?? ''), code: error.status ?? 1 };
+    return { stdout: String(error.stdout ?? ''), stderr: String(error.stderr ?? ''), code: error.status ?? 1 };
   }
 }
 
@@ -519,6 +519,67 @@ test('lint --fix-dry-run changes nothing on disk', { skip: !built }, () => {
   const result = run(['lint', root, '--fix-dry-run', '--no-progress']);
   assert.match(result.stdout, /would fix 1/);
   assert.equal(fs.readFileSync(path.join(root, 'lua/autorun/sh_b.lua'), 'utf8'), before);
+});
+
+/* ----------------------------------------------------------------- stdin */
+
+test('--stdin-filepath lints text from stdin at a virtual path', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_ok.lua': 'print("hi")\n' });
+
+  const result = run(
+    ['lint', '--root', root, '--stdin-filepath', 'lua/autorun/sh_virtual.lua', '--no-progress'],
+    { input: 'local x = 1\nx += 1\nprint(x)\n' },
+  );
+
+  assert.match(result.stdout, /sh_virtual\.lua/);
+  assert.match(result.stdout, /compound-assignment/);
+  assert.equal(result.code, 1);
+  assert.ok(
+    !fs.existsSync(path.join(root, 'lua/autorun/sh_virtual.lua')),
+    'nothing should have been written to disk',
+  );
+});
+
+test('--stdin-filepath quotes the buffer, not whatever is saved on disk', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_a.lua': 'local n = 0\nn += 1\nprint(n)\n' });
+
+  const result = run(
+    ['lint', '--root', root, '--stdin-filepath', path.join(root, 'lua/autorun/sh_a.lua'), '--no-progress'],
+    { input: 'local n = 0\nn += 2\nprint(n)\n' },
+  );
+
+  assert.match(result.stdout, /n \+= 2/, `expected the stdin content quoted:\n${result.stdout}`);
+});
+
+test('--stdin-filepath cannot be combined with --fix', { skip: !built }, () => {
+  const root = addon({ 'lua/autorun/sh_ok.lua': 'print("hi")\n' });
+  const result = run(
+    ['lint', '--root', root, '--stdin-filepath', 'lua/autorun/sh_virtual.lua', '--fix'],
+    { input: 'print("hi")\n' },
+  );
+  assert.equal(result.code, 2);
+});
+
+/* --------------------------------------------------------------- explain */
+
+test('explain describes a rule by its diagnostic code', { skip: !built }, () => {
+  const result = run(['explain', 'perf-hot-path']);
+  assert.equal(result.code, 0, result.stdout);
+  assert.match(result.stdout, /perf-hot-path/);
+  assert.match(result.stdout, /perfHotPath/);
+  assert.match(result.stdout, /reference\/rules#perf-hot-path/);
+});
+
+test('explain given a settings key points at the code instead', { skip: !built }, () => {
+  const result = run(['explain', 'unusedLocal']);
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /unused-local/);
+});
+
+test('explain given nonsense fails without a settings-key match', { skip: !built }, () => {
+  const result = run(['explain', 'not-a-real-rule']);
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /No rule called/);
 });
 
 /* ---------------------------------------------------------------- doctor */

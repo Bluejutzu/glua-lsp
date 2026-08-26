@@ -8,24 +8,32 @@ commit; this file covers what actually changed for you.
 
 ### Added
 
+- **`glua explain <code>`**, printing what one rule catches, its settings key,
+  how to suppress it, and a link to the full write-up — without leaving the
+  terminal. Given a settings key instead of a code, it says which code you
+  meant rather than reporting nothing matched, since that mix-up is exactly
+  what `unused-suppression` exists to catch.
+
+- **`--stdin-filepath`**, so `glua lint` can check text piped in on stdin as
+  though it lived at a given path — an unsaved editor buffer, or one whose
+  contents differ from what is on disk. The path decides the file's realm and
+  what the cross-file rules match it against; the file need not exist. Code
+  frames quote the piped text, not whatever the path holds on disk. Cannot be
+  combined with `--fix`, `--suppress-all` or `--prune-suppressions`, all of
+  which write back to a real file.
+
+- **A published pre-commit hook.** `glua-lint` and `glua-fmt` in
+  `.pre-commit-hooks.yaml`, so a project can point
+  [pre-commit](https://pre-commit.com) at this repo and run both on staged
+  files before a commit lands. Neither hook needs Node or `glua-cli` installed
+  beforehand — pre-commit installs it the first time the hook runs.
+
 - **`unused-suppression`**, reporting a `-- glua-ignore` or `-- glua-disable`
   that never silenced anything. A suppression outlives the finding it was
   written for — the code gets fixed, the comment stays, and from then on it
   quietly covers whatever appears on that line next. Reported as a hint by
   default, and only for files that parse, since a parse error stops most rules
   from running and every directive in the file would read as dead.
-
-### Fixed
-
-- **A suppression naming something that is not a rule silenced every rule on the
-  line.** `-- glua-ignore unusedLocal` — the settings key where the code
-  belonged — parsed as naming no rules at all, and a directive naming no rules
-  means "all of them". A mistake that looked specific was the broadest
-  suppression available. It now names a rule nothing reports, so it silences
-  nothing and `unused-suppression` points at it. The same bug hid the two rule
-  codes that have no hyphen in them, `deprecated` and `syntax`; both work now.
-
-  A bare `-- glua-ignore` followed by prose still means the whole line.
 
 - **A fact cache for the CLI.** Every run indexes the whole project, because
   cross-file rules are only correct once the index has seen everything — so
@@ -55,6 +63,16 @@ commit; this file covers what actually changed for you.
   large addon still indexes everything, and this is what says so.
 
 ### Fixed
+
+- **A suppression naming something that is not a rule silenced every rule on the
+  line.** `-- glua-ignore unusedLocal` — the settings key where the code
+  belonged — parsed as naming no rules at all, and a directive naming no rules
+  means "all of them". A mistake that looked specific was the broadest
+  suppression available. It now names a rule nothing reports, so it silences
+  nothing and `unused-suppression` points at it. The same bug hid the two rule
+  codes that have no hyphen in them, `deprecated` and `syntax`; both work now.
+
+  A bare `-- glua-ignore` followed by prose still means the whole line.
 
 - A run reporting nothing but hints printed "✓ no problems" directly under the
   hints it had just listed. The summary now counts suggestions alongside errors

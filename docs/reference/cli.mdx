@@ -80,6 +80,7 @@ glua lint . --quiet --max-warnings 0
 | `--no-code-frames` | One line per finding, without the source |
 | `--timing` | Report where the time went |
 | `--no-cache` | Do not read or write `.glua-cache` |
+| `--stdin-filepath <file>` | Lint text from stdin as though it lived at this path |
 
 Exits `1` when there are errors, or when `--max-warnings` is exceeded. Otherwise `0`.
 
@@ -155,6 +156,25 @@ build wrote. Anything that goes wrong with it — corrupt file, read-only
 checkout — is a cache miss rather than an error.
 
 `--no-cache` skips it in both directions. `glua fmt` never touches it.
+
+### Linting stdin
+
+An editor integration usually has a buffer that has not been saved, or has been
+saved with contents different from what is on disk. `--stdin-filepath` lints
+whatever comes in on stdin as though it were the file at that path:
+
+```bash
+cat lua/autorun/sh_main.lua | glua lint --stdin-filepath lua/autorun/sh_main.lua
+```
+
+The path decides the file's realm and what the cross-file rules match it
+against — a `net.Start` typed into an unsaved `sv_` file is still checked
+against the project's other `net.Receive` calls. It does not need to exist on
+disk at all; the rest of the project is still indexed around it normally.
+
+Code frames quote the piped text, not whatever the path happens to hold on
+disk. `--fix`, `--suppress-all` and `--prune-suppressions` all write back to a
+real file, so none of them can be combined with `--stdin-filepath`.
 
 ### Fixing
 
@@ -333,6 +353,30 @@ Each code has a section in the [rule reference](/reference/rules) explaining
 what it catches. Diagnostics link there directly, so in an editor you can click
 the code in the Problems panel rather than looking it up.
 
+## `glua explain`
+
+What one rule means, without leaving the terminal:
+
+```bash
+glua explain perf-hot-path
+```
+
+```
+perf-hot-path
+─────────────────────────
+
+  Expensive work reached from something the engine runs every frame or tick.
+
+  settings key  perfHotPath
+  suppress      -- glua-ignore perf-hot-path
+  read more     https://glua.bluejutzu.dev/reference/rules#perf-hot-path
+```
+
+Given a settings key instead of a code — `glua explain unusedLocal` — it says
+which code you meant (`unused-local`) rather than pretending nothing matched,
+since that mix-up is the one [`unused-suppression`](/reference/rules#unused-suppression)
+exists to catch. Exits `2` for anything it cannot resolve.
+
 ## Configuration
 
 The CLI reads exactly the same files as the editor — `.glua.json`,
@@ -442,6 +486,35 @@ jobs:
 <Note>
   Paths in the file are relative to `--root`, or to the directory you ran from. Run it from the repository root, or pass `--root`, so the uploaded locations line up with the files on the diff. `continue-on-error` is there so findings still upload when the lint exits non-zero.
 </Note>
+
+## Pre-commit hook
+
+This repository publishes [pre-commit](https://pre-commit.com) hooks, so
+`glua lint` and `glua fmt` can run on staged files before a commit lands:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: https://github.com/Bluejutzu/glua-lsp
+    rev: v0.4.2 # a tag from this repo — see the Releases page for the latest
+    hooks:
+      - id: glua-lint
+      - id: glua-fmt
+```
+
+Neither hook needs Node or `glua-cli` installed beforehand — pre-commit
+installs `glua-cli` itself the first time the hook runs, in its own isolated
+environment. `rev` pins which version of the *hook definition* you get, not
+which version of `glua-cli` gets installed; add this under a hook to pin that
+too:
+
+```yaml
+      - id: glua-lint
+        additional_dependencies: ['glua-cli@0.4.2']
+```
+
+Both hooks still index the whole project even when only a few files are
+staged — cross-file rules need the whole picture — which is exactly the case
+the [fact cache](#caching) exists to make cheap.
 
 ## Colour
 
