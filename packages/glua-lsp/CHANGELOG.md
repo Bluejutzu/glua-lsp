@@ -10,9 +10,10 @@ commit; this file covers what actually changed for you.
 
 - **`glua explain <code>`**, printing what one rule catches, its settings key,
   how to suppress it, and a link to the full write-up — without leaving the
-  terminal. Given a settings key instead of a code, it says which code you
-  meant rather than reporting nothing matched, since that mix-up is exactly
-  what `unused-suppression` exists to catch.
+  terminal. Given a settings key instead of a code, it says which code (or
+  codes — a key like `netMessage` covers four) you likely meant rather than
+  reporting nothing matched, since that mix-up is exactly what
+  `unused-suppression` exists to catch.
 
 - **`--stdin-filepath`**, so `glua lint` can check text piped in on stdin as
   though it lived at a given path — an unsaved editor buffer, or one whose

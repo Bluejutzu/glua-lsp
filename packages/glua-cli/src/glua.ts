@@ -346,12 +346,16 @@ program
 
     if (!rule) {
       process.stderr.write(`${c.failure(symbols.error)} No rule called ${bold(code)}.\n`);
-      // A settings key is the likeliest thing someone reaches for by mistake,
-      // and saying which code it belongs to is more use than a list.
-      const owner = RULES.find((entry) => entry.settingsKey === code);
+      // A settings key is the likeliest thing someone reaches for by mistake.
+      // One key can cover several codes — netMessage alone controls four — so
+      // naming just one would be as misleading as the mistake it's correcting.
+      const owners = RULES.filter((entry) => entry.settingsKey === code).map((entry) => entry.code);
       process.stderr.write(
-        owner
-          ? `  ${c.faint(`${code} is the settings key for ${bold(owner.code)}. Try that.`)}\n`
+        owners.length
+          ? `  ${c.faint(
+              `${code} is the settings key for ${owners.map((name) => bold(name)).join(', ')}. ` +
+                `Try ${owners.length === 1 ? 'that' : 'one of those'}.`,
+            )}\n`
           : `  ${c.faint('Run `glua rules` for the whole list.')}\n`,
       );
       process.exitCode = 2;

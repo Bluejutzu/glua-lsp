@@ -576,6 +576,16 @@ test('explain given a settings key points at the code instead', { skip: !built }
   assert.match(result.stderr, /unused-local/);
 });
 
+test('explain given a settings key shared by several codes lists all of them', { skip: !built }, () => {
+  // netMessage alone controls four diagnostics; naming just one would be as
+  // misleading as the settings-key mistake this is meant to correct.
+  const result = run(['explain', 'netMessage']);
+  assert.equal(result.code, 2);
+  for (const code of ['net-unregistered', 'net-never-dispatched', 'net-never-received', 'net-never-sent']) {
+    assert.match(result.stderr, new RegExp(code), `expected ${code} in:\n${result.stderr}`);
+  }
+});
+
 test('explain given nonsense fails without a settings-key match', { skip: !built }, () => {
   const result = run(['explain', 'not-a-real-rule']);
   assert.equal(result.code, 2);
