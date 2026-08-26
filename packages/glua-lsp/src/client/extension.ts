@@ -233,7 +233,7 @@ function formatterConfigTemplate(): string {
 
   return `${JSON.stringify(
     {
-      $schema: './node_modules/glua-lsp/schemas/gluafmtrc.schema.json',
+      $schema: 'https://glua.bluejutzu.dev/schemas/gluafmtrc.schema.json',
       useTabs: !editor.get<boolean>('insertSpaces', true),
       indentSize: editor.get<number>('tabSize', 4),
       maxLineWidth: config.get('maxLineWidth', 120),
@@ -263,7 +263,7 @@ function linterConfigTemplate(): string {
 
   return `${JSON.stringify(
     {
-      $schema: './node_modules/glua-lsp/schemas/glua.schema.json',
+      $schema: 'https://glua.bluejutzu.dev/schemas/glua.schema.json',
       // Globals from addons outside this workspace, so they are not reported
       // as undefined. For example: ["ULib", "ulx", "pac"]
       globals: [],

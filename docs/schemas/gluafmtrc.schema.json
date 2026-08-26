@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GLua formatter configuration",
+  "description": "Formatting rules for the GLua language server. Overrides .editorconfig, .prettierrc and your editor settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL of the JSON schema for this file."
+    },
+    "useTabs": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indent with tabs instead of spaces."
+    },
+    "indentSize": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16,
+      "default": 4,
+      "description": "Spaces per indent level, and the assumed display width of a tab."
+    },
+    "maxLineWidth": {
+      "type": "integer",
+      "minimum": 40,
+      "maximum": 400,
+      "default": 120,
+      "description": "Column at which tables and argument lists wrap."
+    },
+    "quoteStyle": {
+      "enum": ["preserve", "double", "single"],
+      "default": "preserve",
+      "description": "Preferred string quotes. A string is only rewritten when doing so needs no extra escaping."
+    },
+    "operatorStyle": {
+      "enum": ["preserve", "lua"],
+      "default": "preserve",
+      "description": "'lua' rewrites GLua's C-style operators != && || ! as ~= and or not."
+    },
+    "commentStyle": {
+      "enum": ["preserve", "lua"],
+      "default": "preserve",
+      "description": "'lua' rewrites // and /* */ comments as -- and --[[ ]]."
+    },
+    "spaceInsideParens": {
+      "type": "boolean",
+      "default": false,
+      "description": "Write func( a, b ) instead of func(a, b). This is the style used across the Garry's Mod wiki."
+    },
+    "keepSingleLineBlocks": {
+      "type": "boolean",
+      "default": true,
+      "description": "Keep blocks written on one line on one line, e.g. 'if not IsValid(ent) then return end'."
+    },
+    "maxBlankLines": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 2,
+      "description": "Consecutive blank lines to keep between statements."
+    },
+    "semicolons": {
+      "enum": ["remove", "preserve"],
+      "default": "remove",
+      "description": "Whether to keep optional trailing semicolons."
+    },
+    "endOfLine": {
+      "enum": ["\n", "\r\n"],
+      "description": "Line ending to write. Defaults to whatever the file already uses."
+    },
+    "overrides": {
+      "type": "array",
+      "description": "Per-path formatting overrides, applied in order; later entries win.",
+      "items": {
+        "type": "object",
+        "required": ["files", "options"],
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "type": "array",
+            "description": "Glob patterns relative to this file's directory, e.g. lua/vendor/**.",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "options": {
+            "type": "object",
+            "description": "Formatting options to apply to matching files.",
+            "$ref": "#/definitions/optionsSubset"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "optionsSubset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "useTabs": { "type": "boolean" },
+        "indentSize": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "maxLineWidth": { "type": "integer", "minimum": 40, "maximum": 400 },
+        "quoteStyle": { "enum": ["preserve", "double", "single"] },
+        "operatorStyle": { "enum": ["preserve", "lua"] },
+        "commentStyle": { "enum": ["preserve", "lua"] },
+        "spaceInsideParens": { "type": "boolean" },
+        "keepSingleLineBlocks": { "type": "boolean" },
+        "maxBlankLines": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "semicolons": { "enum": ["remove", "preserve"] }
+      }
+    }
+  }
+}

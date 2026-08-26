@@ -1,0 +1,57 @@
+---
+title: "$schema Reference for .glua-baseline.json"
+description: "Every property baseline.schema.json accepts — the schema behind the findings glua lint --suppress-all accepts into .glua-baseline.json."
+icon: "archive"
+sidebarTitle: "baseline.schema.json"
+---
+
+`.glua-baseline.json` is validated against
+[glua.bluejutzu.dev/schemas/baseline.schema.json](https://glua.bluejutzu.dev/schemas/baseline.schema.json).
+Unlike `.glua.json` and `.gluafmtrc.json`, you do not write this file by hand —
+`glua lint --suppress-all` and `--prune-suppressions` write it for you. See
+[Adopting on a codebase you inherited](/reference/cli#adopting-on-a-codebase-you-inherited)
+for the workflow this file supports.
+
+<Info>
+  The schema sets `additionalProperties: false` at the top level, and requires `files`.
+</Info>
+
+## Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `$schema` | `string` | URL of the JSON schema for this file. Written automatically by `glua lint --suppress-all`. |
+| `generated` | `string` | When the baseline was last written, as an ISO timestamp. For a human reading a diff — never read back. |
+| `files` | `object`, required | Project-relative file path → rule code → number of findings accepted for it. See [Shape of `files`](#shape-of-files). |
+
+## Shape of `files`
+
+Keyed by file path, then by the **diagnostic code** (the kebab-case name shown
+in the Problems panel and listed on the [rules reference](/reference/rules) —
+not the camelCase settings key used in `.glua.json`), then a count of at least
+`1`.
+
+```json
+{
+  "$schema": "https://glua.bluejutzu.dev/schemas/baseline.schema.json",
+  "generated": "2026-08-20T12:00:00.000Z",
+  "files": {
+    "lua/autorun/server/sv_legacy.lua": {
+      "unused-local": 4,
+      "undefined-global": 2
+    },
+    "lua/entities/my_ent/init.lua": {
+      "argument-count": 1
+    }
+  }
+}
+```
+
+Findings are counted per file and rule rather than by line number, so moving
+code around does not invalidate the baseline — a file baselined at two
+`unused-local` findings still accepts exactly two no matter where in the file
+they move. A third one is reported as new.
+
+<Warning>
+  This file is generated. Hand-editing a count down is indistinguishable from the code actually improving, which is exactly what `--prune-suppressions` exists to do safely — see the [pruning note](/reference/cli#adopting-on-a-codebase-you-inherited).
+</Warning>

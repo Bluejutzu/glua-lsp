@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GLua lint baseline",
+  "description": "Findings a project has accepted. Written by 'glua lint --suppress-all' and rewritten by '--prune-suppressions'. Counts rather than line numbers, so ordinary edits do not invalidate it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["files"],
+  "properties": {
+    "$schema": { "type": "string", "description": "URL of the JSON schema for this file." },
+    "generated": {
+      "type": "string",
+      "description": "When the baseline was last written. For a human reading a diff; never read back."
+    },
+    "files": {
+      "type": "object",
+      "description": "Project-relative file path to rule code to the number of findings accepted for it.",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Rule code to accepted count.",
+        "additionalProperties": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

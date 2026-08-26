@@ -1,0 +1,135 @@
+---
+title: "$schema Reference for .glua.json"
+description: "Every property glua.schema.json accepts, with its type, default, and what reads it — the schema behind .glua.json's IntelliSense and validation."
+icon: "list-tree"
+sidebarTitle: "glua.schema.json"
+---
+
+`.glua.json` is validated against
+[glua.bluejutzu.dev/schemas/glua.schema.json](https://glua.bluejutzu.dev/schemas/glua.schema.json),
+the same schema `glua init` and **GLua: Create Linter Config File** point
+`$schema` at. This page documents every property it accepts. For a shorter,
+example-first walkthrough see [Config Files](/configuration/config-files).
+
+<Info>
+  The schema sets `additionalProperties: false` at every level shown below, so
+  a typo'd key is flagged in your editor rather than silently ignored.
+</Info>
+
+## Top level
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `$schema` | `string` | URL of the JSON schema for this file. Written automatically by `glua init` and the VS Code commands. |
+| `globals` | `string[]` | Globals provided by addons outside this workspace, e.g. `["ULib", "ulx", "pac"]`. Declaring them stops [`undefined-global`](/reference/rules#undefined-global) firing on every use. |
+| `diagnostics` | [`Diagnostics`](#diagnostics) | Per-rule severities. Rules can also be suppressed inline with [`-- glua-ignore <rule>`](/configuration/suppressions). |
+| `format` | `object` | Formatting options, same shape as [`.gluafmtrc.json`](/reference/gluafmtrc-schema). A `.gluafmtrc.json` file, if present, wins over this. |
+| `workspace` | [`Workspace`](#workspace) | Indexing limits and dependency source trees. |
+| `completion` | [`Completion`](#completion) | Completion behaviour. |
+| `inlayHints` | [`InlayHints`](#inlayhints) | Inline hints shown alongside your code. |
+| `hover` | [`Hover`](#hover) | Hover documentation behaviour. |
+| `overrides` | [`Override[]`](#overrides) | Per-path rule overrides, applied in order; later entries win. |
+
+```json
+{
+  "$schema": "https://glua.bluejutzu.dev/schemas/glua.schema.json",
+  "globals": ["ULib", "ulx"],
+  "diagnostics": {
+    "unusedLocal": "warning",
+    "realmViolation": "error"
+  },
+  "overrides": [
+    {
+      "files": ["lua/vendor/**"],
+      "diagnostics": { "unusedLocal": "off" }
+    }
+  ]
+}
+```
+
+## `diagnostics`
+
+Every property accepts a **severity** — `"error"`, `"warning"`, `"information"`,
+`"hint"` or `"off"` — except `enable` and `scope`, which are about how the
+server runs rather than any one rule. See the
+[rule reference](/reference/rules) for what each rule actually catches; the
+settings key here is the same one shown under each rule there.
+
+| Settings key | Default | Rule(s) it controls |
+| --- | --- | --- |
+| `enable` *(boolean)* | `true` | Turns every diagnostic on or off at once. |
+| `undefinedGlobal` | `warning` | [`undefined-global`](/reference/rules#undefined-global) |
+| `realmViolation` | `warning` | [`realm-violation`](/reference/rules#realm-violation) |
+| `unusedLocal` | `hint` | [`unused-local`](/reference/rules#unused-local) |
+| `deprecated` | `warning` | [`deprecated`](/reference/rules#deprecated) |
+| `argumentCount` | `warning` | [`argument-count`](/reference/rules#argument-count) |
+| `argumentType` | `warning` | [`argument-type`](/reference/rules#argument-type) |
+| `unknownHook` | `information` | [`unknown-hook`](/reference/rules#unknown-hook) |
+| `netMessage` | `warning` | [`net-unregistered`](/reference/rules#net-unregistered), [`net-never-dispatched`](/reference/rules#net-never-dispatched), [`net-never-received`](/reference/rules#net-never-received), [`net-never-sent`](/reference/rules#net-never-sent) |
+| `netReadWriteMismatch` | `warning` | [`net-payload-mismatch`](/reference/rules#net-payload-mismatch) |
+| `missingAddCSLuaFile` | `warning` | [`missing-addcsluafile`](/reference/rules#missing-addcsluafile) |
+| `globalWrite` | `off` | [`global-write`](/reference/rules#global-write) |
+| `duplicateIdentifier` | `warning` | [`duplicate-hook-identifier`](/reference/rules#duplicate-hook-identifier), [`duplicate-timer-name`](/reference/rules#duplicate-timer-name) |
+| `missingAsset` | `off` | [`missing-asset`](/reference/rules#missing-asset). Needs [`workspace.gamePath`](/features/assets) — a VS Code setting, not a `.glua.json` property. |
+| `perfHotPath` | `warning` | [`perf-hot-path`](/reference/rules#perf-hot-path) |
+| `unusedFunction` | `off` | [`unused-function`](/reference/rules#unused-function) |
+| `unusedSuppression` | `hint` | [`unused-suppression`](/reference/rules#unused-suppression) |
+| `scope` *(`"open"` \| `"workspace"`)* | `"open"` | Whether to report problems only in open files, or in every indexed file. |
+
+<Warning>
+  Use the settings key, not the diagnostic code, here. `"net-payload-mismatch": "error"` is not a valid entry — the key is `netReadWriteMismatch`. Codes are for the Problems panel and for `-- glua-ignore`; see [Suppressions](/configuration/suppressions) for why the two names differ.
+</Warning>
+
+## `workspace`
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `maxFiles` | `integer`, minimum `1` | Maximum Lua files to index. |
+| `exclude` | `string[]` | Directory names to skip while indexing. |
+| `libraries` | `string[]` | Source trees for frameworks this project uses but does not contain (ULib, DarkRP, Wiremod). Indexed for what they define and never reported on. Absolute, or relative to this file. See [Frameworks and Libraries](/configuration/frameworks). |
+
+<Note>
+  `workspace.gamePath` completes and checks asset paths against a full Garry's Mod install. It is not part of this schema — set it as the VS Code setting `glua.workspace.gamePath` instead, described on the [Asset Paths](/features/assets) page.
+</Note>
+
+## `completion`
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `callSnippets` | `boolean` | `true` | Insert parentheses and tab stops for parameters when completing a function. |
+| `filterByRealm` | `boolean` | `true` | Hide API members that cannot exist in the current file's [realm](/features/realms). |
+
+## `inlayHints`
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `parameterNames` | `boolean` | `true` | Show parameter names inline at call sites of known API functions. |
+| `realm` | `boolean` | `false` | Show the inferred [realm](/features/realms) at the top of each file. |
+
+## `hover`
+
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `wikiLinks` | `boolean` | `true` | Include a link to the Garry's Mod wiki in hover documentation. |
+
+## `overrides`
+
+An array of objects, applied in order — later entries win when two overrides
+match the same file.
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `files` | `string[]`, required, at least one entry | Glob patterns relative to this file's directory, e.g. `lua/vendor/**`. |
+| `diagnostics` | [`Diagnostics`](#diagnostics) | Severities to apply to matching files, same shape as the top-level `diagnostics` object. |
+| `globals` | `string[]` | Extra globals available only in matching files. |
+
+```json
+{
+  "overrides": [
+    {
+      "files": ["lua/vendor/**", "lua/thirdparty/**"],
+      "diagnostics": { "undefinedGlobal": "off", "unusedLocal": "off" }
+    }
+  ]
+}
+```

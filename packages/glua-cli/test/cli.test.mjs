@@ -318,11 +318,13 @@ test('init writes both configs, and the schema it points at exists', { skip: !bu
   assert.ok(!('enable' in linter.diagnostics));
   assert.equal(formatter.maxLineWidth, 120);
 
-  // The $schema path is relative to a consumer's project, so check the file it
-  // names is actually one we ship.
+  // $schema points at the copy Mintlify serves from docs/schemas, so check
+  // that copy is actually the one we ship.
+  const DOCS_SCHEMAS = path.join(ROOT, '..', '..', 'docs', 'schemas');
   for (const config of [linter, formatter]) {
-    const shipped = path.join(ROOT, config.$schema.replace('./node_modules/glua-cli/', ''));
-    assert.ok(fs.existsSync(shipped), `${config.$schema} is not shipped`);
+    assert.match(config.$schema, /^https:\/\/glua\.bluejutzu\.dev\/schemas\/[\w.-]+\.json$/);
+    const shipped = path.join(DOCS_SCHEMAS, path.basename(config.$schema));
+    assert.ok(fs.existsSync(shipped), `${config.$schema} is not shipped in docs/schemas`);
   }
 });
 

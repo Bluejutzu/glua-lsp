@@ -65,6 +65,21 @@ test('the documentation has pages to check', () => {
   assert.ok(files.length > 0, `no .mdx files found under ${DOCS}`);
 });
 
+/**
+ * Generated configs point `$schema` at https://glua.bluejutzu.dev/schemas/,
+ * which Mintlify serves straight from docs/schemas. Nothing rebuilds that
+ * copy automatically, so a schema change here would otherwise ship silently
+ * out of sync with what the hosted URL actually returns.
+ */
+test('docs/schemas is the same as the schemas we ship', () => {
+  const DOCS_SCHEMAS = path.join(DOCS, 'schemas');
+  for (const name of fs.readdirSync(SCHEMAS)) {
+    const shipped = fs.readFileSync(path.join(SCHEMAS, name), 'utf8');
+    const hosted = fs.readFileSync(path.join(DOCS_SCHEMAS, name), 'utf8');
+    assert.equal(hosted, shipped, `docs/schemas/${name} is out of date — copy it from packages/glua-lsp/schemas`);
+  }
+});
+
 test('every JSON example parses', () => {
   const failures = [];
   for (const file of files) {
