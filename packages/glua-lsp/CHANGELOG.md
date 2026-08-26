@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.5.5
+
 ### Added
 
 - **`glua explain <code>`**, printing what one rule catches, its settings key,
