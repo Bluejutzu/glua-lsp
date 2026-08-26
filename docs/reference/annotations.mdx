@@ -5,7 +5,7 @@ icon: "at"
 sidebarTitle: "Annotations"
 ---
 
-GLua uses the same annotation dialect as the Lua Language Server. If you already annotate Lua projects with `---@param`, `---@class`, and similar tags, those annotations work here without changes. This page lists every supported tag and the type syntax you can use with it.
+The same `---@` dialect the Lua Language Server uses, so annotations you already have work here, and anything you write here keeps working there. Every tag and every type form the parser recognises is listed below.
 
 ## Annotation tags
 
@@ -20,7 +20,7 @@ GLua uses the same annotation dialect as the Lua Language Server. If you already
 
 ## Type syntax
 
-You can compose types with unions, optionals, arrays, and generic tables.
+Unions, optionals, arrays and generic tables all compose:
 
 | Pattern | Example | Meaning |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ local function oldVehicleConfig() end
 ```
 
 <Note>
-  When you write an explicit `---@param` or `---@type`, it always wins over automatic inference. Use this to correct the server when your code shape is too dynamic for it to follow.
+  An explicit `---@param` or `---@type` always beats inference. That is the escape hatch for code shapes inference cannot follow — dynamic tables, values built through a helper the server does not know about.
 </Note>
 
 <Warning>

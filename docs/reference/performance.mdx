@@ -1,10 +1,10 @@
 ---
 title: "GLua Performance"
 sidebarTitle: "Performance"
-description: "GLua is designed to stay fast on large codebases, with measured benchmarks on a 932-file, 232,000-line Garry's Mod gamemode."
+description: "Measured latency and memory on a 932-file, 232,000-line Garry's Mod gamemode, and how the server keeps those numbers where they are."
 ---
 
-All numbers on this page were measured on a real-world gamemode: 932 files and 232,000 lines of Garry's Mod Lua. The server is built to stay responsive on codebases of that size and larger.
+Every number below was measured against a real gamemode: 932 files, 232,000 lines. Nothing on this page is a target — it is what the current build does on that codebase.
 
 ## Benchmarks
 
@@ -17,29 +17,25 @@ All numbers on this page were measured on a real-world gamemode: 932 files and 2
 | Completion (global scope) | 4.1 ms |
 | Diagnostics | 3.5 ms |
 
-## How it stays fast
+## How the numbers stay where they are
 
-- **Lazy indexing**: The initial scan is batched and non-blocking. The server indexes files in chunks so the editor UI stays responsive while the workspace loads.
-- **Syntax tree eviction**: Syntax trees for closed files are released from memory. Only open files and their dependencies are retained, which keeps the heap bounded even in large workspaces.
-- **Facts, not trees**: Everything cross-file — the workspace symbol index, net message pairing, the call graph behind [hot paths](/features/hot-paths) and call hierarchy — is extracted once while a tree is in hand and kept as plain data. Re-parsing a file with identical contents leaves those indexes alone, so a scan that reads the whole project does not rebuild them once per file.
-- **Resolution on demand**: Call edges are resolved when something asks for them rather than when the index is built. In a workspace where hundreds of files define the same path, indexing every edge up front would cost the square of that, and almost none of those edges are ever looked at.
+- **Batched indexing.** The initial scan runs in chunks and yields between them, so the editor is usable while the workspace is still loading rather than blocked until it finishes.
+- **Syntax trees are dropped once they have been read.** A closed file keeps only the facts extracted from it — globals it defines, hooks it adds, net messages it sends — and releases the tree along with every closure that captured it. On the same 232,000-line project the trees alone were 770 MB; keeping only the facts brings retained heap to 59.
+- **Everything cross-file is stored as data, not trees.** The symbol index, the net message pairing, the call graph behind [hot paths](/features/hot-paths) and call hierarchy — extracted once while a tree is in hand and left alone if the file's contents did not change. A scan of the whole project does not rebuild them one file at a time.
+- **Call edges are resolved when something asks for them.** In a workspace where hundreds of files define the same path, indexing every edge up front is quadratic in the number of definitions, and almost none of those edges are ever looked at.
 
 ## Running your own benchmark
 
-You can benchmark the server against your own addon. Run the following from the server source directory:
+Point the bench at any addon or gamemode on disk:
 
 ```bash
 pnpm run bench -- path/to/addon
 ```
 
-The output prints:
-
-- Total index time and memory usage
-- Per-feature latency (completion, diagnostics, hover)
-- All diagnostics grouped by rule
+You get the cold index time and retained heap, per-feature latency for completion, diagnostics and hover, and every diagnostic grouped by rule with an example of each. The last one is the useful one: a change that makes the output noisier shows up as a rule whose count jumped, with a line to look at.
 
 ## Known limits
 
-- **Shallow type inference**: Type inference is designed to answer "what follows a dot" quickly. It stays quiet in situations where deep inference would be expensive, so you may need explicit `---@type` or `---@param` annotations for complex generics or heavily metatable-driven code.
-- **Whole-file reanalysis**: When a file changes, the server re-analyses the entire file. At 31 ms for a 3,200-line file and with a 250 ms debounce, incremental reparsing is not currently worth the added complexity.
-- **Wiki as source of truth**: The dataset is built from the Garry's Mod wiki. If the wiki is missing an entry or lists incorrect signatures, the server will reflect that gap.
+- **Type inference is shallow on purpose.** It answers "what can follow this dot" and stays quiet where deeper inference would be expensive. Complex generics and heavily metatable-driven code need an explicit `---@type` or `---@param`.
+- **A file that changes is re-analysed whole.** At 31 ms for a 3,200-line file, behind a 250 ms debounce, incremental reparsing is not worth what it would cost in complexity.
+- **The wiki is the source of truth.** If an entry is missing or a signature is wrong on the wiki, it is missing or wrong here. Rebuild the dataset after a Garry's Mod update.

@@ -66,7 +66,7 @@ account involved is GitHub.
     The namespace must match the `publisher` field in the manifest.
 
     ```bash
-    npx ovsx create-namespace bluejutzu --pat <token>
+    npx ovsx create-namespace blight --pat <token>
     ```
   </Step>
 
@@ -81,7 +81,7 @@ To publish by hand:
 ```bash
 pnpm run build
 pnpm run package
-npx ovsx publish packages/glua-lsp/glua-lsp-0.1.0.vsix --pat <token>
+npx ovsx publish packages/glua-lsp/glua-gmod-0.1.0.vsix --pat <token>
 ```
 
 <Note>
@@ -128,12 +128,18 @@ npx ovsx publish packages/glua-lsp/glua-lsp-0.1.0.vsix --pat <token>
 
     ```json packages/glua-lsp/package.json
     {
-      "publisher": "bluejutzu"
+      "publisher": "blight"
     }
     ```
 
     Change it if you want a different ID, and make sure it matches the one you
     registered.
+
+    <Note>
+      The extension previously published under `bluejutzu`. That listing is
+      deprecated on both registries; `blight` is the current publisher on VS
+      Code Marketplace and Open VSX.
+    </Note>
   </Step>
 
   <Step title="Add the token to GitHub">
@@ -147,7 +153,7 @@ Tag a release and the workflow publishes automatically. To do it by hand:
 ```bash
 pnpm run build
 pnpm run package
-pnpm --filter glua-lsp exec vsce publish --no-dependencies --packagePath glua-lsp-0.1.0.vsix
+pnpm --filter glua-gmod exec vsce publish --no-dependencies --packagePath glua-gmod-0.1.0.vsix
 ```
 
 ## Before the first publish
@@ -169,7 +175,7 @@ around 920 KB, most of which is the bundled Garry's Mod API dataset. Check
 before publishing:
 
 ```bash
-pnpm --filter glua-lsp package:ls
+pnpm --filter glua-gmod package:ls
 ```
 
 ## Rotating a token

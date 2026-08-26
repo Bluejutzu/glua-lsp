@@ -1,7 +1,10 @@
 packages:
   - 'packages/*'
 
-# esbuild needs its postinstall to fetch the platform binary; pnpm 10 blocks
-# build scripts by default.
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  '@scarf/scarf': true
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true
+  puppeteer: true
+  sharp: true

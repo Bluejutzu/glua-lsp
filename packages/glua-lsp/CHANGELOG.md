@@ -28,12 +28,57 @@ commit; this file covers what actually changed for you.
   files before a commit lands. Neither hook needs Node or `glua-cli` installed
   beforehand — pre-commit installs it the first time the hook runs.
 
+## 0.5.4
+
+### Changed
+
+- Extension id is now `blight.glua-gmod`. Both `blight.glua` and
+  `blight.glua-lsp` came back unavailable on the Marketplace, so `glua-gmod`
+  is the one that's actually live.
+
+## 0.5.3
+
+### Changed
+
+- Extension id is now `blight.glua`, not `blight.glua-lsp` as 0.5.2 said. The
+  Marketplace ties extension names to the Azure DevOps organisation rather
+  than the publisher, and `glua-lsp` was already taken there — `glua` is the
+  name that actually published.
+
+## 0.5.2
+
+### Changed
+
+- Now published under the `blight` publisher on the VS Code Marketplace and
+  Open VSX. The old `bluejutzu.glua-lsp` listing is deprecated — install
+  `blight.glua-lsp` instead.
+
+## 0.5.1
+
+_Nothing yet._
+
+## 0.5.0
+
+### Added
+
 - **`unused-suppression`**, reporting a `-- glua-ignore` or `-- glua-disable`
   that never silenced anything. A suppression outlives the finding it was
   written for — the code gets fixed, the comment stays, and from then on it
   quietly covers whatever appears on that line next. Reported as a hint by
   default, and only for files that parse, since a parse error stops most rules
   from running and every directive in the file would read as dead.
+
+### Fixed
+
+- **A suppression naming something that is not a rule silenced every rule on the
+  line.** `-- glua-ignore` followed by `unusedLocal` — the settings key where the code
+  belonged — parsed as naming no rules at all, and a directive naming no rules
+  means "all of them". A mistake that looked specific was the broadest
+  suppression available. It now names a rule nothing reports, so it silences
+  nothing and `unused-suppression` points at it. The same bug hid the two rule
+  codes that have no hyphen in them, `deprecated` and `syntax`; both work now.
+
+  A bare `-- glua-ignore` followed by prose still means the whole line.
 
 - **A fact cache for the CLI.** Every run indexes the whole project, because
   cross-file rules are only correct once the index has seen everything — so
@@ -63,16 +108,6 @@ commit; this file covers what actually changed for you.
   large addon still indexes everything, and this is what says so.
 
 ### Fixed
-
-- **A suppression naming something that is not a rule silenced every rule on the
-  line.** `-- glua-ignore unusedLocal` — the settings key where the code
-  belonged — parsed as naming no rules at all, and a directive naming no rules
-  means "all of them". A mistake that looked specific was the broadest
-  suppression available. It now names a rule nothing reports, so it silences
-  nothing and `unused-suppression` points at it. The same bug hid the two rule
-  codes that have no hyphen in them, `deprecated` and `syntax`; both work now.
-
-  A bare `-- glua-ignore` followed by prose still means the whole line.
 
 - A run reporting nothing but hints printed "✓ no problems" directly under the
   hints it had just listed. The summary now counts suggestions alongside errors

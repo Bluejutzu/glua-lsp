@@ -92,7 +92,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     vscode.commands.registerCommand('glua.openSettings', () =>
-      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:bluejutzu.glua-lsp'),
+      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:blight.glua-gmod'),
     ),
 
     vscode.commands.registerCommand('glua.createFormatterConfig', () =>

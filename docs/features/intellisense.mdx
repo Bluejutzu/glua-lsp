@@ -5,11 +5,11 @@ icon: "wand-magic-sparkles"
 sidebarTitle: "Intellisense"
 ---
 
-Completion and hover follow the actual type of your variables, not just their names — through function calls, string literals, loops, and metatables — using the bundled Garry's Mod wiki dataset.
+Completion and hover follow the type of the value, not the name of the variable. Types propagate through function calls, string literals, loops and metatables, read from the bundled Garry's Mod wiki dataset.
 
 ## Type tracking
 
-The server understands how common GLua functions transform types and propagates that knowledge through your code.
+The server knows how the common GLua functions transform types, and carries that through the rest of the file.
 
 ### Player lookup
 
@@ -61,8 +61,7 @@ end
 
 ## Generated accessors
 
-Garry's Mod creates getters and setters at runtime that appear nowhere in your
-source, so nothing else knows they exist. Both forms are tracked:
+Garry's Mod creates getters and setters at runtime that appear nowhere in your source, so nothing else knows they exist. Both forms are tracked:
 
 ```lua
 function ENT:SetupDataTables()
@@ -79,15 +78,11 @@ function ENT:Think()
 end
 ```
 
-Declarations carry across the whole entity directory, so a `NetworkVar` in
-`shared.lua` completes in `init.lua` and `cl_init.lua` as well. Entities in other
-directories keep their accessors to themselves.
+Declarations carry across the whole entity directory, so a `NetworkVar` in `shared.lua` completes in `init.lua` and `cl_init.lua` as well. Entities in other directories keep their accessors to themselves.
 
 ## Your own entity and weapon classes
 
-Garry's Mod takes a scripted class name from where its files sit, so
-`lua/entities/my_turret/` defines the class `my_turret`. Spawning one gives you
-that class rather than a bare `Entity`:
+Garry's Mod takes a scripted class name from where its files sit, so `lua/entities/my_turret/` defines the class `my_turret`. Spawning one gives you that class rather than a bare `Entity`:
 
 ```lua
 local turret = ents.Create("my_turret")
@@ -97,19 +92,15 @@ turret:GetAmmo()   -- an accessor from its NetworkVar
 turret:SetModel()  -- and the whole Entity API underneath
 ```
 
-This works the same for weapons in `lua/weapons/` and for the calls that take a
-class name: `ents.FindByClass` (as an array), `ents.CreateClientside`,
-`weapons.Get`, and `Player:Give`.
+This works the same for weapons in `lua/weapons/` and for the calls that take a class name: `ents.FindByClass` (as an array), `ents.CreateClientside`, `weapons.Get`, and `Player:Give`.
 
-The class name itself completes inside the string, and go-to-definition on it
-opens the class, preferring `shared.lua` where there is one.
+The class name itself completes inside the string, and go-to-definition on it opens the class, preferring `shared.lua` where there is one.
 
-An engine class like `prop_physics` is left alone and stays a plain `Entity` —
-nothing in the workspace defines it, so there is nothing extra to offer.
+An engine class like `prop_physics` is left alone and stays a plain `Entity` — nothing in the workspace defines it, so there is nothing extra to offer.
 
 ## Typing your own functions
 
-You can add explicit types to your own functions with annotations, or let the server infer them from usage.
+Annotate them, or let inference read the type from the methods called on each parameter. Both work; you can mix them freely.
 
 <CodeGroup>
 
@@ -155,12 +146,12 @@ You can also use union types, optional parameters, and array syntax:
 
 ## How inference falls back
 
-When the server cannot determine an exact type, it uses the following strategy:
+When an exact type is not available, the server picks the least wrong thing rather than guessing:
 
-1. **Ambiguous sets** — If an object could be one of several types, the server finds the most specific common base class. For example, a value that is sometimes a `Player` and sometimes an `NPC` falls back to `Entity`.
-2. **Unrecognisable values** — If a type cannot be inferred at all, it falls back to `any`. You will still get generic Lua completions, but no Garry's Mod specific methods.
-3. **Explicit annotations always win** — If you add a `---@type` or `---@param` annotation, it overrides any inferred type.
+1. **Ambiguous sets.** A value that is sometimes a `Player` and sometimes an `NPC` narrows to their common ancestor, `Entity`. The completion list is the methods both actually have.
+2. **Nothing to work with.** A value the server cannot classify at all stays `any`. Generic Lua completions still work; no Garry's Mod methods are offered.
+3. **An explicit annotation always wins.** `---@type` and `---@param` override whatever inference decided.
 
 <Tip>
-  Add explicit annotations at module boundaries (shared files called from multiple realms, library functions used by other addons) to improve completion accuracy across your entire workspace.
+  Annotations pay for themselves most at module boundaries: shared files called from multiple realms, library functions used by other addons. Everywhere else, inference is usually enough.
 </Tip>

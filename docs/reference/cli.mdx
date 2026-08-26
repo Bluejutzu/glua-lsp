@@ -495,7 +495,7 @@ This repository publishes [pre-commit](https://pre-commit.com) hooks, so
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/Bluejutzu/glua-lsp
-    rev: v0.4.2 # a tag from this repo — see the Releases page for the latest
+    rev: v0.5.4 # a tag from this repo — see the Releases page for the latest
     hooks:
       - id: glua-lint
       - id: glua-fmt
@@ -509,7 +509,7 @@ too:
 
 ```yaml
       - id: glua-lint
-        additional_dependencies: ['glua-cli@0.4.2']
+        additional_dependencies: ['glua-cli@0.5.4']
 ```
 
 Both hooks still index the whole project even when only a few files are

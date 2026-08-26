@@ -5,7 +5,7 @@ icon: "terminal"
 sidebarTitle: "Commands"
 ---
 
-GLua adds several commands to the VS Code Command Palette. Use them to inspect your addon, regenerate config files, or force a re-scan after large file changes.
+Everything the extension does from the Command Palette. Reach for these to inspect a project, seed a config file, or force a re-scan when a bulk file change slipped past the watcher.
 
 | Command | Description |
 | --- | --- |
@@ -23,29 +23,18 @@ GLua adds several commands to the VS Code Command Palette. Use them to inspect y
 
 ## Code lens
 
-Counts appear above the things whose other half lives in another file — a
-`net.Receive` shows how many senders it has, a `net.Start` how many handlers, a
-custom `hook.Add` how many call sites, and a global function how many
-references. Clicking one opens the peek view.
+Counts appear above the things whose other half lives in another file — a `net.Receive` shows how many senders it has, a `net.Start` how many handlers, a custom `hook.Add` how many call sites, and a global function how many references. Clicking one opens the peek view.
 
 ## Call hierarchy
 
-Put the cursor on a function and open the call hierarchy — **Shift\+Alt\+H** in
-VS Code, or `Show Call Hierarchy` from the Command Palette — to see who calls it
-across the workspace, or switch the tree to outgoing calls to see what it
-reaches. Callbacks are named after what registers them, so a chain ending in a
-render hook says so, which is the same graph the
-[hot path rule](/features/hot-paths) walks.
+Put the cursor on a function and open the call hierarchy — **Shift\+Alt\+H** in VS Code, or `Show Call Hierarchy` from the Command Palette — to see who calls it across the workspace, or switch the tree to outgoing calls to see what it reaches. Callbacks are named after what registers them, so a chain ending in a render hook says so, which is the same graph the [hot path rule](/features/hot-paths) walks.
 
-Calls made through a value rather than a name — a function passed in as an
-argument, or stored in a table and looked up at runtime — are left out rather
-than guessed at.
+Calls made through a value rather than a name — a function passed in as an argument, or stored in a table and looked up at runtime — are left out rather than guessed at.
 
 ## Outside the editor
 
-Everything the linter and formatter do is also available from the
-[command line](/reference/cli), which is how you run them in CI.
+Everything the linter and formatter do is also available from the [command line](/reference/cli), which is how you run them in CI.
 
 <Tip>
-  Open any command quickly from the Command Palette with **Ctrl\+Shift\+P** (Windows/Linux) or **Cmd\+Shift\+P** (macOS), then type the command name.
+  Command Palette: **Ctrl\+Shift\+P** on Windows/Linux, **Cmd\+Shift\+P** on macOS. Type `GLua:` to filter to these.
 </Tip>

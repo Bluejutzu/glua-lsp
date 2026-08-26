@@ -5,7 +5,7 @@ description: "GLua is configurable through VS Code settings, committed config fi
 icon: "sliders"
 ---
 
-GLua gives you three ways to control behavior: VS Code editor settings for personal preferences, committed config files for team-wide rules, and inline suppressions for one-off exceptions. These layers stack so you can enforce standards across a project while still allowing individual overrides where they make sense.
+Configuration lives in three places: your editor settings for personal preferences, a committed config file for anything the whole team needs to agree on, and inline suppressions for a single line the rule got wrong. Higher layers win when the same option is set in more than one.
 
 <CardGroup cols={3}>
   <Card title="Committed config files" icon="file-code" href="/configuration/config-files">
@@ -23,7 +23,7 @@ GLua gives you three ways to control behavior: VS Code editor settings for perso
 
 ## Precedence order
 
-Settings are resolved from lowest to highest priority. A higher layer always wins when the same option is set in multiple places.
+Lowest to highest. The last one to set an option wins.
 
 1. Built-in defaults
 2. VS Code editor settings (`settings.json`)
@@ -32,17 +32,15 @@ Settings are resolved from lowest to highest priority. A higher layer always win
 5. `.glua.json` (linter)
 6. `.gluafmtrc.json` (formatter)
 
-[Inline suppressions](/configuration/suppressions) sit outside this chain. They
-do not change a rule's severity — they hide individual findings from a rule that
-is otherwise still running.
+[Inline suppressions](/configuration/suppressions) sit outside this chain. They do not change a rule's severity; they hide individual findings from a rule that is otherwise still running.
 
 <Note>
-  Generic tools like `.editorconfig` and `.prettierrc` are read so you do not repeat yourself. GLua-specific config files (`.glua.json` and `.gluafmtrc.json`) override them when there is a conflict.
+  `.editorconfig` and `.prettierrc` are read so a project that already has them does not repeat itself. Where they disagree with `.glua.json` or `.gluafmtrc.json`, the GLua-specific file wins.
 </Note>
 
 ## The `glua.activation` setting
 
-Use `glua.activation` to decide when the language server starts. The default is auto-detect, which activates only when GLua files are present in the workspace.
+`glua.activation` decides when the language server attaches to `.lua` files. The default is to attach only in workspaces that look like Garry's Mod.
 
 | Value | Behavior |
 | --- | --- |
@@ -50,4 +48,4 @@ Use `glua.activation` to decide when the language server starts. The default is 
 | `always` | Takes over every `.lua` file |
 | `never` | Never takes over `.lua` files; only `.glua` files are handled |
 
-When the server is active, the VS Code status bar shows the current realm: `GLua · Server`, `GLua · Client`, `GLua · Shared`, or `Plain Lua`. You can toggle activation manually through the command palette if the auto-detection guess is wrong.
+The status bar shows the current realm — `GLua · Server`, `GLua · Client`, `GLua · Shared`, or `Plain Lua` — while the server is attached. Click it, or use the Command Palette, to override when the auto-detection guessed wrong.

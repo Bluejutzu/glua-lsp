@@ -71,7 +71,7 @@ jobs:
           # Name it explicitly rather than globbing: a stray .vsix in the tree
           # would otherwise be picked up and published in place of the build.
           version=$(node -p "require('./packages/glua-lsp/package.json').version")
-          vsix="packages/glua-lsp/glua-lsp-${version}.vsix"
+          vsix="packages/glua-lsp/glua-gmod-${version}.vsix"
           if [ ! -f "$vsix" ]; then
             echo "::error::Expected $vsix, but packaging did not produce it."
             ls -la packages/glua-lsp/*.vsix || true
@@ -128,13 +128,13 @@ jobs:
             echo
             echo "| Editor | Command |"
             echo "| --- | --- |"
-            echo "| VS Code | \`code --install-extension bluejutzu.glua-lsp\` |"
-            echo "| Cursor | \`cursor --install-extension bluejutzu.glua-lsp\` |"
-            echo "| VSCodium | \`codium --install-extension bluejutzu.glua-lsp\` |"
-            echo "| Windsurf | \`windsurf --install-extension bluejutzu.glua-lsp\` |"
+            echo "| VS Code | \`code --install-extension blight.glua-gmod\` |"
+            echo "| Cursor | \`cursor --install-extension blight.glua-gmod\` |"
+            echo "| VSCodium | \`codium --install-extension blight.glua-gmod\` |"
+            echo "| Windsurf | \`windsurf --install-extension blight.glua-gmod\` |"
             echo
             echo "Cursor, VSCodium and Windsurf resolve that from"
-            echo "[Open VSX](https://open-vsx.org/extension/bluejutzu/glua-lsp);"
+            echo "[Open VSX](https://open-vsx.org/extension/blight/glua-gmod);"
             echo "VS Code resolves it from the Marketplace."
             echo
             echo "Or install the \`${VSIX}\` attached below, which works in any of them:"
@@ -188,7 +188,7 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          pnpm --filter glua-lsp exec vsce publish \
+          pnpm --filter glua-gmod exec vsce publish \
             --no-dependencies \
             --packagePath "../../${{ steps.artifact.outputs.path }}"
           echo "published=true" >> "$GITHUB_OUTPUT"
