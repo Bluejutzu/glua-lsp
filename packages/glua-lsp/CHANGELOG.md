@@ -6,7 +6,11 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Changed
+
+- Extension id is now `blight.glua-gmod`. Both `blight.glua` and
+  `blight.glua-lsp` came back unavailable on the Marketplace, so `glua-gmod`
+  is the one that's actually live.
 
 ## 0.5.3
 

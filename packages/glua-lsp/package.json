@@ -1,5 +1,5 @@
 {
-  "name": "glua",
+  "name": "glua-gmod",
   "displayName": "GLua for Garry's Mod",
   "description": "Language server for Garry's Mod Lua — AST-based IntelliSense, realm awareness, hook and net message analysis, cross-file diagnostics.",
   "version": "0.5.3",
@@ -507,7 +507,7 @@
     ],
     "configurationDefaults": {
       "[glua]": {
-        "editor.defaultFormatter": "blight.glua"
+        "editor.defaultFormatter": "blight.glua-gmod"
       }
     },
     "semanticTokenScopes": [

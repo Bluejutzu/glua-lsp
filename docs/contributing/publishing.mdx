@@ -81,7 +81,7 @@ To publish by hand:
 ```bash
 pnpm run build
 pnpm run package
-npx ovsx publish packages/glua-lsp/glua-0.1.0.vsix --pat <token>
+npx ovsx publish packages/glua-lsp/glua-gmod-0.1.0.vsix --pat <token>
 ```
 
 <Note>
@@ -153,7 +153,7 @@ Tag a release and the workflow publishes automatically. To do it by hand:
 ```bash
 pnpm run build
 pnpm run package
-pnpm --filter glua exec vsce publish --no-dependencies --packagePath glua-0.1.0.vsix
+pnpm --filter glua-gmod exec vsce publish --no-dependencies --packagePath glua-gmod-0.1.0.vsix
 ```
 
 ## Before the first publish
@@ -175,7 +175,7 @@ around 920 KB, most of which is the bundled Garry's Mod API dataset. Check
 before publishing:
 
 ```bash
-pnpm --filter glua package:ls
+pnpm --filter glua-gmod package:ls
 ```
 
 ## Rotating a token

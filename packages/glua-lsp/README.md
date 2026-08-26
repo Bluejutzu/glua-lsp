@@ -57,7 +57,7 @@ To use the formatter:
 
 ```json
 "[glua]": {
-  "editor.defaultFormatter": "blight.glua",
+  "editor.defaultFormatter": "blight.glua-gmod",
   "editor.formatOnSave": true
 }
 ```
