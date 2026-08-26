@@ -60,13 +60,20 @@
         "tab": "Reference",
         "groups": [
           {
-            "group": "Reference",
+            "group": "Language",
+            "pages": ["reference/rules", "reference/annotations"]
+          },
+          {
+            "group": "Config Schemas",
             "pages": [
-              "reference/rules",
               "reference/glua-schema",
               "reference/gluafmtrc-schema",
-              "reference/baseline-schema",
-              "reference/annotations",
+              "reference/baseline-schema"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
               "reference/commands",
               "reference/cli",
               "reference/editors",
