@@ -6,6 +6,10 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
+_Nothing yet._
+
+## 0.5.6
+
 ### Added
 
 - **A schema reference page** for `.glua.json`, `.gluafmtrc.json` and

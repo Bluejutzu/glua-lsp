@@ -8,7 +8,24 @@ sidebarTitle: "Changelog"
 Each GitHub release lists every commit. This page covers what actually
 changed for you — see the [full history on GitHub](https://github.com/Bluejutzu/glua-lsp/releases).
 
-<Update label="0.5.5 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.5.5">View release on GitHub ↗</a>}>
+<Update label="0.5.6 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.5.6">View release on GitHub ↗</a>}>
+**Added**
+
+- **A schema reference page** for `.glua.json`, `.gluafmtrc.json` and
+  `.glua-baseline.json`, with the schemas hosted at `glua.bluejutzu.dev/schemas`
+  so editors get autocomplete and validation for them.
+
+**Fixed**
+
+- **`.glua.json`'s `workspace.exclude` now works for `glua lint`/`glua fmt`,
+  not just the editor.** Same glob syntax as override `files` patterns (`**`,
+  `*`, `?`, `{a,b}`).
+- **`.glua.json` settings for completion, hover, inlay hints and
+  `workspace.maxFiles`/`exclude` now actually apply in the editor**, instead of
+  only taking effect when the same value was also set in VS Code.
+</Update>
+
+<Update label="0.5.5" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/v0.5.5">View release on GitHub ↗</a>}>
 **Added**
 
 - **`glua explain <code>`**, printing what one rule catches, its settings key,
