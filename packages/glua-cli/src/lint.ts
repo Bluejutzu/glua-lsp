@@ -37,6 +37,14 @@ export interface LintOptions {
   timing?: boolean;
   /** Read and write the fact cache. On unless asked otherwise. */
   cache?: boolean;
+  /**
+   * Lint text read from stdin as though it lived at this path.
+   *
+   * The path is what decides the file's realm and what the cross-file rules
+   * match it against, so an editor can check a buffer that has not been saved —
+   * or has been saved with different contents — and get the same answers.
+   */
+  stdin?: { path: string; text: string };
 }
 
 interface Finding {
@@ -109,11 +117,20 @@ export function lint(targets: string[], options: LintOptions): LintResult {
   const progress = createProgress(options.progress ?? false);
   const started = Date.now();
 
-  const { api, workspace, config, files, root, cache } = loadProject(targets, {
+  // A file given over stdin need not exist on disk, so it cannot come from a
+  // directory walk. The project around it still gets indexed.
+  const stdin = options.stdin
+    ? { file: path.resolve(options.stdin.path), text: options.stdin.text }
+    : null;
+
+  const { api, workspace, config, files: walked, root, cache } = loadProject(stdin ? [] : targets, {
     root: options.root,
     ...(options.cache === false ? { cache: false } : {}),
     onIndex: (done, total, file) => progress.update(done, total, `indexing ${path.basename(file)}`),
   });
+
+  if (stdin) workspace.analyse(uriOf(stdin.file), stdin.text, 1, false);
+  const files = stdin ? [stdin.file] : walked;
 
   const indexed = Date.now();
   const perFile: { file: string; ms: number }[] = [];
@@ -202,6 +219,7 @@ export function lint(targets: string[], options: LintOptions): LintResult {
         suppressed,
         stale,
         frames: options.codeFrames ?? true,
+        ...(stdin ? { stdin } : {}),
       }),
     compact: () => renderCompact(visible, root),
     github: () => renderGithub(visible, root),
@@ -302,6 +320,8 @@ interface Pretty {
   suppressed: number;
   stale: number;
   frames: boolean;
+  /** Content for a file whose text did not come from disk. */
+  stdin?: { file: string; text: string };
 }
 
 function renderPretty({
@@ -313,9 +333,13 @@ function renderPretty({
   suppressed,
   stale,
   frames,
+  stdin,
 }: Pretty): string {
   const lines: string[] = [];
   const sources = new SourceCache();
+  // Otherwise the frame quotes whatever is saved on disk, which is precisely
+  // what the caller was telling us not to read.
+  if (stdin) sources.seed(stdin.file, stdin.text);
 
   const byFile = new Map<string, Finding[]>();
   for (const finding of findings) {

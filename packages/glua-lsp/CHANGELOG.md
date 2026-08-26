@@ -6,7 +6,22 @@ commit; this file covers what actually changed for you.
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+
+- **`glua explain <code>`**, printing what one rule catches, its settings key,
+  how to suppress it, and a link to the full write-up — without leaving the
+  terminal. Given a settings key instead of a code, it says which code (or
+  codes — a key like `netMessage` covers four) you likely meant rather than
+  reporting nothing matched, since that mix-up is exactly what
+  `unused-suppression` exists to catch.
+
+- **`--stdin-filepath`**, so `glua lint` can check text piped in on stdin as
+  though it lived at a given path — an unsaved editor buffer, or one whose
+  contents differ from what is on disk. The path decides the file's realm and
+  what the cross-file rules match it against; the file need not exist. Code
+  frames quote the piped text, not whatever the path holds on disk. Cannot be
+  combined with `--fix`, `--suppress-all` or `--prune-suppressions`, all of
+  which write back to a real file.
 
 ## 0.5.4
 
