@@ -7,7 +7,7 @@ sidebarTitle: "CLI"
 
 The `glua` command runs the same parser, analyser and formatter as the extension,
 so a finding in CI is the same finding you saw in the editor. Use it to gate pull
-requests, run a pre-commit hook, or format a whole addon in one go.
+requests or format a whole addon in one go.
 
 ## Installing
 
@@ -486,35 +486,6 @@ jobs:
 <Note>
   Paths in the file are relative to `--root`, or to the directory you ran from. Run it from the repository root, or pass `--root`, so the uploaded locations line up with the files on the diff. `continue-on-error` is there so findings still upload when the lint exits non-zero.
 </Note>
-
-## Pre-commit hook
-
-This repository publishes [pre-commit](https://pre-commit.com) hooks, so
-`glua lint` and `glua fmt` can run on staged files before a commit lands:
-
-```yaml title=".pre-commit-config.yaml"
-repos:
-  - repo: https://github.com/Bluejutzu/glua-lsp
-    rev: v0.5.4 # a tag from this repo — see the Releases page for the latest
-    hooks:
-      - id: glua-lint
-      - id: glua-fmt
-```
-
-Neither hook needs Node or `glua-cli` installed beforehand — pre-commit
-installs `glua-cli` itself the first time the hook runs, in its own isolated
-environment. `rev` pins which version of the *hook definition* you get, not
-which version of `glua-cli` gets installed; add this under a hook to pin that
-too:
-
-```yaml
-      - id: glua-lint
-        additional_dependencies: ['glua-cli@0.5.4']
-```
-
-Both hooks still index the whole project even when only a few files are
-staged — cross-file rules need the whole picture — which is exactly the case
-the [fact cache](#caching) exists to make cheap.
 
 ## Colour
 

@@ -23,12 +23,6 @@ commit; this file covers what actually changed for you.
   combined with `--fix`, `--suppress-all` or `--prune-suppressions`, all of
   which write back to a real file.
 
-- **A published pre-commit hook.** `glua-lint` and `glua-fmt` in
-  `.pre-commit-hooks.yaml`, so a project can point
-  [pre-commit](https://pre-commit.com) at this repo and run both on staged
-  files before a commit lands. Neither hook needs Node or `glua-cli` installed
-  beforehand — pre-commit installs it the first time the hook runs.
-
 ## 0.5.4
 
 ### Changed
