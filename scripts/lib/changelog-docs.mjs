@@ -28,6 +28,11 @@ export function renderChangelogDocs(
     resolveTag = (version) => `v${version}`,
     title = 'Changelog',
     description = 'Notable changes, release by release.',
+    // { path, label } for a pointer to a sibling package's own changelog
+    // page, e.g. glua-gmod's page pointing at glua-cli's and vice versa —
+    // the two version independently, so a reader on one page has no other
+    // way to know the other even exists.
+    crossLink,
   },
 ) {
   const versions = parseSections(markdown).filter((section) => VERSION_HEADING.test(section.title));
@@ -38,6 +43,10 @@ export function renderChangelogDocs(
     return `<Update label="${label}" description={<a href="${repoUrl}/releases/tag/${resolveTag(section.title)}">View release on GitHub ↗</a>}>\n${body}\n</Update>`;
   });
 
+  const crossLinkLine = crossLink
+    ? `\n\n${title} and [${crossLink.label}](${crossLink.path}) version and release independently — this page only covers ${title}.`
+    : '';
+
   return `---
 title: "${title}"
 description: "${description}"
@@ -46,7 +55,7 @@ sidebarTitle: "${title}"
 ---
 
 Each GitHub release lists every commit. This page covers what actually
-changed for you — see the [full history on GitHub](${repoUrl}/releases).
+changed for you — see the [full history on GitHub](${repoUrl}/releases).${crossLinkLine}
 
 ${updates.join('\n\n')}
 `;

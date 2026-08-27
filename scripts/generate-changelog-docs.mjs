@@ -26,16 +26,18 @@ const PAGES = [
     changelog: path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md'),
     out: path.join(ROOT, 'docs', 'changelog.mdx'),
     newTagPrefix: 'glua-gmod@',
-    title: 'Changelog',
-    description: "Notable changes to GLua for Garry's Mod, release by release.",
+    title: 'glua-gmod',
+    description: "Notable changes to the GLua for Garry's Mod extension, release by release.",
+    crossLink: { path: '/cli-changelog', label: 'glua-cli' },
   },
   {
     manifest: path.join(ROOT, 'packages', 'glua-cli', 'package.json'),
     changelog: path.join(ROOT, 'packages', 'glua-cli', 'CHANGELOG.md'),
     out: path.join(ROOT, 'docs', 'cli-changelog.mdx'),
     newTagPrefix: 'glua-cli@',
-    title: 'CLI Changelog',
-    description: 'Notable changes to glua-cli, release by release.',
+    title: 'glua-cli',
+    description: 'Notable changes to the glua-cli command-line tool, release by release.',
+    crossLink: { path: '/changelog', label: 'glua-gmod' },
   },
 ];
 
@@ -47,12 +49,18 @@ function resolveTagFor(newPrefix) {
   return (version) => (tagExists(`v${version}`) ? `v${version}` : `${newPrefix}${version}`);
 }
 
-for (const { manifest, changelog, out, newTagPrefix, title, description } of PAGES) {
+for (const { manifest, changelog, out, newTagPrefix, title, description, crossLink } of PAGES) {
   const repoUrl = JSON.parse(fs.readFileSync(manifest, 'utf8')).repository.url.replace(/\.git$/, '');
   const markdown = fs.readFileSync(changelog, 'utf8');
   fs.writeFileSync(
     out,
-    renderChangelogDocs(markdown, { repoUrl, resolveTag: resolveTagFor(newTagPrefix), title, description }),
+    renderChangelogDocs(markdown, {
+      repoUrl,
+      resolveTag: resolveTagFor(newTagPrefix),
+      title,
+      description,
+      crossLink,
+    }),
   );
   console.log(`wrote ${path.relative(ROOT, out)}`);
 }

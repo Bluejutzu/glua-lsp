@@ -6,14 +6,6 @@
 
 - e38b80a: The extension and CLI now release independently — a change to one no longer bumps the other's version or changelog.
 
-Notable changes to the GLua for Garry's Mod extension. Release notes on each
-[GitHub release](https://github.com/Bluejutzu/glua-lsp/releases) list every
-commit; this file covers what actually changed for you.
-
-## Unreleased
-
-_Nothing yet._
-
 ## 0.5.6
 
 ### Added

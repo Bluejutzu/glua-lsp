@@ -28,10 +28,16 @@ const PACKAGES = {
   'glua-gmod': {
     dir: path.join(ROOT, 'packages', 'glua-lsp'),
     changelogDocsOut: path.join(ROOT, 'docs', 'changelog.mdx'),
+    title: 'glua-gmod',
+    description: "Notable changes to the GLua for Garry's Mod extension, release by release.",
+    crossLink: { path: '/cli-changelog', label: 'glua-cli' },
   },
   'glua-cli': {
     dir: path.join(ROOT, 'packages', 'glua-cli'),
     changelogDocsOut: path.join(ROOT, 'docs', 'cli-changelog.mdx'),
+    title: 'glua-cli',
+    description: 'Notable changes to the glua-cli command-line tool, release by release.',
+    crossLink: { path: '/changelog', label: 'glua-gmod' },
   },
 };
 
@@ -133,7 +139,7 @@ function resolveTagFor(newPrefix) {
 }
 
 for (const name of bumped) {
-  const { dir, changelogDocsOut } = PACKAGES[name];
+  const { dir, changelogDocsOut, title, description, crossLink } = PACKAGES[name];
   const changelogPath = path.join(dir, 'CHANGELOG.md');
   if (!fs.existsSync(changelogPath)) continue;
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
@@ -141,7 +147,7 @@ for (const name of bumped) {
   const markdown = fs.readFileSync(changelogPath, 'utf8');
   fs.writeFileSync(
     changelogDocsOut,
-    renderChangelogDocs(markdown, { repoUrl, resolveTag: resolveTagFor(`${name}@`) }),
+    renderChangelogDocs(markdown, { repoUrl, resolveTag: resolveTagFor(`${name}@`), title, description, crossLink }),
   );
   staged.push(path.relative(ROOT, changelogDocsOut));
 }
