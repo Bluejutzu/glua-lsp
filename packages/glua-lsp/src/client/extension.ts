@@ -17,6 +17,8 @@ const OVERRIDE_KEY = 'glua.fileOverrides';
 let overrides: Record<string, boolean> = {};
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  maybeNotifyToolingChange(context);
+
   overrides = context.workspaceState.get<Record<string, boolean>>(OVERRIDE_KEY, {});
 
   const serverModule = context.asAbsolutePath(path.join('dist', 'server.js'));
@@ -191,6 +193,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export async function deactivate(): Promise<void> {
   await client?.stop();
   client = undefined;
+}
+
+/* --------------------------------------------------------- tooling notice */
+
+/**
+ * The extension and CLI stopped sharing one version/changelog as of this
+ * release. Below this version, the release process itself is what you'd
+ * expect from before; upgrading past it is the one time that's worth saying
+ * out loud, since it changes what a version number and a changelog entry
+ * actually mean going forward.
+ */
+const TOOLING_SPLIT_VERSION = '0.6.0';
+const LAST_VERSION_KEY = 'glua.lastActivatedVersion';
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
+ * Only fires for someone upgrading from a version older than the split — a
+ * fresh install has nothing to compare against, and anyone already past it
+ * has already seen this once.
+ */
+function maybeNotifyToolingChange(context: vscode.ExtensionContext): void {
+  const currentVersion = String(context.extension.packageJSON.version);
+  const lastVersion = context.globalState.get<string>(LAST_VERSION_KEY);
+  void context.globalState.update(LAST_VERSION_KEY, currentVersion);
+
+  if (!lastVersion) return;
+  if (compareVersions(lastVersion, TOOLING_SPLIT_VERSION) >= 0) return;
+  if (compareVersions(currentVersion, TOOLING_SPLIT_VERSION) < 0) return;
+
+  void vscode.window
+    .showInformationMessage(
+      'GLua: the extension and CLI now release independently, each with its own changelog.',
+      'View changelog',
+    )
+    .then((choice) => {
+      if (choice === 'View changelog') {
+        void vscode.env.openExternal(vscode.Uri.parse('https://glua.bluejutzu.dev/changelog'));
+      }
+    });
 }
 
 /* ----------------------------------------------------------- config files */
