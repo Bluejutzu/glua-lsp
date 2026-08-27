@@ -1,11 +1,21 @@
 ---
-title: "CLI Changelog"
-description: "Notable changes to glua-cli, release by release."
+title: "Changelog"
+description: "Notable changes, release by release."
 icon: "clock"
-sidebarTitle: "CLI Changelog"
+sidebarTitle: "Changelog"
 ---
 
 Each GitHub release lists every commit. This page covers what actually
 changed for you — see the [full history on GitHub](https://github.com/Bluejutzu/glua-lsp/releases).
 
+<Update label="0.6.0 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/glua-cli@0.6.0">View release on GitHub ↗</a>}>
+**Minor Changes**
 
+- e38b80a: The extension and CLI now release independently — a change to one no longer bumps the other's version or changelog.
+
+Notable changes to `glua-cli`, the command-line linter and formatter. A
+change to the shared engine (`glua-core`) is noted here only once this
+package bumps its own dependency on it — see
+[glua-gmod's changelog](../glua-lsp/CHANGELOG.md) for the editor-extension
+side of the same engine.
+</Update>
