@@ -10,7 +10,7 @@ const copyApiData = {
   name: 'copy-api-data',
   setup(build) {
     build.onEnd(async () => {
-      const from = path.resolve('src/api/data/gmod-api.json');
+      const from = path.resolve('../glua-core/src/api/data/gmod-api.json');
       const to = path.resolve('dist/gmod-api.json');
       try {
         await fs.mkdir('dist', { recursive: true });
@@ -47,7 +47,7 @@ const contexts = await Promise.all([
   }),
   esbuild.context({
     ...shared,
-    entryPoints: ['src/server/main.ts'],
+    entryPoints: ['../glua-core/src/server/main.ts'],
     outfile: 'dist/server.js',
     external: ['vscode'],
   }),

@@ -1,9 +1,9 @@
 // Terminal colours, sharing the project's palette with the editor tooling.
 //
-// The hex values come from palette.json in the extension package, so the CLI,
-// the test reporter and the benchmark cannot drift apart.
+// The hex values come from palette.json in glua-core, so the CLI, the test
+// reporter and the benchmark cannot drift apart.
 
-import PALETTE from '../../glua-lsp/tools/palette.json';
+import PALETTE from 'glua-core/tools/palette.json';
 
 export { PALETTE };
 

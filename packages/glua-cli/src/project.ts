@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { URI } from 'vscode-uri';
 
-import { GmodApi } from '@glua/api/index.js';
-import { Workspace } from '@glua/analyze/workspace.js';
-import { ConfigResolver, matchesGlob } from '@glua/config/index.js';
-import { DEFAULT_SETTINGS } from '@glua/server/settings.js';
+import { GmodApi } from 'glua-core/api/index.js';
+import { Workspace } from 'glua-core/analyze/workspace.js';
+import { ConfigResolver, matchesGlob } from 'glua-core/config/index.js';
+import { DEFAULT_SETTINGS } from 'glua-core/server/settings.js';
 import { FactCache, hashOf } from './cache.js';
 
 const SKIP_DIRECTORIES = new Set([

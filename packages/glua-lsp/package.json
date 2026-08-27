@@ -529,20 +529,13 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "compile": "tsc",
-    "test": "pnpm run compile && node --test --test-reporter=./test/reporter.mjs test/*.test.mjs",
-    "test:plain": "pnpm run compile && node --test test/*.test.mjs",
-    "bench": "pnpm run compile && node --expose-gc test/bench-real.mjs",
-    "generate-api": "node tools/generate-api.mjs",
+    "test": "node --test test/*.test.mjs",
     "package": "vsce package --no-dependencies",
     "package:ls": "vsce ls --no-dependencies",
     "vscode:prepublish": "node esbuild.mjs --production"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1",
-    "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.11",
-    "vscode-uri": "^3.0.8"
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -550,6 +543,7 @@
     "@vscode/vsce": "^3.2.2",
     "ajv": "^8.20.0",
     "esbuild": "^0.25.0",
+    "glua-core": "workspace:*",
     "typescript": "^7.0.2"
   }
 }

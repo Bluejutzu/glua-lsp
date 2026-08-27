@@ -1,25 +1,39 @@
 #!/usr/bin/env node
-// Cuts a release: bumps the manifest, commits, tags, and tells you to push.
+// Cuts a release: applies pending changesets, regenerates the docs
+// changelogs, commits, and tags each publishable package that actually
+// changed version.
 //
-// The release workflow refuses to build when the tag and the manifest version
-// disagree, so doing this by hand is easy to get wrong in a way you only find
-// out about after pushing a tag.
+// Versioning and per-package changelogs come from Changesets — this script
+// turns that into a commit plus the tags the release workflow acts on.
+// `glua-core` is private and never tagged/published; it can still bump
+// alongside the others (or on its own) without triggering a release.
 //
-//   pnpm run release 0.2.0
-//   pnpm run release patch|minor|major
-//   pnpm run release 0.2.0 --dry-run
+//   pnpm changeset             # author a changeset for your change
+//   pnpm run release           # apply pending changesets, commit, tag
+//   pnpm run release --dry-run
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bold, c, heading, symbols } from '../packages/glua-lsp/tools/palette.mjs';
+import { bold, c, heading, symbols } from '../packages/glua-core/tools/palette.mjs';
 import { renderChangelogDocs } from './lib/changelog-docs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MANIFEST = path.join(ROOT, 'packages', 'glua-lsp', 'package.json');
-const CHANGELOG = path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md');
-const CHANGELOG_DOCS = path.join(ROOT, 'docs', 'changelog.mdx');
+
+// The publishable packages this script tags and releases. glua-core is
+// deliberately not here — it never gets its own tag (see
+// .changeset/config.json's privatePackages.tag: false).
+const PACKAGES = {
+  'glua-gmod': {
+    dir: path.join(ROOT, 'packages', 'glua-lsp'),
+    changelogDocsOut: path.join(ROOT, 'docs', 'changelog.mdx'),
+  },
+  'glua-cli': {
+    dir: path.join(ROOT, 'packages', 'glua-cli'),
+    changelogDocsOut: path.join(ROOT, 'docs', 'cli-changelog.mdx'),
+  },
+};
 
 /**
  * Generated configs point `$schema` at glua.bluejutzu.dev, which Mintlify
@@ -29,21 +43,8 @@ const CHANGELOG_DOCS = path.join(ROOT, 'docs', 'changelog.mdx');
 const SCHEMAS_SRC = path.join(ROOT, 'packages', 'glua-lsp', 'schemas');
 const SCHEMAS_DOCS = path.join(ROOT, 'docs', 'schemas');
 
-/**
- * The CLI bundles the analyser straight from the extension's source, so any
- * change to one is a change to the other. Versioning them apart would ship a
- * `glua-cli` whose number says nothing about what is inside it.
- */
-const CLI_MANIFEST = path.join(ROOT, 'packages', 'glua-cli', 'package.json');
-
-/** The heading a new release's notes accumulate under between releases. */
-const UNRELEASED = '## Unreleased';
-const PLACEHOLDER = '_Nothing yet._';
-
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
-const skipChangelog = args.includes('--no-changelog');
-const requested = args.find((a) => !a.startsWith('-'));
 
 const die = (message) => {
   console.error(`${c.failure(symbols.fail)} ${message}`);
@@ -51,88 +52,17 @@ const die = (message) => {
 };
 
 const git = (...cmd) => execFileSync('git', cmd, { cwd: ROOT, encoding: 'utf8' }).trim();
+const tagExists = (tag) => git('tag', '--list', tag) !== '';
 
-if (!requested) {
-  die('Usage: pnpm run release <version|patch|minor|major> [--dry-run] [--no-changelog]');
+function readVersion(dir) {
+  return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version;
 }
 
-/**
- * Moves the accumulated notes under `## Unreleased` to the new version and
- * opens a fresh Unreleased section.
- *
- * Doing this by hand is the step that gets forgotten, which is how a shipped
- * release ends up still described as unreleased.
- */
-function rollChangelog(version) {
-  if (!fs.existsSync(CHANGELOG)) {
-    return { status: 'missing', message: 'no CHANGELOG.md' };
-  }
-
-  const original = fs.readFileSync(CHANGELOG, 'utf8');
-  // Only horizontal whitespace: `\s*$` would eat the blank line after the
-  // heading and leave the new version's title glued to its first entry.
-  const heading = new RegExp(`^${UNRELEASED}[ \\t]*$`, 'm');
-  const match = heading.exec(original);
-
-  if (!match) {
-    return {
-      status: 'skipped',
-      message: `no "${UNRELEASED}" heading — add one and the next release will pick it up`,
-    };
-  }
-
-  // Everything between this heading and the next one is the release's notes.
-  const bodyStart = match.index + match[0].length;
-  const nextHeading = original.slice(bodyStart).search(/^## /m);
-  const body = (nextHeading === -1 ? original.slice(bodyStart) : original.slice(bodyStart, bodyStart + nextHeading)).trim();
-
-  const empty = body === '' || body === PLACEHOLDER;
-
-  const updated =
-    original.slice(0, match.index) +
-    `${UNRELEASED}\n\n${PLACEHOLDER}\n\n## ${version}` +
-    original.slice(match.index + match[0].length);
-
-  const entries = body.split('\n').filter((line) => line.trim().startsWith('-')).length;
-
-  return {
-    status: empty ? 'empty' : 'rolled',
-    contents: updated,
-    message: empty
-      ? `"${UNRELEASED}" had no entries, so ${version} will have none either`
-      : `moved ${entries} ${entries === 1 ? 'entry' : 'entries'} under ${version}`,
-  };
-}
-
-/* ------------------------------------------------------------ next version */
-
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const cliManifest = JSON.parse(fs.readFileSync(CLI_MANIFEST, 'utf8'));
-const current = manifest.version;
-
-function bump(version, kind) {
-  const [major, minor, patch] = version.split('.').map(Number);
-  if (kind === 'major') return `${major + 1}.0.0`;
-  if (kind === 'minor') return `${major}.${minor + 1}.0`;
-  return `${major}.${minor}.${patch + 1}`;
-}
-
-const next = ['patch', 'minor', 'major'].includes(requested)
-  ? bump(current, requested)
-  : requested;
-
-if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(next)) {
-  die(`'${next}' is not a valid semver version.`);
-}
-if (next === current) die(`Already at ${current}.`);
-
-/* ------------------------------------------------------------ safety check */
+/* ------------------------------------------------------------- safety check */
 
 const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
 const dirty = git('status', '--porcelain');
-const tag = `v${next}`;
 
-if (git('tag', '--list', tag)) die(`Tag ${tag} already exists.`);
 if (dirty && !dryRun) {
   die(`Working tree is not clean:\n${dirty}\n\nCommit or stash first.`);
 }
@@ -140,42 +70,53 @@ if (branch !== 'main') {
   console.warn(`${c.warning('!')} On branch ${bold(branch)}, not main.`);
 }
 
-const changelog = skipChangelog
-  ? { status: 'off', message: 'skipped with --no-changelog' }
-  : rollChangelog(next);
-
-const changelogColour = {
-  rolled: c.success,
-  empty: c.warning,
-  skipped: c.warning,
-  missing: c.warning,
-  off: c.faint,
-}[changelog.status];
-
 console.log(heading('Release'));
-console.log(`  ${c.muted('version')}    ${c.text(current)} ${c.faint('→')} ${c.highlight(bold(next))}`);
-console.log(`  ${c.muted('tag')}        ${c.highlight(tag)}`);
-console.log(`  ${c.muted('branch')}     ${c.text(branch)}`);
-console.log(`  ${c.muted('changelog')}  ${changelogColour(changelog.message)}`);
-console.log(
-  `  ${c.muted('glua-cli')}   ${c.text(cliManifest.version)} ${c.faint('→')} ${c.text(next)}` +
-    `${cliManifest.version === current ? '' : c.faint('  (was out of step)')}`,
-);
+console.log(`  ${c.muted('branch')}  ${c.text(branch)}`);
 
 if (dryRun) {
+  try {
+    execFileSync('pnpm', ['exec', 'changeset', 'status', '--verbose'], { cwd: ROOT, stdio: 'inherit', shell: true });
+  } catch {
+    // `changeset status` exits non-zero when there are unreleased changes to
+    // report, which is exactly what a dry run wants to show — not a failure.
+  }
   console.log(`\n  ${c.warning('dry run')} ${c.faint('— nothing written')}\n`);
   process.exit(0);
 }
 
 /* ----------------------------------------------------------------- perform */
 
-manifest.version = next;
-fs.writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
+const before = Object.fromEntries(
+  Object.entries(PACKAGES).map(([name, { dir }]) => [name, readVersion(dir)]),
+);
 
-cliManifest.version = next;
-fs.writeFileSync(CLI_MANIFEST, `${JSON.stringify(cliManifest, null, 2)}\n`);
+execFileSync('pnpm', ['exec', 'changeset', 'version'], { cwd: ROOT, stdio: 'inherit', shell: true });
 
-const staged = [path.relative(ROOT, MANIFEST), path.relative(ROOT, CLI_MANIFEST)];
+const after = Object.fromEntries(
+  Object.entries(PACKAGES).map(([name, { dir }]) => [name, readVersion(dir)]),
+);
+const bumped = Object.keys(PACKAGES).filter((name) => after[name] !== before[name]);
+
+if (bumped.length === 0) {
+  console.log(`\n  ${c.faint('no pending changesets touched a publishable package — nothing to tag')}\n`);
+  process.exit(0);
+}
+
+for (const name of bumped) {
+  console.log(`  ${c.muted(name)}  ${c.text(before[name])} ${c.faint('→')} ${c.highlight(bold(after[name]))}`);
+}
+
+const staged = [];
+for (const name of Object.keys(PACKAGES)) {
+  staged.push(path.relative(ROOT, path.join(PACKAGES[name].dir, 'package.json')));
+  const changelog = path.join(PACKAGES[name].dir, 'CHANGELOG.md');
+  if (fs.existsSync(changelog)) staged.push(path.relative(ROOT, changelog));
+}
+// glua-core has no tag of its own, but `changeset version` may still have
+// bumped its manifest/changelog — stage it too whenever that happened.
+const coreDir = path.join(ROOT, 'packages', 'glua-core');
+staged.push(path.relative(ROOT, path.join(coreDir, 'package.json')));
+staged.push(path.relative(ROOT, path.join(coreDir, 'CHANGELOG.md')));
 
 fs.mkdirSync(SCHEMAS_DOCS, { recursive: true });
 for (const name of fs.readdirSync(SCHEMAS_SRC)) {
@@ -183,23 +124,36 @@ for (const name of fs.readdirSync(SCHEMAS_SRC)) {
   staged.push(path.relative(ROOT, path.join(SCHEMAS_DOCS, name)));
 }
 
-if (changelog.contents) {
-  fs.writeFileSync(CHANGELOG, changelog.contents);
-  staged.push(path.relative(ROOT, CHANGELOG));
+function resolveTagFor(newPrefix) {
+  return (version) => (tagExists(`v${version}`) ? `v${version}` : `${newPrefix}${version}`);
+}
 
+for (const name of bumped) {
+  const { dir, changelogDocsOut } = PACKAGES[name];
+  const changelogPath = path.join(dir, 'CHANGELOG.md');
+  if (!fs.existsSync(changelogPath)) continue;
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
   const repoUrl = manifest.repository.url.replace(/\.git$/, '');
-  fs.writeFileSync(CHANGELOG_DOCS, renderChangelogDocs(changelog.contents, { repoUrl }));
-  staged.push(path.relative(ROOT, CHANGELOG_DOCS));
+  const markdown = fs.readFileSync(changelogPath, 'utf8');
+  fs.writeFileSync(
+    changelogDocsOut,
+    renderChangelogDocs(markdown, { repoUrl, resolveTag: resolveTagFor(`${name}@`) }),
+  );
+  staged.push(path.relative(ROOT, changelogDocsOut));
 }
 
 git('add', ...staged);
-git('commit', '-m', `release ${tag}`);
-git('tag', '-a', tag, '-m', tag);
+const summary = bumped.map((name) => `${name}@${after[name]}`).join(', ');
+git('commit', '-m', `release ${summary}`);
 
-console.log(`\n  ${c.success(symbols.pass)} committed and tagged`);
+const tags = bumped.map((name) => `${name}@${after[name]}`);
+for (const tag of tags) {
+  git('tag', '-a', tag, '-m', tag);
+}
+
+console.log(`\n  ${c.success(symbols.pass)} committed and tagged ${tags.join(', ')}`);
 console.log(`\n  ${c.muted('push it with')}\n`);
 console.log(`    ${c.accent(`git push origin ${branch} --follow-tags`)}\n`);
 console.log(
-  `  ${c.faint('That triggers the release workflow, which builds the VSIX and')}\n` +
-    `  ${c.faint('attaches it to a new GitHub release.')}\n`,
+  `  ${c.faint('That triggers the release workflow for each tagged package.')}\n`,
 );

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { DiagnosticSeverity, type Diagnostic } from 'vscode-languageserver-types';
 
-import { diagnose } from '@glua/server/features/diagnostics.js';
+import { diagnose } from 'glua-core/server/features/diagnostics.js';
 import { bold, c, heading, pad, plain, symbols } from './palette.js';
 import {
   applyBaseline,
@@ -14,7 +14,7 @@ import {
 } from './baseline.js';
 import { codeFrame, SourceCache } from './frame.js';
 import { loadProject, uriOf } from './project.js';
-import { DOCS_BASE, RULES, ruleDocUrl } from '@glua/rules.js';
+import { DOCS_BASE, RULES, ruleDocUrl } from 'glua-core/rules.js';
 import { createProgress } from './progress.js';
 
 export type LintFormat = 'pretty' | 'json' | 'github' | 'compact' | 'sarif';

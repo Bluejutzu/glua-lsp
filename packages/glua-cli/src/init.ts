@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DEFAULT_SETTINGS } from '@glua/server/settings.js';
+import { DEFAULT_SETTINGS } from 'glua-core/server/settings.js';
 import { bold, c, heading, symbols } from './palette.js';
 
 export type ConfigKind = 'lint' | 'format';

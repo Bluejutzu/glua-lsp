@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const CORE = path.join(ROOT, '..', 'glua-core');
 const DOCS = path.join(ROOT, '..', '..', 'docs');
 const SCHEMAS = path.join(ROOT, 'schemas');
 
@@ -171,7 +172,7 @@ test('documented settings keys all exist in the manifest', () => {
 
 test('documented diagnostic codes all exist', () => {
   const source = fs.readFileSync(
-    path.join(ROOT, 'src', 'server', 'features', 'diagnostics.ts'),
+    path.join(CORE, 'src', 'server', 'features', 'diagnostics.ts'),
     'utf8',
   );
   const codes = new Set(
@@ -212,13 +213,13 @@ test('documented diagnostic codes all exist', () => {
  */
 test('every rule has a catalogue entry and a section to link to', () => {
   const diagnostics = fs.readFileSync(
-    path.join(ROOT, 'src', 'server', 'features', 'diagnostics.ts'),
+    path.join(CORE, 'src', 'server', 'features', 'diagnostics.ts'),
     'utf8',
   );
   const codes = [...diagnostics.matchAll(/= '([a-z][a-z-]+)',/g)].map((m) => m[1]);
   assert.ok(codes.length > 10, 'failed to read the diagnostic codes');
 
-  const catalogue = fs.readFileSync(path.join(ROOT, 'src', 'rules.ts'), 'utf8');
+  const catalogue = fs.readFileSync(path.join(CORE, 'src', 'rules.ts'), 'utf8');
   const listed = [...catalogue.matchAll(/code: '([a-z][a-z-]+)'/g)].map((m) => m[1]);
 
   const page = fs.readFileSync(path.join(DOCS, 'reference', 'rules.mdx'), 'utf8');
@@ -228,7 +229,7 @@ test('every rule has a catalogue entry and a section to link to', () => {
   assert.deepEqual(
     codes.filter((code) => !listed.includes(code)),
     [],
-    'diagnostic codes with no entry in src/rules.ts',
+    'diagnostic codes with no entry in glua-core/src/rules.ts',
   );
   assert.deepEqual(
     listed.filter((code) => !codes.includes(code)),
@@ -250,7 +251,7 @@ test('every settings key in the catalogue exists in the manifest', () => {
       .map((key) => key.slice('glua.diagnostics.'.length)),
   );
 
-  const catalogue = fs.readFileSync(path.join(ROOT, 'src', 'rules.ts'), 'utf8');
+  const catalogue = fs.readFileSync(path.join(CORE, 'src', 'rules.ts'), 'utf8');
   const unknown = [...catalogue.matchAll(/settingsKey: '([a-zA-Z]+)'/g)]
     .map((m) => m[1])
     .filter((key) => !known.has(key));

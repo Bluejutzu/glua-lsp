@@ -10,8 +10,8 @@
     "watch": "pnpm --filter glua-gmod watch",
     "test": "pnpm -r --sequential test",
     "typecheck": "pnpm -r --sequential typecheck",
-    "bench": "pnpm --filter glua-gmod bench",
-    "generate-api": "pnpm --filter glua-gmod generate-api",
+    "bench": "pnpm --filter glua-core bench",
+    "generate-api": "pnpm --filter glua-core generate-api",
     "package": "pnpm --filter glua-gmod package",
     "release": "node scripts/release.mjs",
     "generate-icon": "node scripts/generate-icon.mjs",
@@ -22,6 +22,7 @@
     "docs:check": "cd docs && mint broken-links"
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.1",
     "mint": "^4.2.818"
   }
 }

@@ -20,7 +20,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FACTS_VERSION, type FileFacts } from '@glua/analyze/facts.js';
+import { FACTS_VERSION, type FileFacts } from 'glua-core/analyze/facts.js';
 
 declare const __GLUA_VERSION__: string | undefined;
 

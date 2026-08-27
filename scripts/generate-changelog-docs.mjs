@@ -1,21 +1,58 @@
 #!/usr/bin/env node
-// Regenerates docs/changelog.mdx from packages/glua-lsp/CHANGELOG.md. Run
-// standalone with `pnpm run docs:changelog`, or via `pnpm run release`,
-// which calls this automatically so the two files can't drift apart.
+// Regenerates docs/changelog.mdx and docs/cli-changelog.mdx from each
+// package's own CHANGELOG.md. Run standalone with `pnpm run docs:changelog`,
+// or via `pnpm run release`, which calls this automatically so the docs
+// can't drift from what actually shipped.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderChangelogDocs } from './lib/changelog-docs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MANIFEST = path.join(ROOT, 'packages', 'glua-lsp', 'package.json');
-const CHANGELOG = path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md');
-const OUT = path.join(ROOT, 'docs', 'changelog.mdx');
 
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const repoUrl = manifest.repository.url.replace(/\.git$/, '');
-const markdown = fs.readFileSync(CHANGELOG, 'utf8');
+const tagExists = (tag) => {
+  try {
+    return execFileSync('git', ['tag', '--list', tag], { cwd: ROOT, encoding: 'utf8' }).trim() !== '';
+  } catch {
+    return false;
+  }
+};
 
-fs.writeFileSync(OUT, renderChangelogDocs(markdown, { repoUrl }));
-console.log(`wrote ${path.relative(ROOT, OUT)}`);
+const PAGES = [
+  {
+    manifest: path.join(ROOT, 'packages', 'glua-lsp', 'package.json'),
+    changelog: path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md'),
+    out: path.join(ROOT, 'docs', 'changelog.mdx'),
+    newTagPrefix: 'glua-gmod@',
+    title: 'Changelog',
+    description: "Notable changes to GLua for Garry's Mod, release by release.",
+  },
+  {
+    manifest: path.join(ROOT, 'packages', 'glua-cli', 'package.json'),
+    changelog: path.join(ROOT, 'packages', 'glua-cli', 'CHANGELOG.md'),
+    out: path.join(ROOT, 'docs', 'cli-changelog.mdx'),
+    newTagPrefix: 'glua-cli@',
+    title: 'CLI Changelog',
+    description: 'Notable changes to glua-cli, release by release.',
+  },
+];
+
+// Releases before the independent-versioning split were tagged `vX.Y.Z`
+// (one tag for both packages). Only fall back to the new `<name>@X.Y.Z`
+// scheme for a version that was never tagged the old way, so historical
+// entries keep linking to the tag that actually exists.
+function resolveTagFor(newPrefix) {
+  return (version) => (tagExists(`v${version}`) ? `v${version}` : `${newPrefix}${version}`);
+}
+
+for (const { manifest, changelog, out, newTagPrefix, title, description } of PAGES) {
+  const repoUrl = JSON.parse(fs.readFileSync(manifest, 'utf8')).repository.url.replace(/\.git$/, '');
+  const markdown = fs.readFileSync(changelog, 'utf8');
+  fs.writeFileSync(
+    out,
+    renderChangelogDocs(markdown, { repoUrl, resolveTag: resolveTagFor(newTagPrefix), title, description }),
+  );
+  console.log(`wrote ${path.relative(ROOT, out)}`);
+}

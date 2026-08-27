@@ -52,7 +52,7 @@
           },
           {
             "group": "Changelog",
-            "pages": ["changelog"]
+            "pages": ["changelog", "cli-changelog"]
           }
         ]
       },

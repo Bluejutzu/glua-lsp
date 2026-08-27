@@ -341,7 +341,7 @@ program
   .description('What one diagnostic code means, and how to deal with it')
   .argument('<code>', 'a diagnostic code, as shown in the Problems panel')
   .action(async (code: string) => {
-    const { RULES, ruleDocUrl, ruleInfo } = await import('@glua/rules.js');
+    const { RULES, ruleDocUrl, ruleInfo } = await import('glua-core/rules.js');
     const rule = ruleInfo(code);
 
     if (!rule) {
@@ -375,7 +375,7 @@ program
   .command('rules')
   .description('List every diagnostic rule and its settings key')
   .action(async () => {
-    const { RULES, DOCS_BASE } = await import('@glua/rules.js');
+    const { RULES, DOCS_BASE } = await import('glua-core/rules.js');
     process.stdout.write(`${heading('Diagnostic rules')}\n\n`);
     const width = Math.max(...RULES.map((r) => r.code.length));
     for (const rule of RULES) {

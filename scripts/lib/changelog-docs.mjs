@@ -1,5 +1,6 @@
-// Renders packages/glua-lsp/CHANGELOG.md as the Update-timeline MDX page at
-// docs/changelog.mdx, so the two can't drift apart after a release.
+// Renders a package CHANGELOG.md as an Update-timeline MDX page — used for
+// both docs/changelog.mdx (glua-gmod) and docs/cli-changelog.mdx (glua-cli),
+// so neither can drift apart from what actually shipped.
 
 const VERSION_HEADING = /^\d+\.\d+\.\d+/;
 
@@ -16,20 +17,32 @@ function parseSections(markdown) {
   });
 }
 
-export function renderChangelogDocs(markdown, { repoUrl }) {
+export function renderChangelogDocs(
+  markdown,
+  {
+    repoUrl,
+    // Called per version to name its git tag. Defaults to the old bare
+    // `vX.Y.Z` scheme; a resolver that switches schemes partway through a
+    // package's history (e.g. once independent per-package tags were
+    // adopted) can check the version and branch accordingly.
+    resolveTag = (version) => `v${version}`,
+    title = 'Changelog',
+    description = 'Notable changes, release by release.',
+  },
+) {
   const versions = parseSections(markdown).filter((section) => VERSION_HEADING.test(section.title));
 
   const updates = versions.map((section, i) => {
     const label = i === 0 ? `${section.title} (latest)` : section.title;
     const body = section.body.replace(/^### (.+)$/gm, '**$1**');
-    return `<Update label="${label}" description={<a href="${repoUrl}/releases/tag/v${section.title}">View release on GitHub ↗</a>}>\n${body}\n</Update>`;
+    return `<Update label="${label}" description={<a href="${repoUrl}/releases/tag/${resolveTag(section.title)}">View release on GitHub ↗</a>}>\n${body}\n</Update>`;
   });
 
   return `---
-title: "Changelog"
-description: "Notable changes to GLua for Garry's Mod, release by release."
+title: "${title}"
+description: "${description}"
 icon: "clock"
-sidebarTitle: "Changelog"
+sidebarTitle: "${title}"
 ---
 
 Each GitHub release lists every commit. This page covers what actually

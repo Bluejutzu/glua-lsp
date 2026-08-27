@@ -2,9 +2,14 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['glua-gmod@*', 'glua-cli@*']
   workflow_dispatch:
     inputs:
+      package:
+        description: 'Which package to build (workflow_dispatch only)'
+        type: choice
+        options: [glua-gmod, glua-cli]
+        default: glua-gmod
       dry_run:
         description: 'Build and package without creating a release'
         type: boolean
@@ -16,8 +21,9 @@ permissions:
   id-token: write
 
 jobs:
-  release:
-    name: Build and publish
+  release-lsp:
+    name: Build and publish glua-gmod
+    if: startsWith(github.ref, 'refs/tags/glua-gmod@') || (github.event_name == 'workflow_dispatch' && inputs.package == 'glua-gmod')
     runs-on: ubuntu-latest
 
     steps:
@@ -39,10 +45,10 @@ jobs:
       # A tag that disagrees with the manifest produces a release whose
       # filename and contents do not match its name. Fail early instead.
       - name: Check the tag matches the manifest version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           manifest=$(node -p "require('./packages/glua-lsp/package.json').version")
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${GITHUB_REF_NAME#glua-gmod@}"
           echo "manifest=$manifest tag=$tag"
           if [ "$manifest" != "$tag" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $manifest."
@@ -53,7 +59,9 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      # Before the tests: the CLI's tests exercise its built bundle.
+      # Before the tests: the CLI's tests exercise its built bundle, and both
+      # packages build from glua-core, so everything builds regardless of
+      # which one is being released.
       - name: Build
         run: pnpm run build
 
@@ -89,30 +97,26 @@ jobs:
           if-no-files-found: error
 
       - name: Write release notes
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
           VSIX: ${{ steps.artifact.outputs.name }}
         run: |
-          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          previous=$(git describe --tags --abbrev=0 --match 'glua-gmod@*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
 
-          # GitHub's own generator builds this list from merged pull requests,
-          # so it produces nothing for a commit pushed straight to main. Same
-          # shape, but a commit that has no PR links its hash instead.
-          jqline='[.sha, (.commit.message | split("\n")[0]), (.author.login // .commit.author.name)] | @tsv'
+          # Scoped to commits touching this package or the shared engine —
+          # a glua-cli-only commit has nothing to do with this release.
           if [ -n "$previous" ]; then
-            raw=$(gh api --paginate \
-              "repos/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}" \
-              --jq ".commits[] | select((.parents | length) < 2) | ${jqline}")
+            range="${previous}..${GITHUB_REF_NAME}"
           else
-            raw=$(gh api --paginate \
-              "repos/${GITHUB_REPOSITORY}/commits?sha=${GITHUB_REF_NAME}&per_page=100" \
-              --jq ".[] | select((.parents | length) < 2) | ${jqline}")
+            range="${GITHUB_REF_NAME}"
           fi
+          shas=$(git log "$range" --no-merges --format='%H' -- packages/glua-lsp packages/glua-core)
 
           changes=""
-          while IFS=$'\t' read -r sha subject author; do
-            [ -z "$sha" ] && continue
+          for sha in $shas; do
+            subject=$(git log -1 --format='%s' "$sha")
+            author=$(git log -1 --format='%an' "$sha")
             pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls" \
                    --jq '.[0].number // empty' 2>/dev/null || true)
             if [ -n "$pr" ]; then
@@ -121,7 +125,7 @@ jobs:
               ref="[\`${sha:0:7}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${sha})"
             fi
             changes="${changes}- ${subject} by @${author} in ${ref}"$'\n'
-          done <<< "$raw"
+          done
 
           {
             echo "## Install"
@@ -133,9 +137,7 @@ jobs:
             echo "| VSCodium | \`codium --install-extension blight.glua-gmod\` |"
             echo "| Windsurf | \`windsurf --install-extension blight.glua-gmod\` |"
             echo
-            echo "Cursor, VSCodium and Windsurf resolve that from"
-            echo "[Open VSX](https://open-vsx.org/extension/blight/glua-gmod);"
-            echo "VS Code resolves it from the Marketplace."
+            echo "Cursor, VSCodium and Windsurf resolve that from [Open VSX](https://open-vsx.org/extension/blight/glua-gmod); VS Code resolves it from the Marketplace."
             echo
             echo "Or install the \`${VSIX}\` attached below, which works in any of them:"
             echo
@@ -145,9 +147,7 @@ jobs:
             echo
             echo "In the editor instead: **Extensions** → the \`···\` menu → **Install from VSIX…**"
             echo
-            echo "📖 [Full installation guide](https://glua.bluejutzu.dev/installation)"
-            echo " · [Documentation](https://glua.bluejutzu.dev)"
-            echo " · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-lsp/CHANGELOG.md)"
+            echo "📖 [Full installation guide](https://glua.bluejutzu.dev/installation) · [Documentation](https://glua.bluejutzu.dev) · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-lsp/CHANGELOG.md)"
             echo
             echo "## What's Changed"
             echo
@@ -160,7 +160,7 @@ jobs:
           cat RELEASE_NOTES.md
 
       - name: Create the release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -179,7 +179,7 @@ jobs:
       - name: Publish to the VS Code Marketplace
         id: marketplace
         continue-on-error: true
-        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
@@ -196,7 +196,7 @@ jobs:
       # Cursor, VSCodium and Windsurf do not use the Microsoft marketplace.
       - name: Publish to Open VSX
         id: openvsx
-        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
@@ -208,12 +208,131 @@ jobs:
           npx --yes ovsx publish "${{ steps.artifact.outputs.path }}" --pat "$OVSX_PAT"
           echo "published=true" >> "$GITHUB_OUTPUT"
 
+      - name: Summary
+        run: |
+          {
+            echo "### ${{ steps.artifact.outputs.name }}"
+            echo
+            echo "- size: ${{ steps.artifact.outputs.size }}"
+            if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+              echo "- released as \`$GITHUB_REF_NAME\`"
+              echo "- Marketplace: ${{ steps.marketplace.outcome == 'failure' && '**failed** — publish it by hand' || (steps.marketplace.outputs.published == 'true' && 'published' || 'skipped') }}"
+              echo "- Open VSX: ${{ steps.openvsx.outputs.published == 'true' && 'published' || 'skipped' }}"
+            else
+              echo "- dry run, attached as a workflow artifact only"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release-cli:
+    name: Build and publish glua-cli
+    if: startsWith(github.ref, 'refs/tags/glua-cli@') || (github.event_name == 'workflow_dispatch' && inputs.package == 'glua-cli')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check the tag matches the manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          manifest=$(node -p "require('./packages/glua-cli/package.json').version")
+          tag="${GITHUB_REF_NAME#glua-cli@}"
+          echo "manifest=$manifest tag=$tag"
+          if [ "$manifest" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $manifest."
+            echo "::error::Bump the version in packages/glua-cli/package.json, or retag."
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Test
+        run: pnpm test
+        env:
+          FORCE_COLOR: '1'
+
+      - name: Write release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'glua-cli@*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+
+          if [ -n "$previous" ]; then
+            range="${previous}..${GITHUB_REF_NAME}"
+          else
+            range="${GITHUB_REF_NAME}"
+          fi
+          shas=$(git log "$range" --no-merges --format='%H' -- packages/glua-cli packages/glua-core)
+
+          changes=""
+          for sha in $shas; do
+            subject=$(git log -1 --format='%s' "$sha")
+            author=$(git log -1 --format='%an' "$sha")
+            pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls" \
+                   --jq '.[0].number // empty' 2>/dev/null || true)
+            if [ -n "$pr" ]; then
+              ref="#${pr}"
+            else
+              ref="[\`${sha:0:7}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${sha})"
+            fi
+            changes="${changes}- ${subject} by @${author} in ${ref}"$'\n'
+          done
+
+          {
+            echo "## Install"
+            echo
+            echo '```bash'
+            echo "npm install -g glua-cli"
+            echo '```'
+            echo
+            echo "Gives you the \`glua\` and \`glua-lsp\` binaries — the latter is the same language server the VS Code extension runs, for any editor with an LSP client."
+            echo
+            echo "📖 [Documentation](https://glua.bluejutzu.dev) · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-cli/CHANGELOG.md)"
+            echo
+            echo "## What's Changed"
+            echo
+            echo "$changes"
+            if [ -n "$previous" ]; then
+              echo
+              echo "**Full diff:** https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...${GITHUB_REF_NAME}"
+            fi
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Create the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease)
+
       # No token: npm authenticates this over OIDC against the trusted publisher
-      # configured on the package. Non-fatal for the same reason as the others.
-      - name: Publish the CLI to npm
+      # configured on the package. Non-fatal: the GitHub release is already
+      # created by this point, so an expired setup should leave a release to
+      # publish by hand, not a red workflow and a half-done tag.
+      - name: Publish to npm
         id: npm
         continue-on-error: true
-        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
         working-directory: packages/glua-cli
         run: |
           # Node 22 ships npm 10, which predates OIDC publishing entirely.
@@ -234,15 +353,13 @@ jobs:
       - name: Summary
         run: |
           {
-            echo "### ${{ steps.artifact.outputs.name }}"
+            version=$(node -p "require('./packages/glua-cli/package.json').version")
+            echo "### glua-cli@${version}"
             echo
-            echo "- size: ${{ steps.artifact.outputs.size }}"
-            if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
+            if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
               echo "- released as \`$GITHUB_REF_NAME\`"
-              echo "- Marketplace: ${{ steps.marketplace.outcome == 'failure' && '**failed** — publish it by hand' || (steps.marketplace.outputs.published == 'true' && 'published' || 'skipped') }}"
-              echo "- Open VSX: ${{ steps.openvsx.outputs.published == 'true' && 'published' || 'skipped' }}"
-              echo "- npm (glua-cli): ${{ steps.npm.outcome == 'failure' && '**failed** — publish it by hand' || (steps.npm.outputs.published == 'true' && 'published' || 'skipped') }}"
+              echo "- npm: ${{ steps.npm.outcome == 'failure' && '**failed** — publish it by hand' || (steps.npm.outputs.published == 'true' && 'published' || 'skipped') }}"
             else
-              echo "- dry run, attached as a workflow artifact only"
+              echo "- dry run, nothing published"
             fi
           } >> "$GITHUB_STEP_SUMMARY"

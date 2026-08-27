@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { parse } from '@glua/parser/parser.js';
-import { detectEndOfLine, formatDocument } from '@glua/format/printer.js';
+import { parse } from 'glua-core/parser/parser.js';
+import { detectEndOfLine, formatDocument } from 'glua-core/format/printer.js';
 import { bold, c, heading, symbols } from './palette.js';
 import { loadProject } from './project.js';
 import { createProgress } from './progress.js';

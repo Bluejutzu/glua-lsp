@@ -7,8 +7,8 @@ import {
   isAutoApplicable,
   mergeEdits,
   safetyOf,
-} from '@glua/server/features/codeActions.js';
-import { diagnose } from '@glua/server/features/diagnostics.js';
+} from 'glua-core/server/features/codeActions.js';
+import { diagnose } from 'glua-core/server/features/diagnostics.js';
 import { bold, c, heading, symbols } from './palette.js';
 import { loadProject, uriOf } from './project.js';
 import { createProgress } from './progress.js';

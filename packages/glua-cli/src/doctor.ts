@@ -1,8 +1,8 @@
 import { statSync } from 'node:fs';
 import path from 'node:path';
 
-import { buildReport, type ProjectReport } from '@glua/server/features/report.js';
-import { renderHtml } from '@glua/server/features/reportHtml.js';
+import { buildReport, type ProjectReport } from 'glua-core/server/features/report.js';
+import { renderHtml } from 'glua-core/server/features/reportHtml.js';
 import { bold, c, heading, pad, symbols } from './palette.js';
 import { loadProject } from './project.js';
 import { createProgress } from './progress.js';

@@ -16,7 +16,7 @@ const copyAssets = {
       try {
         await fs.mkdir('dist/schemas', { recursive: true });
         await fs.copyFile(
-          path.resolve('../glua-lsp/src/api/data/gmod-api.json'),
+          path.resolve('../glua-core/src/api/data/gmod-api.json'),
           path.resolve('dist/gmod-api.json'),
         );
         for (const schema of await fs.readdir(path.resolve('../glua-lsp/schemas'))) {
@@ -27,7 +27,7 @@ const copyAssets = {
         }
       } catch (error) {
         console.error(`Could not copy bundled data: ${error.message}`);
-        console.error('Run `pnpm run generate-api` in packages/glua-lsp first.');
+        console.error('Run `pnpm run generate-api` in packages/glua-core first.');
         process.exitCode = 1;
       }
     });
@@ -45,9 +45,6 @@ const shared = {
   target: 'node18',
   sourcemap: !production,
   minify: production,
-  // Resolved through tsconfig `paths`, which esbuild reads, so the CLI bundles
-  // the analyser straight from the extension package's source.
-  tsconfig: 'tsconfig.json',
   banner: { js: '#!/usr/bin/env node' },
   logLevel: 'info',
 };
@@ -63,7 +60,7 @@ const contexts = await Promise.all([
   // binary so any editor with an LSP client can drive it.
   esbuild.context({
     ...shared,
-    entryPoints: ['../glua-lsp/src/server/main.ts'],
+    entryPoints: ['../glua-core/src/server/main.ts'],
     outfile: 'dist/glua-lsp.js',
   }),
 ]);

@@ -1,0 +1,29 @@
+{
+  "name": "glua-core",
+  "private": true,
+  "version": "0.5.6",
+  "description": "Parser, analysis, formatter and LSP engine for Garry's Mod Lua — internal, consumed by glua-gmod and glua-cli.",
+  "license": "MIT",
+  "type": "commonjs",
+  "exports": {
+    "./*": "./src/*",
+    "./tools/*": "./tools/*"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "compile": "tsc",
+    "test": "pnpm run compile && node --test --test-reporter=./test/reporter.mjs test/*.test.mjs",
+    "test:plain": "pnpm run compile && node --test test/*.test.mjs",
+    "bench": "pnpm run compile && node --expose-gc test/bench-real.mjs",
+    "generate-api": "node tools/generate-api.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^7.0.2",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-uri": "^3.0.8",
+    "ajv": "^8.20.0"
+  }
+}
