@@ -19,21 +19,57 @@ overview alongside `.glua.json`.
 
 ## Properties
 
-| Property | Type | Default | Description |
-| --- | --- | --- | --- |
-| `$schema` | `string` | — | URL of the JSON schema for this file. Written automatically by `glua init` and the VS Code command. |
-| `useTabs` | `boolean` | `true` | Indent with tabs instead of spaces. |
-| `indentSize` | `integer`, `1`–`16` | `4` | Spaces per indent level — and, when `useTabs` is on, the assumed display width of a tab for measuring line length. |
-| `maxLineWidth` | `integer`, `40`–`400` | `120` | Column at which tables and argument lists wrap. |
-| `quoteStyle` | `"preserve"` \| `"double"` \| `"single"` | `"preserve"` | Preferred string quotes. A string is only rewritten when doing so needs no extra escaping. |
-| `operatorStyle` | `"preserve"` \| `"lua"` | `"preserve"` | `"lua"` rewrites GLua's C-style operators `!= && || !` as `~= and or not`. |
-| `commentStyle` | `"preserve"` \| `"lua"` | `"preserve"` | `"lua"` rewrites `//` and `/* */` comments as `--` and `--[[ ]]`. |
-| `spaceInsideParens` | `boolean` | `false` | Write `func( a, b )` instead of `func(a, b)` — the style used across the Garry's Mod wiki. |
-| `keepSingleLineBlocks` | `boolean` | `true` | Keep blocks written on one line on one line, e.g. `if not IsValid(ent) then return end`. See [idiomatic one-liners](/features/formatter#idiomatic-one-liners). |
-| `maxBlankLines` | `integer`, `0`–`10` | `2` | Consecutive blank lines to keep between statements. |
-| `semicolons` | `"remove"` \| `"preserve"` | `"remove"` | Whether to keep optional trailing semicolons. |
-| `endOfLine` | `"\n"` \| `"\r\n"` | — | Line ending to write. Defaults to whatever the file already uses. |
-| `overrides` | [`Override[]`](#overrides) | — | Per-path formatting overrides, applied in order; later entries win. |
+<ParamField path="$schema" type="string">
+  URL of the JSON schema for this file. Written automatically by `glua init` and the VS Code command.
+</ParamField>
+
+<ParamField path="useTabs" type="boolean" default="true">
+  Indent with tabs instead of spaces.
+</ParamField>
+
+<ParamField path="indentSize" type="integer, 1-16" default="4">
+  Spaces per indent level — and, when `useTabs` is on, the assumed display width of a tab for measuring line length.
+</ParamField>
+
+<ParamField path="maxLineWidth" type="integer, 40-400" default="120">
+  Column at which tables and argument lists wrap.
+</ParamField>
+
+<ParamField path="quoteStyle" type='"preserve" | "double" | "single"' default="preserve">
+  Preferred string quotes. A string is only rewritten when doing so needs no extra escaping.
+</ParamField>
+
+<ParamField path="operatorStyle" type='"preserve" | "lua"' default="preserve">
+  `"lua"` rewrites GLua's C-style operators `!= && || !` as `~= and or not`.
+</ParamField>
+
+<ParamField path="commentStyle" type='"preserve" | "lua"' default="preserve">
+  `"lua"` rewrites `//` and `/* */` comments as `--` and `--[[ ]]`.
+</ParamField>
+
+<ParamField path="spaceInsideParens" type="boolean" default="false">
+  Write `func( a, b )` instead of `func(a, b)` — the style used across the Garry's Mod wiki.
+</ParamField>
+
+<ParamField path="keepSingleLineBlocks" type="boolean" default="true">
+  Keep blocks written on one line on one line, e.g. `if not IsValid(ent) then return end`. See [idiomatic one-liners](/features/formatter#idiomatic-one-liners).
+</ParamField>
+
+<ParamField path="maxBlankLines" type="integer, 0-10" default="2">
+  Consecutive blank lines to keep between statements.
+</ParamField>
+
+<ParamField path="semicolons" type='"remove" | "preserve"' default="remove">
+  Whether to keep optional trailing semicolons.
+</ParamField>
+
+<ParamField path="endOfLine" type='"\n" | "\r\n"'>
+  Line ending to write. Defaults to whatever the file already uses.
+</ParamField>
+
+<ParamField path="overrides" type="Override[]">
+  Per-path formatting overrides, applied in order; later entries win — see [below](#overrides).
+</ParamField>
 
 ```json
 {
@@ -51,10 +87,13 @@ An array of objects, applied in order — later entries win when two overrides
 match the same file. Unlike `.glua.json`'s overrides, `options` is **required**
 and only accepts formatting keys — no `diagnostics` or `globals` here.
 
-| Property | Type | Description |
-| --- | --- | --- |
-| `files` | `string[]`, required, at least one entry | Glob patterns relative to this file's directory, e.g. `lua/vendor/**`. |
-| `options` | `object`, required | A subset of the [top-level properties](#properties) above (excluding `$schema` and `overrides`) to apply to matching files. |
+<ParamField path="files" type="string[]" required>
+  Glob patterns relative to this file's directory, e.g. `lua/vendor/**`. At least one entry.
+</ParamField>
+
+<ParamField path="options" type="object" required>
+  A subset of the [top-level properties](#properties) above (excluding `$schema` and `overrides`) to apply to matching files.
+</ParamField>
 
 ```json
 {

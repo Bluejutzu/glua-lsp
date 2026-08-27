@@ -18,11 +18,17 @@ for the workflow this file supports.
 
 ## Properties
 
-| Property | Type | Description |
-| --- | --- | --- |
-| `$schema` | `string` | URL of the JSON schema for this file. Written automatically by `glua lint --suppress-all`. |
-| `generated` | `string` | When the baseline was last written, as an ISO timestamp. For a human reading a diff — never read back. |
-| `files` | `object`, required | Project-relative file path → rule code → number of findings accepted for it. See [Shape of `files`](#shape-of-files). |
+<ParamField path="$schema" type="string">
+  URL of the JSON schema for this file. Written automatically by `glua lint --suppress-all`.
+</ParamField>
+
+<ParamField path="generated" type="string">
+  When the baseline was last written, as an ISO timestamp. For a human reading a diff — never read back.
+</ParamField>
+
+<ParamField path="files" type="object" required>
+  Project-relative file path → rule code → number of findings accepted for it. See [Shape of `files`](#shape-of-files).
+</ParamField>
 
 ## Shape of `files`
 
