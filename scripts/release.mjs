@@ -118,6 +118,10 @@ const coreDir = path.join(ROOT, 'packages', 'glua-core');
 staged.push(path.relative(ROOT, path.join(coreDir, 'package.json')));
 staged.push(path.relative(ROOT, path.join(coreDir, 'CHANGELOG.md')));
 
+// `changeset version` deletes every changeset file it just consumed —
+// stage that deletion too, or the release commit leaves them dangling.
+staged.push('.changeset');
+
 fs.mkdirSync(SCHEMAS_DOCS, { recursive: true });
 for (const name of fs.readdirSync(SCHEMAS_SRC)) {
   fs.copyFileSync(path.join(SCHEMAS_SRC, name), path.join(SCHEMAS_DOCS, name));
