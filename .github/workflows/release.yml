@@ -44,16 +44,28 @@ jobs:
 
       # A tag that disagrees with the manifest produces a release whose
       # filename and contents do not match its name. Fail early instead.
+      #
+      # The version is the tag with its `glua-gmod@` prefix stripped, NOT
+      # the raw ref name — the package name itself contains a hyphen, so
+      # checking the whole ref for "-" to detect a prerelease would always
+      # match.
       - name: Check the tag matches the manifest version
+        id: tag
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           manifest=$(node -p "require('./packages/glua-lsp/package.json').version")
-          tag="${GITHUB_REF_NAME#glua-gmod@}"
-          echo "manifest=$manifest tag=$tag"
-          if [ "$manifest" != "$tag" ]; then
+          version="${GITHUB_REF_NAME#glua-gmod@}"
+          echo "manifest=$manifest tag=$version"
+          if [ "$manifest" != "$version" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $manifest."
             echo "::error::Bump the version in packages/glua-lsp/package.json, or retag."
             exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Typecheck
@@ -168,7 +180,7 @@ jobs:
             "${{ steps.artifact.outputs.path }}" \
             --title "$GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \
-            $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease)
+            $([ "${{ steps.tag.outputs.prerelease }}" = "true" ] && echo --prerelease)
 
       # Publishing is opt-in: without the token the step is skipped, so the
       # GitHub release still happens and nothing fails.
@@ -179,7 +191,7 @@ jobs:
       - name: Publish to the VS Code Marketplace
         id: marketplace
         continue-on-error: true
-        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
+        if: startsWith(github.ref, 'refs/tags/') && steps.tag.outputs.prerelease != 'true'
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
@@ -196,7 +208,7 @@ jobs:
       # Cursor, VSCodium and Windsurf do not use the Microsoft marketplace.
       - name: Publish to Open VSX
         id: openvsx
-        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
+        if: startsWith(github.ref, 'refs/tags/') && steps.tag.outputs.prerelease != 'true'
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
@@ -243,16 +255,27 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The version is the tag with its `glua-cli@` prefix stripped, NOT the
+      # raw ref name — the package name itself contains a hyphen, so
+      # checking the whole ref for "-" to detect a prerelease would always
+      # match.
       - name: Check the tag matches the manifest version
+        id: tag
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           manifest=$(node -p "require('./packages/glua-cli/package.json').version")
-          tag="${GITHUB_REF_NAME#glua-cli@}"
-          echo "manifest=$manifest tag=$tag"
-          if [ "$manifest" != "$tag" ]; then
+          version="${GITHUB_REF_NAME#glua-cli@}"
+          echo "manifest=$manifest tag=$version"
+          if [ "$manifest" != "$version" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $manifest."
             echo "::error::Bump the version in packages/glua-cli/package.json, or retag."
             exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Typecheck
@@ -323,7 +346,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file RELEASE_NOTES.md \
-            $([[ "$GITHUB_REF_NAME" == *-* ]] && echo --prerelease)
+            $([ "${{ steps.tag.outputs.prerelease }}" = "true" ] && echo --prerelease)
 
       # No token: npm authenticates this over OIDC against the trusted publisher
       # configured on the package. Non-fatal: the GitHub release is already
@@ -332,7 +355,7 @@ jobs:
       - name: Publish to npm
         id: npm
         continue-on-error: true
-        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
+        if: startsWith(github.ref, 'refs/tags/') && steps.tag.outputs.prerelease != 'true'
         working-directory: packages/glua-cli
         run: |
           # Node 22 ships npm 10, which predates OIDC publishing entirely.
