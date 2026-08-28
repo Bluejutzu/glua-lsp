@@ -22,7 +22,7 @@ Every number below was measured against a real gamemode: 932 files, 232,000 line
 
 - **Batched indexing.** The initial scan runs in chunks and yields between them, so the editor is usable while the workspace is still loading rather than blocked until it finishes.
 - **Syntax trees are dropped once they have been read.** A closed file keeps only the facts extracted from it — globals it defines, hooks it adds, net messages it sends — and releases the tree along with every closure that captured it. On the same 232,000-line project the trees alone were 770 MB; keeping only the facts brings retained heap to 59.
-- **Everything cross-file is stored as data, not trees.** The symbol index, the net message pairing, the call graph behind [hot paths](/features/hot-paths) and call hierarchy — extracted once while a tree is in hand and left alone if the file's contents did not change. A scan of the whole project does not rebuild them one file at a time.
+- **Everything cross-file is stored as data, not trees.** The symbol index, the net message pairing, the call graph behind [hot paths](/glua/features/hot-paths) and call hierarchy — extracted once while a tree is in hand and left alone if the file's contents did not change. A scan of the whole project does not rebuild them one file at a time.
 - **Call edges are resolved when something asks for them.** In a workspace where hundreds of files define the same path, indexing every edge up front is quadratic in the number of definitions, and almost none of those edges are ever looked at.
 
 ## Running your own benchmark

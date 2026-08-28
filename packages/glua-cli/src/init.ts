@@ -21,7 +21,7 @@ const TEMPLATES: Record<ConfigKind, Template> = {
   lint: {
     file: '.glua.json',
     build: () => ({
-      $schema: 'https://glua.bluejutzu.dev/schemas/glua.schema.json',
+      $schema: 'https://docs.bluejutzu.dev/glua/schemas/glua.schema.json',
       globals: [],
       // Every rule at its current severity, which is a more useful starting
       // point than an empty object — the schema describes each on hover, and
@@ -37,7 +37,7 @@ const TEMPLATES: Record<ConfigKind, Template> = {
   format: {
     file: '.gluafmtrc.json',
     build: () => ({
-      $schema: 'https://glua.bluejutzu.dev/schemas/gluafmtrc.schema.json',
+      $schema: 'https://docs.bluejutzu.dev/glua/schemas/gluafmtrc.schema.json',
       useTabs: true,
       indentSize: 4,
       maxLineWidth: DEFAULT_SETTINGS.format.maxLineWidth,

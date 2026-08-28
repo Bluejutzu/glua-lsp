@@ -3,7 +3,7 @@
   "version": "0.6.0",
   "description": "Lint and format Garry's Mod Lua from the command line, using the same analysis as the GLua language server.",
   "license": "MIT",
-  "homepage": "https://glua.bluejutzu.dev",
+  "homepage": "https://docs.bluejutzu.dev/glua",
   "repository": {
     "type": "git",
     "url": "https://github.com/Bluejutzu/glua-lsp.git",

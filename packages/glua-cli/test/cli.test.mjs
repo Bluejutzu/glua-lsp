@@ -132,7 +132,7 @@ test('json output is machine readable', { skip: !built }, () => {
     assert.ok(Number.isInteger(finding.line));
     assert.ok(typeof finding.code === 'string');
     assert.ok(typeof finding.message === 'string');
-    assert.equal(finding.url, `https://glua.bluejutzu.dev/reference/rules#${finding.code}`);
+    assert.equal(finding.url, `https://docs.bluejutzu.dev/glua/reference/rules#${finding.code}`);
   }
 });
 
@@ -143,7 +143,7 @@ test('sarif points every rule at its own section', { skip: !built }, () => {
 
   assert.ok(rules.length > 10, 'the catalogue should carry every rule');
   for (const rule of rules) {
-    assert.equal(rule.helpUri, `https://glua.bluejutzu.dev/reference/rules#${rule.id}`);
+    assert.equal(rule.helpUri, `https://docs.bluejutzu.dev/glua/reference/rules#${rule.id}`);
   }
 });
 
@@ -340,11 +340,11 @@ test('init writes both configs, and the schema it points at exists', { skip: !bu
   assert.ok(!('enable' in linter.diagnostics));
   assert.equal(formatter.maxLineWidth, 120);
 
-  // $schema points at the copy Mintlify serves from docs/schemas, so check
-  // that copy is actually the one we ship.
-  const DOCS_SCHEMAS = path.join(ROOT, '..', '..', 'docs', 'schemas');
+  // $schema points at the copy Mintlify serves from docs/glua/schemas, so
+  // check that copy is actually the one we ship.
+  const DOCS_SCHEMAS = path.join(ROOT, '..', '..', 'docs', 'glua', 'schemas');
   for (const config of [linter, formatter]) {
-    assert.match(config.$schema, /^https:\/\/glua\.bluejutzu\.dev\/schemas\/[\w.-]+\.json$/);
+    assert.match(config.$schema, /^https:\/\/docs\.bluejutzu\.dev\/glua\/schemas\/[\w.-]+\.json$/);
     const shipped = path.join(DOCS_SCHEMAS, path.basename(config.$schema));
     assert.ok(fs.existsSync(shipped), `${config.$schema} is not shipped in docs/schemas`);
   }

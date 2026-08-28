@@ -27,27 +27,27 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PACKAGES = {
   'glua-gmod': {
     dir: path.join(ROOT, 'packages', 'glua-lsp'),
-    changelogDocsOut: path.join(ROOT, 'docs', 'changelog.mdx'),
+    changelogDocsOut: path.join(ROOT, 'docs', 'glua', 'changelog.mdx'),
     title: 'glua-gmod',
     description: "Notable changes to the GLua for Garry's Mod extension, release by release.",
-    crossLink: { path: '/cli-changelog', label: 'glua-cli' },
+    crossLink: { path: '/glua/cli-changelog', label: 'glua-cli' },
   },
   'glua-cli': {
     dir: path.join(ROOT, 'packages', 'glua-cli'),
-    changelogDocsOut: path.join(ROOT, 'docs', 'cli-changelog.mdx'),
+    changelogDocsOut: path.join(ROOT, 'docs', 'glua', 'cli-changelog.mdx'),
     title: 'glua-cli',
     description: 'Notable changes to the glua-cli command-line tool, release by release.',
-    crossLink: { path: '/changelog', label: 'glua-gmod' },
+    crossLink: { path: '/glua/changelog', label: 'glua-gmod' },
   },
 };
 
 /**
- * Generated configs point `$schema` at glua.bluejutzu.dev, which Mintlify
+ * Generated configs point `$schema` at docs.bluejutzu.dev/glua, which Mintlify
  * serves straight from here. Copied on every release so the hosted schema
  * never drifts from the one glua-lsp actually ships.
  */
 const SCHEMAS_SRC = path.join(ROOT, 'packages', 'glua-lsp', 'schemas');
-const SCHEMAS_DOCS = path.join(ROOT, 'docs', 'schemas');
+const SCHEMAS_DOCS = path.join(ROOT, 'docs', 'glua', 'schemas');
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');

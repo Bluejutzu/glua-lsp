@@ -9,7 +9,7 @@ sidebarTitle: "baseline.schema.json"
 [glua.bluejutzu.dev/schemas/baseline.schema.json](https://glua.bluejutzu.dev/schemas/baseline.schema.json).
 Unlike `.glua.json` and `.gluafmtrc.json`, you do not write this file by hand —
 `glua lint --suppress-all` and `--prune-suppressions` write it for you. See
-[Adopting on a codebase you inherited](/reference/cli#adopting-on-a-codebase-you-inherited)
+[Adopting on a codebase you inherited](/glua/reference/cli#adopting-on-a-codebase-you-inherited)
 for the workflow this file supports.
 
 <Info>
@@ -33,7 +33,7 @@ for the workflow this file supports.
 ## Shape of `files`
 
 Keyed by file path, then by the **diagnostic code** (the kebab-case name shown
-in the Problems panel and listed on the [rules reference](/reference/rules) —
+in the Problems panel and listed on the [rules reference](/glua/reference/rules) —
 not the camelCase settings key used in `.glua.json`), then a count of at least
 `1`.
 
@@ -59,5 +59,5 @@ code around does not invalidate the baseline — a file baselined at two
 they move. A third one is reported as new.
 
 <Warning>
-  This file is generated. Hand-editing a count down is indistinguishable from the code actually improving, which is exactly what `--prune-suppressions` exists to do safely — see the [pruning note](/reference/cli#adopting-on-a-codebase-you-inherited).
+  This file is generated. Hand-editing a count down is indistinguishable from the code actually improving, which is exactly what `--prune-suppressions` exists to do safely — see the [pruning note](/glua/reference/cli#adopting-on-a-codebase-you-inherited).
 </Warning>

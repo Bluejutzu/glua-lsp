@@ -1,0 +1,46 @@
+name: Sync docs to bluejutzu/docs
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/glua/**"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: sync-docs
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          sparse-checkout: docs/glua
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Bluejutzu/docs
+          token: ${{ secrets.DOCS_SYNC_TOKEN }}
+          path: docs-hub
+
+      # DOCS_SYNC_TOKEN is a fine-grained PAT scoped to Bluejutzu/docs with
+      # Contents: Read and write. See CONTRIBUTING.md in that repo.
+      - name: Replace the glua folder
+        run: |
+          rm -rf docs-hub/glua
+          cp -r source/docs/glua docs-hub/glua
+
+      - name: Commit and push if changed
+        working-directory: docs-hub
+        run: |
+          git config user.name "glua-docs-sync[bot]"
+          git config user.email "actions@users.noreply.github.com"
+          git add glua
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+          git commit -m "sync glua docs from Bluejutzu/glua-lsp@${GITHUB_SHA::7}"
+          git push

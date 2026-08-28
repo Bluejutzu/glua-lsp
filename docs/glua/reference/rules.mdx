@@ -9,7 +9,7 @@ GLua ships with built-in diagnostics that catch common mistakes in Garry's Mod L
 
 Each rule has two names, and they are not the same thing:
 
-- a **diagnostic code** such as `net-payload-mismatch`, shown in the Problems panel and used by [inline suppressions](/configuration/suppressions)
+- a **diagnostic code** such as `net-payload-mismatch`, shown in the Problems panel and used by [inline suppressions](/glua/configuration/suppressions)
 - a **settings key** such as `netReadWriteMismatch`, used in `.glua.json` and in VS Code settings
 
 Severity accepts `error`, `warning`, `information`, `hint` or `off`.
@@ -36,7 +36,7 @@ if DarkRP and DarkRP.getPhrase then
 end
 ```
 
-For a hard dependency, declare it under [`globals`](/configuration/config-files)
+For a hard dependency, declare it under [`globals`](/glua/configuration/config-files)
 rather than turning the rule off — that keeps the check working for real typos.
 
 ### `global-write`
@@ -168,7 +168,7 @@ calls and two files away from its hook still explains itself.
 
 Calls behind a `CurTime()` guard, a `nextThink`-style field, or a one-time
 `if not x then` gate are skipped, since those already rate-limit themselves.
-[Full description](/features/hot-paths).
+[Full description](/glua/features/hot-paths).
 
 ## Dead code
 
@@ -201,7 +201,7 @@ A material, model or sound path that does not exist. Missing content never
 raises a Lua error — it renders as the checkerboard, the error model, or
 silence — which is exactly why a typo here can survive a long time.
 
-Requires [`workspace.gamePath`](/configuration/config-files), and **off by
+Requires [`workspace.gamePath`](/glua/configuration/config-files), and **off by
 default on purpose**: content mounted from the Workshop or a separate content
 pack is invisible from here, so on a typical server most findings would be
 wrong. Turn it on only if every asset you reference ships in this repository.
@@ -277,7 +277,7 @@ above. Each accepts `error`, `warning`, `information`, `hint` or `off`.
 ```
 
 <Info>
-  Omitted rules keep their built-in default, so you only list what you want to change. The [hosted JSON schema](/reference/glua-schema) validates these keys as you type — an unknown key is flagged in the editor.
+  Omitted rules keep their built-in default, so you only list what you want to change. The [hosted JSON schema](/glua/reference/glua-schema) validates these keys as you type — an unknown key is flagged in the editor.
 </Info>
 
 <Warning>

@@ -17,7 +17,7 @@ export interface RuleInfo {
 }
 
 /** Where the published documentation lives. */
-export const DOCS_BASE = 'https://glua.bluejutzu.dev';
+export const DOCS_BASE = 'https://docs.bluejutzu.dev/glua';
 
 /**
  * The page section explaining a rule.

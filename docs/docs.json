@@ -22,37 +22,37 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": ["index", "installation", "quickstart"]
+            "pages": ["glua/index", "glua/installation", "glua/quickstart"]
           },
           {
             "group": "Features",
             "pages": [
-              "features/intellisense",
-              "features/typing-your-code",
-              "features/realms",
-              "features/net-messages",
-              "features/hooks",
-              "features/assets",
-              "features/hot-paths",
-              "features/report"
+              "glua/features/intellisense",
+              "glua/features/typing-your-code",
+              "glua/features/realms",
+              "glua/features/net-messages",
+              "glua/features/hooks",
+              "glua/features/assets",
+              "glua/features/hot-paths",
+              "glua/features/report"
             ]
           },
           {
             "group": "Formatting",
-            "pages": ["features/formatter"]
+            "pages": ["glua/features/formatter"]
           },
           {
             "group": "Configuration",
             "pages": [
-              "configuration/overview",
-              "configuration/config-files",
-              "configuration/frameworks",
-              "configuration/suppressions"
+              "glua/configuration/overview",
+              "glua/configuration/config-files",
+              "glua/configuration/frameworks",
+              "glua/configuration/suppressions"
             ]
           },
           {
             "group": "Changelog",
-            "pages": ["changelog", "cli-changelog"]
+            "pages": ["glua/changelog", "glua/cli-changelog"]
           }
         ]
       },
@@ -61,23 +61,23 @@
         "groups": [
           {
             "group": "Language",
-            "pages": ["reference/rules", "reference/annotations"]
+            "pages": ["glua/reference/rules", "glua/reference/annotations"]
           },
           {
             "group": "Config Schemas",
             "pages": [
-              "reference/glua-schema",
-              "reference/gluafmtrc-schema",
-              "reference/baseline-schema"
+              "glua/reference/glua-schema",
+              "glua/reference/gluafmtrc-schema",
+              "glua/reference/baseline-schema"
             ]
           },
           {
             "group": "Tools",
             "pages": [
-              "reference/commands",
-              "reference/cli",
-              "reference/editors",
-              "reference/performance"
+              "glua/reference/commands",
+              "glua/reference/cli",
+              "glua/reference/editors",
+              "glua/reference/performance"
             ]
           }
         ]
@@ -87,11 +87,11 @@
         "groups": [
           {
             "group": "Internals",
-            "pages": ["contributing/architecture", "contributing/development"]
+            "pages": ["glua/contributing/architecture", "glua/contributing/development"]
           },
           {
             "group": "Maintaining",
-            "pages": ["contributing/publishing"]
+            "pages": ["glua/contributing/publishing"]
           }
         ]
       }

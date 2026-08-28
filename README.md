@@ -13,7 +13,7 @@ Backed by 5,586 API entries scraped from the Garry's Mod wiki, plus an index of
 your own workspace. Nothing is fetched at runtime.
 
 [Install](#install) · [Quick start](#quick-start) ·
-[Documentation](https://glua.bluejutzu.dev) ·
+[Documentation](https://docs.bluejutzu.dev/glua) ·
 [Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest)
 
 ## Install
@@ -41,7 +41,7 @@ Every push to `main` also attaches a build to its
 want a fix before it is tagged.
 
 Full instructions, including building from source:
-**[glua.bluejutzu.dev/installation](https://glua.bluejutzu.dev/installation)**
+**[docs.bluejutzu.dev/glua/installation](https://docs.bluejutzu.dev/glua/installation)**
 
 ## Quick start
 
@@ -78,7 +78,7 @@ And a committed config, so your team shares one set of rules — run
 from whatever you already have set.
 
 A longer tour, with the net message and realm checks in context:
-**[glua.bluejutzu.dev/quickstart](https://glua.bluejutzu.dev/quickstart)**
+**[docs.bluejutzu.dev/glua/quickstart](https://docs.bluejutzu.dev/glua/quickstart)**
 
 ## Features
 
@@ -304,7 +304,7 @@ glua fmt lua/ --check
 pull request. `--format sarif` writes SARIF 2.1.0 for GitHub code scanning,
 which gives findings a history and somewhere to be dismissed rather than a log
 line that disappears with the run.
-[Full reference](https://glua.bluejutzu.dev/reference/cli).
+[Full reference](https://docs.bluejutzu.dev/glua/reference/cli).
 
 ## Configuration
 

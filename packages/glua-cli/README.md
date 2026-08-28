@@ -2,7 +2,7 @@
 
 Lint and format Garry's Mod Lua from the command line, using the same parser,
 analyser and formatter as the
-[GLua language server](https://glua.bluejutzu.dev) — so a finding in CI is the
+[GLua language server](https://docs.bluejutzu.dev/glua) — so a finding in CI is the
 same finding you saw in the editor.
 
 ```bash
@@ -52,7 +52,7 @@ is the key you set in `.glua.json`.
 Reads the same files as the editor: `.glua.json`, `.gluafmtrc.json`,
 `.editorconfig` and `.prettierrc`, resolved from `--root` or the working
 directory. See the
-[configuration guide](https://glua.bluejutzu.dev/configuration/overview).
+[configuration guide](https://docs.bluejutzu.dev/glua/configuration/overview).
 
 ## In CI
 

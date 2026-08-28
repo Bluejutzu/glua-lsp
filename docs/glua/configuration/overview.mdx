@@ -8,15 +8,15 @@ icon: "sliders"
 Configuration lives in three places: your editor settings for personal preferences, a committed config file for anything the whole team needs to agree on, and inline suppressions for a single line the rule got wrong. Higher layers win when the same option is set in more than one.
 
 <CardGroup cols={3}>
-  <Card title="Committed config files" icon="file-code" href="/configuration/config-files">
+  <Card title="Committed config files" icon="file-code" href="/glua/configuration/config-files">
     Share linter and formatter settings with `.glua.json` and `.gluafmtrc.json`.
   </Card>
 
-  <Card title="Inline suppressions" icon="message-square-x" href="/configuration/suppressions">
+  <Card title="Inline suppressions" icon="message-square-x" href="/glua/configuration/suppressions">
     Silence a specific diagnostic on a single line or block without changing global rules.
   </Card>
 
-  <Card title="Diagnostic rules" icon="list" href="/reference/rules">
+  <Card title="Diagnostic rules" icon="list" href="/glua/reference/rules">
     Browse every diagnostic rule the linter can enforce or ignore.
   </Card>
 </CardGroup>
@@ -32,7 +32,7 @@ Lowest to highest. The last one to set an option wins.
 5. `.glua.json` (linter)
 6. `.gluafmtrc.json` (formatter)
 
-[Inline suppressions](/configuration/suppressions) sit outside this chain. They do not change a rule's severity; they hide individual findings from a rule that is otherwise still running.
+[Inline suppressions](/glua/configuration/suppressions) sit outside this chain. They do not change a rule's severity; they hide individual findings from a rule that is otherwise still running.
 
 <Note>
   `.editorconfig` and `.prettierrc` are read so a project that already has them does not repeat itself. Where they disagree with `.glua.json` or `.gluafmtrc.json`, the GLua-specific file wins.
