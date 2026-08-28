@@ -69,7 +69,7 @@ if (
       `Your editor starts this, not you. Point an LSP client at:\n\n` +
       `  glua-lsp --stdio\n\n` +
       `Setting that up in Neovim, Helix, Zed and others:\n` +
-      `  https://glua.bluejutzu.dev/reference/editors\n\n` +
+      `  https://docs.bluejutzu.dev/glua/reference/editors\n\n` +
       `To lint or format from a terminal, use \`glua\` instead.\n`,
   );
   process.exit(help ? 0 : 1);

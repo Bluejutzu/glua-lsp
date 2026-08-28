@@ -33,7 +33,7 @@ git push origin main --follow-tags
 annotated `v<version>` tag. Pushing the tag runs the release workflow:
 typecheck, test, build, package, GitHub release, then publish. It also rolls
 `CHANGELOG.md`'s `Unreleased` section into the new version and regenerates the
-docs [changelog page](/changelog) from it, so the two never drift apart.
+docs [changelog page](/glua/changelog) from it, so the two never drift apart.
 
 <Note>
   The workflow refuses to build when the tag and the manifest version disagree.

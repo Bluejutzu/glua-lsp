@@ -13,7 +13,7 @@ Everything the extension does from the Command Palette. Reach for these to inspe
 | `GLua: Create Linter Config File` | Writes a `.glua.json` file into the workspace root using your current settings as the baseline. Edit the file afterward to tune rule severity. |
 | `GLua: Create Formatter Config File` | Writes a `.gluafmtrc.json` file into the workspace root using your current formatter settings as the baseline. |
 | `GLua: Re-index Workspace` | Forces a full rescan of the workspace. Reach for this after large disk changes (for example, switching Git branches or bulk file moves) when the incremental watcher may have missed events. |
-| `GLua: Project Report` | Opens a [whole-project health report](/features/report) — net message health, collisions, unknown globals, and the files worth looking at. |
+| `GLua: Project Report` | Opens a [whole-project health report](/glua/features/report) — net message health, collisions, unknown globals, and the files worth looking at. |
 | `GLua: Open Settings` | Opens the GLua settings page in the VS Code Settings UI. |
 | `GLua: Check Whole Workspace` | Reports problems in every indexed file, not just the ones you have open. Set `glua.diagnostics.scope` to `workspace` to do this automatically after indexing. |
 | `GLua: Clear Workspace Problems` | Clears reported problems for files that are not open. |
@@ -27,13 +27,13 @@ Counts appear above the things whose other half lives in another file — a `net
 
 ## Call hierarchy
 
-Put the cursor on a function and open the call hierarchy — **Shift\+Alt\+H** in VS Code, or `Show Call Hierarchy` from the Command Palette — to see who calls it across the workspace, or switch the tree to outgoing calls to see what it reaches. Callbacks are named after what registers them, so a chain ending in a render hook says so, which is the same graph the [hot path rule](/features/hot-paths) walks.
+Put the cursor on a function and open the call hierarchy — **Shift\+Alt\+H** in VS Code, or `Show Call Hierarchy` from the Command Palette — to see who calls it across the workspace, or switch the tree to outgoing calls to see what it reaches. Callbacks are named after what registers them, so a chain ending in a render hook says so, which is the same graph the [hot path rule](/glua/features/hot-paths) walks.
 
 Calls made through a value rather than a name — a function passed in as an argument, or stored in a table and looked up at runtime — are left out rather than guessed at.
 
 ## Outside the editor
 
-Everything the linter and formatter do is also available from the [command line](/reference/cli), which is how you run them in CI.
+Everything the linter and formatter do is also available from the [command line](/glua/reference/cli), which is how you run them in CI.
 
 <Tip>
   Command Palette: **Ctrl\+Shift\+P** on Windows/Linux, **Cmd\+Shift\+P** on macOS. Type `GLua:` to filter to these.

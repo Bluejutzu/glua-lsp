@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Regenerates docs/changelog.mdx and docs/cli-changelog.mdx from each
+// Regenerates docs/glua/changelog.mdx and docs/glua/cli-changelog.mdx from each
 // package's own CHANGELOG.md. Run standalone with `pnpm run docs:changelog`,
 // or via `pnpm run release`, which calls this automatically so the docs
 // can't drift from what actually shipped.
@@ -24,20 +24,20 @@ const PAGES = [
   {
     manifest: path.join(ROOT, 'packages', 'glua-lsp', 'package.json'),
     changelog: path.join(ROOT, 'packages', 'glua-lsp', 'CHANGELOG.md'),
-    out: path.join(ROOT, 'docs', 'changelog.mdx'),
+    out: path.join(ROOT, 'docs', 'glua', 'changelog.mdx'),
     newTagPrefix: 'glua-gmod@',
     title: 'glua-gmod',
     description: "Notable changes to the GLua for Garry's Mod extension, release by release.",
-    crossLink: { path: '/cli-changelog', label: 'glua-cli' },
+    crossLink: { path: '/glua/cli-changelog', label: 'glua-cli' },
   },
   {
     manifest: path.join(ROOT, 'packages', 'glua-cli', 'package.json'),
     changelog: path.join(ROOT, 'packages', 'glua-cli', 'CHANGELOG.md'),
-    out: path.join(ROOT, 'docs', 'cli-changelog.mdx'),
+    out: path.join(ROOT, 'docs', 'glua', 'cli-changelog.mdx'),
     newTagPrefix: 'glua-cli@',
     title: 'glua-cli',
     description: 'Notable changes to the glua-cli command-line tool, release by release.',
-    crossLink: { path: '/changelog', label: 'glua-gmod' },
+    crossLink: { path: '/glua/changelog', label: 'glua-gmod' },
   },
 ];
 

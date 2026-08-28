@@ -72,7 +72,7 @@ export function writeBaseline(root: string, tally: Tally): void {
   }
 
   const contents: BaselineFile = {
-    $schema: 'https://glua.bluejutzu.dev/schemas/baseline.schema.json',
+    $schema: 'https://docs.bluejutzu.dev/glua/schemas/baseline.schema.json',
     generated: new Date().toISOString(),
     files,
   };

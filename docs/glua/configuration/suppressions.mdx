@@ -14,7 +14,7 @@ GLua recognizes several suppression styles in Lua comments.
 Suppressions take a **diagnostic code** — the kebab-case name shown in the
 Problems panel, such as `unused-local`. That is not the same as the camelCase
 settings key (`unusedLocal`) you would use in `.glua.json`. See the
-[rule reference](/reference/rules) for both names.
+[rule reference](/glua/reference/rules) for both names.
 
 ```lua
 -- Suppress all rules on the next line
@@ -50,7 +50,7 @@ end
 
 A suppression outlives the finding it was written for: the code gets fixed, the
 comment stays, and from then on it silently covers whatever appears on that line
-next. [`unused-suppression`](/reference/rules#unused-suppression) reports the
+next. [`unused-suppression`](/glua/reference/rules#unused-suppression) reports the
 ones that never silenced anything.
 
 <Warning>
@@ -84,6 +84,6 @@ local shared = {}
 ## Not a suppression: `-- glua-format-ignore`
 
 These comments silence diagnostics. The formatter has its own directive,
-[`-- glua-format-ignore`](/features/formatter#leaving-code-alone), which leaves
+[`-- glua-format-ignore`](/glua/features/formatter#leaving-code-alone), which leaves
 the statement below it exactly as written. They are unrelated: suppressing a
 rule does not stop the formatter, and a format-ignore does not silence anything.

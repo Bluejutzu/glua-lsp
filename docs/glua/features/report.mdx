@@ -85,14 +85,14 @@ glua doctor --max-findings 0
 
   <Card title="Unknown globals" icon="circle-question">
     Ranked by how often each is used. A name near the top is usually a
-    [framework you have not pointed at](/configuration/frameworks) rather than a
+    [framework you have not pointed at](/glua/configuration/frameworks) rather than a
     typo.
   </Card>
 
   <Card title="Hot paths" icon="gauge-high">
     Expensive work the engine reaches from something it runs every frame or
     tick, furthest from its entry point first, since those are the ones nobody
-    finds by reading one file. See [hot paths](/features/hot-paths).
+    finds by reading one file. See [hot paths](/glua/features/hot-paths).
   </Card>
 
   <Card title="Never called" icon="ghost">
@@ -115,7 +115,7 @@ glua doctor --max-findings 0
 
 ## Frameworks are not counted
 
-If you have pointed at a [framework's source](/configuration/frameworks), its
+If you have pointed at a [framework's source](/glua/configuration/frameworks), its
 files are indexed but excluded from every total here. A hook only ULib fires, an
 entity only DarkRP ships, or two of a dependency's own registrations clashing
 with each other are not this project's, and putting them in a report about your

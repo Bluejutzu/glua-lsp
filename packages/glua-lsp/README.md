@@ -4,9 +4,9 @@ Language support for Garry's Mod Lua: IntelliSense that follows your values,
 diagnostics that catch realm and net message bugs before you launch the game,
 and a formatter.
 
-[Documentation](https://glua.bluejutzu.dev) ·
-[Installation](https://glua.bluejutzu.dev/installation) ·
-[Quick start](https://glua.bluejutzu.dev/quickstart) ·
+[Documentation](https://docs.bluejutzu.dev/glua) ·
+[Installation](https://docs.bluejutzu.dev/glua/installation) ·
+[Quick start](https://docs.bluejutzu.dev/glua/quickstart) ·
 [Source](https://github.com/Bluejutzu/glua-lsp) ·
 [Releases](https://github.com/Bluejutzu/glua-lsp/releases/latest)
 
@@ -85,8 +85,8 @@ Individual findings can be suppressed inline:
 local placeholder = nil
 ```
 
-[Configuration guide →](https://glua.bluejutzu.dev/configuration/overview)
-· [Rule reference →](https://glua.bluejutzu.dev/reference/rules)
+[Configuration guide →](https://docs.bluejutzu.dev/glua/configuration/overview)
+· [Rule reference →](https://docs.bluejutzu.dev/glua/reference/rules)
 
 ## Prior art
 

@@ -17,7 +17,7 @@ npm install -g glua-cli
 ```
 
 That puts two commands on your path: `glua` for [linting and
-formatting](/reference/cli), and `glua-lsp` for the language server. The wiki
+formatting](/glua/reference/cli), and `glua-lsp` for the language server. The wiki
 dataset is bundled, so neither needs a network connection.
 
 Check it starts:
@@ -107,10 +107,10 @@ glua-lsp --stdio
 
 Editors that support `workspace/configuration` can send the same settings the
 VS Code extension uses, under the `glua` key. Everything on the
-[configuration page](/configuration/overview) applies.
+[configuration page](/glua/configuration/overview) applies.
 
 If your client does not send configuration, the server falls back to its
-defaults, and a committed [`.glua.json`](/configuration/config-files) still
+defaults, and a committed [`.glua.json`](/glua/configuration/config-files) still
 works — it is read from disk rather than from the editor.
 
 ## Fixing on save

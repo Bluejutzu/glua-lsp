@@ -67,13 +67,13 @@ test('the documentation has pages to check', () => {
 });
 
 /**
- * Generated configs point `$schema` at https://glua.bluejutzu.dev/schemas/,
+ * Generated configs point `$schema` at https://docs.bluejutzu.dev/glua/schemas/,
  * which Mintlify serves straight from docs/schemas. Nothing rebuilds that
  * copy automatically, so a schema change here would otherwise ship silently
  * out of sync with what the hosted URL actually returns.
  */
 test('docs/schemas is the same as the schemas we ship', () => {
-  const DOCS_SCHEMAS = path.join(DOCS, 'schemas');
+  const DOCS_SCHEMAS = path.join(DOCS, 'glua', 'schemas');
   for (const name of fs.readdirSync(SCHEMAS)) {
     const shipped = fs.readFileSync(path.join(SCHEMAS, name), 'utf8');
     const hosted = fs.readFileSync(path.join(DOCS_SCHEMAS, name), 'utf8');
@@ -222,7 +222,7 @@ test('every rule has a catalogue entry and a section to link to', () => {
   const catalogue = fs.readFileSync(path.join(CORE, 'src', 'rules.ts'), 'utf8');
   const listed = [...catalogue.matchAll(/code: '([a-z][a-z-]+)'/g)].map((m) => m[1]);
 
-  const page = fs.readFileSync(path.join(DOCS, 'reference', 'rules.mdx'), 'utf8');
+  const page = fs.readFileSync(path.join(DOCS, 'glua', 'reference', 'rules.mdx'), 'utf8');
   // The anchor Mintlify generates for `### \`some-code\`` is `some-code`.
   const sections = [...page.matchAll(/^#{2,3} `([a-z][a-z-]+)`\s*$/gm)].map((m) => m[1]);
 

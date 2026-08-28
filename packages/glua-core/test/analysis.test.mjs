@@ -218,7 +218,7 @@ test('every diagnostic carries a link to the rule that produced it', () => {
   for (const diagnostic of found) {
     assert.equal(
       diagnostic.codeDescription?.href,
-      `https://glua.bluejutzu.dev/reference/rules#${diagnostic.code}`,
+      `https://docs.bluejutzu.dev/glua/reference/rules#${diagnostic.code}`,
       `no rule link on ${diagnostic.code}`,
     );
   }

@@ -159,7 +159,7 @@ jobs:
             echo
             echo "In the editor instead: **Extensions** → the \`···\` menu → **Install from VSIX…**"
             echo
-            echo "📖 [Full installation guide](https://glua.bluejutzu.dev/installation) · [Documentation](https://glua.bluejutzu.dev) · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-lsp/CHANGELOG.md)"
+            echo "📖 [Full installation guide](https://docs.bluejutzu.dev/glua/installation) · [Documentation](https://docs.bluejutzu.dev/glua) · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-lsp/CHANGELOG.md)"
             echo
             echo "## What's Changed"
             echo
@@ -326,7 +326,7 @@ jobs:
             echo
             echo "Gives you the \`glua\` and \`glua-lsp\` binaries — the latter is the same language server the VS Code extension runs, for any editor with an LSP client."
             echo
-            echo "📖 [Documentation](https://glua.bluejutzu.dev) · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-cli/CHANGELOG.md)"
+            echo "📖 [Documentation](https://docs.bluejutzu.dev/glua) · [Changelog](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/packages/glua-cli/CHANGELOG.md)"
             echo
             echo "## What's Changed"
             echo
