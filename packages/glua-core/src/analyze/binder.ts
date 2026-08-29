@@ -766,6 +766,27 @@ export function analyseFile(
     globalDefs.push(def);
   }
 
+  /**
+   * `Handler.foo = ...` / `function Handler:foo() end` on a local table.
+   *
+   * Globals get member tracking for free from `globalDefs` and the workspace's
+   * cross-file index, but a `local Handler = {}` module/OOP table is invisible
+   * to that system — its members only ever live in the `TableConstructor`
+   * literal. Mutating the table's own `members` map here is what makes
+   * `Handler.` / `Handler:` completion (and argument-type checking) see
+   * methods and fields added after the initial `{}`.
+   */
+  function recordLocalMember(target: Expression, valueType: GType, scope: Scope): void {
+    if (target.type !== 'MemberExpression' || target.identifier.missing) return;
+    const rootId = rootIdentifier(target);
+    if (!rootId || !scope.lookup(rootId.name, rootId.start)) return; // handled as a global instead
+
+    const baseType = inferType(target.base, scope);
+    if (baseType.kind !== 'table' || baseType.library || baseType.hookTable || baseType.struct) return;
+    if (!baseType.members) baseType.members = new Map();
+    baseType.members.set(target.identifier.name, valueType);
+  }
+
   function recordCallFacts(call: Extract<Expression, { type: 'CallExpression' }>, scope: Scope): void {
     const path = exprToPath(call.base);
     if (!path) return;
@@ -1228,6 +1249,7 @@ export function analyseFile(
           } else {
             bindExpression(target, scope);
             recordGlobal(target, valueType, { start: stat.start, end: stat.end }, doc);
+            recordLocalMember(target, valueType, scope);
           }
 
           if (value?.type === 'FunctionExpression') {
@@ -1265,6 +1287,11 @@ export function analyseFile(
           bindExpression(target.base, scope);
           if (target.indexer === ':') selfType = selfTypeFor(target.base, scope);
           paramTypes = hookParamsFor(target);
+          recordLocalMember(
+            target,
+            { kind: 'function', node: stat.func, name: exprToPath(target) ?? undefined },
+            scope,
+          );
         } else if (target?.type === 'Identifier') {
           const local = scope.lookup(target.name, target.start);
           if (local) {

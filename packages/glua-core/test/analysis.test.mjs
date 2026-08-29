@@ -125,6 +125,104 @@ frame:|
   assert.ok(names.includes('SetSize'), 'inherited Panel:SetSize should be offered');
 });
 
+test('function Handler:Method() on a local table is visible via both : and . access', () => {
+  const dotFixture = withCursor(`
+local Handler = {}
+
+function Handler:DoSomething(x)
+  return x
+end
+
+function Handler.Static()
+end
+
+Handler.Version = 1
+
+Handler.|
+`);
+  {
+    const { workspace, analyses } = makeWorkspace({ 'lua/autorun/sh_handler_dot.lua': dotFixture.text });
+    const analysis = analyses['lua/autorun/sh_handler_dot.lua'];
+    const names = labels(
+      completion(analysis, analysis.lines.positionAt(dotFixture.offset), deps(workspace)),
+    );
+    assert.ok(names.includes('DoSomething'), 'colon-defined method should complete on Handler.');
+    assert.ok(names.includes('Static'), 'dot-defined function should complete on Handler.');
+    assert.ok(names.includes('Version'), 'plain field assignment should complete on Handler.');
+  }
+
+  const colonFixture = withCursor(`
+local Handler = {}
+
+function Handler:DoSomething(x)
+  return x
+end
+
+Handler:|
+`);
+  {
+    const { workspace, analyses } = makeWorkspace({ 'lua/autorun/sh_handler_colon.lua': colonFixture.text });
+    const analysis = analyses['lua/autorun/sh_handler_colon.lua'];
+    const names = labels(
+      completion(analysis, analysis.lines.positionAt(colonFixture.offset), deps(workspace)),
+    );
+    assert.ok(names.includes('DoSomething'), 'colon-defined method should complete on Handler:');
+  }
+});
+
+test('self inside a local module method sees sibling methods defined later in the file', () => {
+  const { text, offset } = withCursor(`
+local Handler = {}
+
+function Handler:First()
+  self:|
+end
+
+function Handler:Second()
+end
+`);
+  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/sh_handler_self.lua': text });
+  const analysis = analyses['lua/autorun/sh_handler_self.lua'];
+
+  const names = labels(completion(analysis, analysis.lines.positionAt(offset), deps(workspace)));
+  assert.ok(names.includes('Second'), 'self should see a sibling method defined later in the same file');
+  assert.ok(names.includes('First'), 'self should see its own method');
+});
+
+test('control-structure snippets carry tab stops for their editable parts', () => {
+  const { text, offset } = withCursor('|');
+  const { workspace, analyses } = makeWorkspace({ 'lua/autorun/sh_snippets.lua': text });
+  const analysis = analyses['lua/autorun/sh_snippets.lua'];
+
+  const items = completion(analysis, analysis.lines.positionAt(offset), deps(workspace)).items;
+  // Several plain keywords (e.g. "function") share a label with their snippet
+  // counterpart; the snippet is the one carrying an insertTextFormat.
+  const byLabel = (label) => items.find((item) => item.label === label && item.insertTextFormat === 2);
+
+  const fn = byLabel('function');
+  assert.ok(fn, 'a plain function snippet should be offered');
+  assert.equal(fn.insertTextFormat, 2, 'InsertTextFormat.Snippet');
+  assert.match(fn.insertText, /^function \$\{1:name\}\(\$\{2:args\}\)\n\t\$0\nend$/);
+
+  const method = byLabel('function (method)');
+  assert.ok(method, 'a Table:Method() stub should be offered for OOP-style definitions');
+  assert.match(method.insertText, /function \$\{1:Table\}:\$\{2:MethodName\}\(\$\{3:args\}\)\n\t\$0\nend/);
+
+  const ifSnippet = byLabel('if');
+  assert.ok(ifSnippet);
+  assert.match(ifSnippet.insertText, /if \$\{1:condition\} then\n\t\$0\nend/);
+
+  const forPairs = byLabel('for in pairs');
+  assert.ok(forPairs);
+  assert.match(forPairs.insertText, /for \$\{1:key\}, \$\{2:value\} in pairs\(\$\{3:tbl\}\) do/);
+
+  const cls = byLabel('class (module table)');
+  assert.ok(cls, 'the module/class boilerplate snippet should be offered');
+  // Same tabstop repeated across the class name, __index and constructor lines
+  // so editing it once renames every occurrence together.
+  assert.equal((cls.insertText.match(/\$\{1:ClassName\}/g) ?? []).length, 6);
+});
+
 test('completion still works on the line being typed, mid-expression', () => {
   // No closing paren, no `end` — exactly the state the old extension chokes on.
   const { text, offset } = withCursor(`
