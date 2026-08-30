@@ -10,7 +10,15 @@ changed for you — see the [full history on GitHub](https://github.com/Bluejutz
 
 glua-gmod and [glua-cli](/glua/cli-changelog) version and release independently — this page only covers glua-gmod.
 
-<Update label="0.6.0 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/glua-gmod@0.6.0">View release on GitHub ↗</a>}>
+<Update label="0.6.1 (latest)" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/glua-gmod@0.6.1">View release on GitHub ↗</a>}>
+**Patch Changes**
+
+- 803c677: Local module/OOP tables (`local Handler = {}` with `function Handler:Method()` or `Handler.field = ...`) now get completion, hover and argument-type checking for methods and fields added after the initial `{}` — previously only genuine globals tracked this. `self` inside such a method also sees sibling methods defined later in the same file.
+  
+  Added snippet completions with proper tab stops for `function`, `function Table:Method()`, `if`/`if-else`, numeric and generic `for`, `while`, `repeat`, and a `class (module table)` boilerplate for the GLua module pattern — similar to how `rfce`-style snippets pre-place the cursor on the parts you're expected to edit.
+</Update>
+
+<Update label="0.6.0" description={<a href="https://github.com/Bluejutzu/glua-lsp/releases/tag/glua-gmod@0.6.0">View release on GitHub ↗</a>}>
 **Minor Changes**
 
 - e38b80a: The extension and CLI now release independently — a change to one no longer bumps the other's version or changelog.

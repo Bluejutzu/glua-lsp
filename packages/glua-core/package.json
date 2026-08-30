@@ -1,7 +1,7 @@
 {
   "name": "glua-core",
   "private": true,
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Parser, analysis, formatter and LSP engine for Garry's Mod Lua — internal, consumed by glua-gmod and glua-cli.",
   "license": "MIT",
   "type": "commonjs",
