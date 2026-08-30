@@ -70,6 +70,65 @@ const SNIPPETS: { label: string; detail: string; body: string }[] = [
     detail: 'Bail out when an entity is invalid',
     body: 'if not IsValid(${1:ent}) then return end\n$0',
   },
+
+  /* ------------------------------------------------- control structures */
+
+  {
+    label: 'function',
+    detail: 'Function declaration',
+    body: 'function ${1:name}(${2:args})\n\t$0\nend',
+  },
+  {
+    label: 'function (method)',
+    detail: 'Method on a table — function Table:Method()',
+    body: 'function ${1:Table}:${2:MethodName}(${3:args})\n\t$0\nend',
+  },
+  {
+    label: 'if',
+    detail: 'if ... then ... end',
+    body: 'if ${1:condition} then\n\t$0\nend',
+  },
+  {
+    label: 'if / else',
+    detail: 'if ... then ... else ... end',
+    body: 'if ${1:condition} then\n\t$2\nelse\n\t$0\nend',
+  },
+  {
+    label: 'for',
+    detail: 'Numeric for loop',
+    body: 'for ${1:i} = ${2:1}, ${3:10} do\n\t$0\nend',
+  },
+  {
+    label: 'for in pairs',
+    detail: 'Generic for loop over a table',
+    body: 'for ${1:key}, ${2:value} in pairs(${3:tbl}) do\n\t$0\nend',
+  },
+  {
+    label: 'for in ipairs',
+    detail: 'Generic for loop over an array',
+    body: 'for ${1:index}, ${2:value} in ipairs(${3:tbl}) do\n\t$0\nend',
+  },
+  {
+    label: 'while',
+    detail: 'while ... do ... end',
+    body: 'while ${1:condition} do\n\t$0\nend',
+  },
+  {
+    label: 'repeat',
+    detail: 'repeat ... until ...',
+    body: 'repeat\n\t$0\nuntil ${1:condition}',
+  },
+
+  /* --------------------------------------------------------------- OOP */
+
+  {
+    label: 'class (module table)',
+    detail: 'Local table with methods, a constructor and a metatable — the standard GLua "class"',
+    body:
+      'local ${1:ClassName} = {}\n${1:ClassName}.__index = ${1:ClassName}\n\n' +
+      'function ${1:ClassName}.new(${2:...})\n\tlocal self = setmetatable({}, ${1:ClassName})\n\t$0\n\treturn self\nend\n\n' +
+      'return ${1:ClassName}',
+  },
 ];
 
 export interface CompletionDeps {
